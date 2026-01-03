@@ -17,7 +17,7 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 };
 
 // --- VISUAL PULSE SYNC ---
-const PULSE_OFFSET = -0.1; // Adjust this to sync button pulse
+const PULSE_OFFSET = -0.05; // Adjust this to sync button pulse
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("random");
