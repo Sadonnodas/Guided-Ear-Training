@@ -57,8 +57,11 @@ export class AudioEngine {
 
   async loadBackingTracks(key: MusicalKey, drumFile: string) {
     if (!this.isInitialized) return;
-    const droneUrl = `/loops/drones/${key.toLowerCase()}_drone.mp3`;
-    const drumUrl = `/loops/drums/${drumFile}`;
+    
+    // Fix: Use BASE_URL from Vite env to respect 'base' config in vite.config.ts
+    const droneUrl = `${import.meta.env.BASE_URL}loops/drones/${key.toLowerCase()}_drone.mp3`;
+    const drumUrl = `${import.meta.env.BASE_URL}loops/drums/${drumFile}`;
+    
     try {
       this.dronePlayer.stop();
       this.drumPlayer.stop();
@@ -75,7 +78,10 @@ export class AudioEngine {
     const promises = uniqueIds.map(async (id) => {
       if (this.noteBuffers.has(id)) return;
       const degree = id.split('_')[0]; 
-      const url = `/samples/${degree}/${id}.mp3`;
+      
+      // Fix: Use BASE_URL here as well for samples
+      const url = `${import.meta.env.BASE_URL}samples/${degree}/${id}.mp3`;
+      
       try {
         const buffer = new Tone.ToneAudioBuffer();
         await buffer.load(url);
