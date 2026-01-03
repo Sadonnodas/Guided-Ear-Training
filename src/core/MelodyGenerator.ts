@@ -1,4 +1,5 @@
-import { getNoteForDegree } from "./MusicTheory";
+// Updated path: pointing to ../audio/MusicTheory instead of ./MusicTheory
+import { getNoteForDegree } from "../audio/MusicTheory";
 import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree } from "../types";
 
 interface GeneratorOptions {
@@ -7,7 +8,7 @@ interface GeneratorOptions {
   scaleType: ScaleType;
   startOnRoot: boolean;
   endOnRoot: boolean;
-  activeDegrees: ScaleDegree[]; // User selected degrees
+  activeDegrees: ScaleDegree[];
 }
 
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
@@ -23,7 +24,6 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
   if (startOnRoot && pool.includes("1")) {
     currentDegree = "1";
   } else {
-    // Pick random from active pool
     currentDegree = pool[Math.floor(Math.random() * pool.length)] as ScaleDegree;
   }
 
@@ -38,17 +38,16 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
         currentDegree = "1";
     }
 
-    // Create Event (Now passing lastMidi for voice leading)
+    // Create Event
     const event = createEvent(currentDegree, key, scaleType, currentBeat, duration, lastMidi);
     melody.push(event);
     
     currentBeat += duration;
-    lastMidi = event.noteInfo.midi; // Update history
+    lastMidi = event.noteInfo.midi; // Update history for voice leading
 
     // --- NEXT NOTE LOGIC ---
     if (i < length - 1) {
         // Pick next degree from POOL
-        // Simple random for now, but constrained to the pool
         const nextDegree = pool[Math.floor(Math.random() * pool.length)] as ScaleDegree;
         currentDegree = nextDegree;
     }
@@ -65,7 +64,6 @@ function createEvent(
   duration: number,
   prevMidi: number | null
 ): NoteEvent {
-  // Pass prevMidi to MusicTheory to choose best octave
   const info = getNoteForDegree(key, degree, scale, prevMidi);
   return {
     noteInfo: info,

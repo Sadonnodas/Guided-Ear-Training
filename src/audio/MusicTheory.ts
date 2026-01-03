@@ -48,21 +48,16 @@ export function getNoteForDegree(
   let targetMidi = rootMidi + interval;
 
   // --- SMART OCTAVE LOGIC ---
-  // If we have a previous note, try to stay close to it
   if (previousMidi !== null) {
     const candidates = [targetMidi - 12, targetMidi, targetMidi + 12];
-    
-    // Find valid candidates within range
     const valid = candidates.filter(m => m >= MIN_MIDI && m <= MAX_MIDI);
     
     if (valid.length > 0) {
-      // Pick closest
       targetMidi = valid.reduce((prev, curr) => 
         Math.abs(curr - previousMidi) < Math.abs(prev - previousMidi) ? curr : prev
       );
     }
   } else {
-    // First note: Center it
     if (targetMidi < 48) targetMidi += 12;
     if (targetMidi > 60) targetMidi -= 12;
   }
@@ -81,4 +76,45 @@ export function getNoteForDegree(
 
 export function getAvailableDegrees(scaleType: ScaleType): ScaleDegree[] {
   return SCALES[scaleType].degrees;
+}
+
+// --- VISUALIZER HELPERS ---
+
+/**
+ * Calculates the "linear index" of a note relative to the root.
+ * e.g. Root = 0, Next scale note up = 1, Scale note down = -1
+ */
+export function getScaleStepsFromRoot(midi: number, key: MusicalKey, scaleType: ScaleType): number {
+  const rootMidi = ROOT_MIDI[key];
+  const scaleDef = SCALES[scaleType];
+  const semitoneDiff = midi - rootMidi;
+  
+  // Calculate octaves and remainder (handling negative numbers correctly)
+  const octaves = Math.floor(semitoneDiff / 12);
+  const remainder = ((semitoneDiff % 12) + 12) % 12; 
+
+  // Find which scale step this remainder corresponds to
+  let stepIndex = scaleDef.intervals.indexOf(remainder);
+  
+  // If exact match not found (chromatic), find closest
+  if (stepIndex === -1) {
+    let minFn = 100;
+    scaleDef.intervals.forEach((val, idx) => {
+        const diff = Math.abs(val - remainder);
+        if (diff < minFn) { minFn = diff; stepIndex = idx; }
+    });
+  }
+
+  return (octaves * scaleDef.degrees.length) + stepIndex;
+}
+
+/**
+ * Gets the degree label (1-7) for a given linear step index
+ */
+export function getDegreeLabelFromStep(stepIndex: number, scaleType: ScaleType): string {
+    const scaleDef = SCALES[scaleType];
+    const len = scaleDef.degrees.length;
+    // Handle negative modulo
+    const wrappedIndex = ((stepIndex % len) + len) % len;
+    return scaleDef.degrees[wrappedIndex];
 }
