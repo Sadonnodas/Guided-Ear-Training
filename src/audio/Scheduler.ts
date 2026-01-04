@@ -14,10 +14,8 @@ export class Scheduler {
   private pulseEventId: number | null = null;
   private clickEventId: number | null = null;
   
-  // FIX: Explicitly declare property
   private callbacks: SchedulerCallbacks;
 
-  // FIX: Remove 'private' keyword from constructor argument
   constructor(callbacks: SchedulerCallbacks) {
     this.callbacks = callbacks;
   }
@@ -46,16 +44,21 @@ export class Scheduler {
     Tone.Transport.bpm.value = bpm;
   }
 
-  scheduleRoutine(notes: NoteEvent[], silentPractice: boolean, isFirstQuestion: boolean, onComplete: () => void): number {
+  // UPDATED: Now accepts 'calculatedMelodyDur'
+  scheduleRoutine(
+      notes: NoteEvent[], 
+      silentPractice: boolean, 
+      isFirstQuestion: boolean, 
+      onComplete: () => void,
+      calculatedMelodyDur: number // NEW PARAMETER
+  ): number {
     this.clearMelody();
     
-    // Ensure metronome/pulse keeps running if we are just queuing a new melody
     if (this.pulseEventId === null && Tone.Transport.state === 'started') {
         this.ensureSystemEvents();
     }
 
     const beatSec = 60 / Tone.Transport.bpm.value;
-    const melodyDur = 8 * beatSec;
     const measureSec = 4 * beatSec;
 
     // --- GRID ALIGNMENT ---
@@ -112,13 +115,14 @@ export class Scheduler {
 
     let cursor = startPoint;
     schedulePass(cursor, true); // Pass 1
-    cursor += melodyDur;
+    cursor += calculatedMelodyDur; // USE CALCULATED DURATION
+    
     schedulePass(cursor, true); // Pass 2
-    cursor += melodyDur;
+    cursor += calculatedMelodyDur;
     
     if (silentPractice) {
         schedulePass(cursor, false); // Pass 3
-        cursor += melodyDur;
+        cursor += calculatedMelodyDur;
     }
 
     schedule(() => setTimeout(() => onComplete(), 0), cursor);

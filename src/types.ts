@@ -23,10 +23,12 @@ export interface MelodyConstraints {
 }
 
 export interface TrainingStage {
-  duration: number; // Duration in seconds (relative to standard time)
+  duration: number; 
   label: string;
   constraints: MelodyConstraints;
-  questionsPerKey?: number; // NEW: How often to change key (undefined = infinite/no change)
+  questionsPerKey?: number; 
+  introSequence?: ScaleDegree[]; // The 1-6-6-1 pattern
+  scalePreview?: ScaleDegree[];  // NEW: The linear 1-2-3-4-5 pattern
 }
 
 export interface TrainingLevel {

@@ -77,9 +77,17 @@ export class AudioEngine {
     await this.backingTracks.load(key, drumFile);
   }
 
+  // --- UPDATED SCHEDULE ROUTINE TO FIX OVERLAP BUG ---
   scheduleRoutine(notes: NoteEvent[], silentPractice: boolean, isFirstQuestion: boolean, onComplete: () => void) {
     if (!this.isInitialized) return;
-    this.scheduler.scheduleRoutine(notes, silentPractice, isFirstQuestion, onComplete);
+    
+    // FIX: Calculate total duration of the melody in seconds
+    const beatSec = 60 / Tone.Transport.bpm.value;
+    const totalMelodyBeats = notes.reduce((sum, n) => sum + n.duration, 0);
+    const melodyDur = totalMelodyBeats * beatSec; 
+
+    // Send the calculated duration into the scheduler, NOT a hardcoded 8 beats
+    this.scheduler.scheduleRoutine(notes, silentPractice, isFirstQuestion, onComplete, melodyDur);
   }
 
   startPlayback() {
@@ -87,7 +95,7 @@ export class AudioEngine {
     this.setupMediaSession();
     if (this.silentHtmlAudio?.paused) this.silentHtmlAudio.play().catch(() => {});
     
-    // FIX 3: Prevent doubling. Only start tracks if Transport isn't already running.
+    // FIX 3: Prevent doubling
     if (Tone.Transport.state !== 'started') {
         this.backingTracks.start();
         this.scheduler.start();
@@ -116,7 +124,7 @@ export class AudioEngine {
   setDrumVol(v: number) { this.backingTracks?.setDrumVol(v); }
   setClickVol(v: number) { this.metronome?.setClickVol(v); }
   
-  // FIX 4: Store in pending state so it persists if called before init
+  // FIX 4: Store in pending state
   setMetronomeVol(v: number) { 
       this.pendingMetronomeVol = v;
       this.metronome?.setDebugVol(v); 

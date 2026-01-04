@@ -1,6 +1,7 @@
 import { getNoteForDegree } from "../audio/MusicTheory";
 import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints } from "../types";
 
+// --- EXISTING RANDOM GENERATOR ---
 interface GeneratorOptions {
   key: MusicalKey;
   scaleType: ScaleType;
@@ -64,6 +65,24 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
   return melody;
 }
 
+// --- NEW: FIXED PATTERN GENERATOR ---
+export function generateFixedPattern(pattern: ScaleDegree[], key: MusicalKey, scaleType: ScaleType): NoteEvent[] {
+    const melody: NoteEvent[] = [];
+    let currentBeat = 0;
+    let lastMidi: number | null = null;
+    
+    pattern.forEach(degree => {
+        const duration = 2; // Fixed Half Notes
+        const event = createEvent(degree, key, scaleType, currentBeat, duration, lastMidi);
+        melody.push(event);
+        currentBeat += duration;
+        lastMidi = event.noteInfo.midi;
+    });
+
+    return melody;
+}
+
+// --- HELPER ---
 function createEvent(
   degree: ScaleDegree, 
   key: MusicalKey, 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { audioEngine } from "./audio/AudioEngine";
-import { generateMelody } from "./core/MelodyGenerator";
+import { generateMelody, generateFixedPattern } from "./core/MelodyGenerator";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
 import { useTrainingMode } from "./hooks/useTrainingMode"; 
-import { MAJOR_LEVELS } from "./config/TrainingLevels"; 
+import { useAudioSetup } from "./hooks/useAudioSetup"; // NEW HOOK
 import type { MusicalKey, ScaleDegree, MelodyConstraints } from "./types";
 import "./App.css";
 
@@ -11,6 +11,7 @@ import "./App.css";
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import Controls from "./components/Controls/Controls";
+import TrainingHUD from "./components/TrainingHUD"; // NEW COMPONENT
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
@@ -52,11 +53,18 @@ export default function App() {
 
   // --- HOOKS ---
   const training = useTrainingMode(); 
+  
+  // REFACTORED: Audio Setup Logic moved to hook
+  const visualTimeoutRef = useRef<number>(0); 
+  useAudioSetup({
+    bpm, volMaster, volDrone, volGroove, volVoice, volClick, 
+    volReverb, debugClick, volMetronome, 
+    setTriggerPulse, setActiveMidi, visualTimeoutRef
+  });
 
   // --- REFS ---
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
-  const visualTimeoutRef = useRef<number>(0); 
   
   const startRootRef = useRef(startRoot);
   const endRootRef = useRef(endRoot);
@@ -65,6 +73,11 @@ export default function App() {
   const enabledDegreesRef = useRef(enabledDegrees);
   const activeTabRef = useRef(activeTab); 
 
+  // State Tracking for Training Sequences
+  const lastPlayedStageIndex = useRef<number>(-1);
+  const hasPlayedScalePreview = useRef(false);
+  const hasPlayedIntroSequence = useRef(false);
+
   // Sync Refs
   useEffect(() => { startRootRef.current = startRoot; }, [startRoot]);
   useEffect(() => { endRootRef.current = endRoot; }, [endRoot]);
@@ -72,31 +85,6 @@ export default function App() {
   useEffect(() => { questionsPerKeyRef.current = questionsPerKey; }, [questionsPerKey]);
   useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
-
-  useEffect(() => {
-    audioEngine.onNotePlay = (note, isClick) => {
-      if (isClick) return; 
-      if (note) {
-        setActiveMidi(note.noteInfo.midi);
-        if (visualTimeoutRef.current) clearTimeout(visualTimeoutRef.current);
-        const secPerBeat = 60 / bpm; 
-        const holdTime = (note.duration * secPerBeat * 1000) - 50; 
-        visualTimeoutRef.current = setTimeout(() => setActiveMidi(null), holdTime);
-      }
-    };
-    audioEngine.onBeat = (_) => { setTriggerPulse(p => !p); };
-
-    audioEngine.setMasterVol(volMaster);
-    audioEngine.setDroneVol(volDrone);
-    audioEngine.setDrumVol(volGroove);
-    audioEngine.setVocalVol(volVoice);
-    audioEngine.setClickVol(volClick);
-    audioEngine.setReverbMix(volReverb);
-    audioEngine.setBpm(bpm);
-    audioEngine.setDebugClick(debugClick);
-    audioEngine.setMetronomeVol(volMetronome);
-
-  }, [volMaster, volDrone, volGroove, volVoice, volClick, volReverb, bpm, debugClick, volMetronome]);
 
   useEffect(() => {
     if (activeMidi !== null) {
@@ -113,6 +101,7 @@ export default function App() {
 
   const toggleDegree = (d: ScaleDegree) => {
     if (activeTab !== 'random') return;
+    
     setEnabledDegrees(prev => {
         if (prev.includes(d)) {
             if (prev.length === 1) return prev; 
@@ -148,18 +137,18 @@ export default function App() {
     }
   };
 
-  // --- NEW: Safe Level Switching ---
   const handleLevelChange = (newLevelId: number) => {
       training.setActiveLevelId(newLevelId);
+      // Reset logic flags
+      lastPlayedStageIndex.current = -1; 
+      hasPlayedScalePreview.current = false;
+      hasPlayedIntroSequence.current = false;
       
-      // If playing, we must RESTART the session to:
-      // 1. Kill the old loop (prevents double audio)
-      // 2. Apply new level immediately (prevents stale constraints)
       if (isPlaying) {
-          audioEngine.reset(); // Stop Transport & Clear Schedules
-          training.resetTraining(); // Reset Timer
+          audioEngine.reset(); 
+          training.resetTraining(); 
           training.startTrainingTimer();
-          runCycle(currentKey, true); // Force new start
+          runCycle(currentKey, true); 
       }
   };
 
@@ -174,6 +163,11 @@ export default function App() {
         
         setIsPlaying(true);
         isPlayingRef.current = true;
+        
+        // Reset Logic Flags
+        lastPlayedStageIndex.current = -1;
+        hasPlayedScalePreview.current = false;
+        hasPlayedIntroSequence.current = false;
         
         if (activeTab === 'training') {
             training.startTrainingTimer();
@@ -196,26 +190,64 @@ export default function App() {
     setLastValidStep(0); 
   };
 
+  // --- THE MAIN LOOP ---
   const runCycle = async (keyToUse: MusicalKey, isFirst = false) => {
     if (!isPlayingRef.current) return;
     setActiveMidi(null);
     questionCount.current += 1;
     let nextKey = keyToUse;
 
-    // --- DETERMINE MODE & CONFIG ---
     let constraints: MelodyConstraints;
     let limitForModulation = 9999;
+    let noteEvents; 
+    let playSilent = false; // By default, don't play silent pass for Intros/Previews
 
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
         constraints = config.constraints;
         limitForModulation = config.questionsPerKey;
+        const stageIndex = config.stageIndex;
 
+        // UI Updates
         setEnabledDegrees(constraints.allowedDegrees);
         setStatus(`${training.stageLabel}`);
         setStartRoot(constraints.startDegree === '1');
         setEndRoot(constraints.endDegree === '1');
+
+        // --- NEW SEQUENCE LOGIC ---
+        
+        // 1. Detect Stage Change
+        if (stageIndex !== lastPlayedStageIndex.current) {
+            lastPlayedStageIndex.current = stageIndex;
+            hasPlayedScalePreview.current = false;
+            hasPlayedIntroSequence.current = false;
+        }
+
+        // 2. Priority 1: Scale Preview (One Shot)
+        if (config.scalePreview && !hasPlayedScalePreview.current) {
+            noteEvents = generateFixedPattern(config.scalePreview, nextKey, "Major");
+            setStatus(`Preview Notes: ${config.scalePreview.join("-")}`);
+            hasPlayedScalePreview.current = true; // Mark done
+        } 
+        // 3. Priority 2: Intro Sequence (One Shot)
+        else if (config.introSequence && !hasPlayedIntroSequence.current) {
+            noteEvents = generateFixedPattern(config.introSequence, nextKey, "Major");
+            setStatus(`Intro Pattern: ${config.introSequence.join("-")}`);
+            hasPlayedIntroSequence.current = true; // Mark done
+        }
+        // 4. Priority 3: Random Melody (Looping)
+        else {
+             noteEvents = generateMelody({
+                key: nextKey, 
+                scaleType: "Major",
+                constraints: constraints
+            });
+            // Only use silent practice for the main random loop
+            playSilent = false; // Force false in training for now, or use silentPracticeRef.current if you want
+        }
+
     } else {
+        // Random Mode Logic
         constraints = {
             allowedDegrees: enabledDegreesRef.current,
             startDegree: startRootRef.current ? "1" : undefined,
@@ -223,8 +255,14 @@ export default function App() {
             length: 4 
         };
         limitForModulation = questionsPerKeyRef.current; 
-        const isSilent = silentPracticeRef.current;
-        setStatus(isSilent ? "Listen & Repeat" : "Listen");
+        playSilent = silentPracticeRef.current;
+        setStatus(playSilent ? "Listen & Repeat" : "Listen");
+        
+        noteEvents = generateMelody({
+            key: nextKey, 
+            scaleType: "Major",
+            constraints: constraints
+        });
     }
 
     // --- MODULATION LOGIC ---
@@ -238,28 +276,13 @@ export default function App() {
         await new Promise(r => setTimeout(r, 2000));
     }
     
-    // GENERATE
-    const melody = generateMelody({
-        key: nextKey, 
-        scaleType: "Major",
-        constraints: constraints
-    });
+    await audioEngine.preloadNotes(noteEvents!);
     
-    await audioEngine.preloadNotes(melody);
-    
-    const isSilent = activeTabRef.current === 'random' ? silentPracticeRef.current : false;
-
-    audioEngine.scheduleRoutine(melody, isSilent, isFirst, () => {
+    audioEngine.scheduleRoutine(noteEvents!, playSilent, isFirst, () => {
         if (isPlayingRef.current) runCycle(nextKey, false);
     });
     
     audioEngine.startPlayback();
-  };
-
-  const formatTime = (s: number) => {
-      const mins = Math.floor(s / 60);
-      const secs = s % 60;
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -274,39 +297,16 @@ export default function App() {
           debugClick={debugClick} setDebugClick={setDebugClick}
         />
 
-        {/* TRAINING HUD */}
         {activeTab === 'training' && (
-            <div className="training-hud">
-                <div className="training-info">
-                   <div style={{fontWeight:'bold'}}>{training.stageLabel}</div>
-                   <div style={{fontSize: '0.9em', opacity: 0.8}}>
-                       {formatTime(training.sessionTime)} / {training.userDurationMinutes}:00
-                   </div>
-                </div>
-                
-                {/* LEVEL SELECTOR: Now uses handleLevelChange */}
-                <div style={{display:'flex', gap:'10px', marginTop:'10px', justifyContent:'center'}}>
-                   <select 
-                     value={training.activeLevelId} 
-                     onChange={(e) => handleLevelChange(Number(e.target.value))}
-                     className="key-select"
-                     style={{width: '100%'}}
-                   >
-                       {MAJOR_LEVELS.map(l => (
-                           <option key={l.id} value={l.id}>{l.name}</option>
-                       ))}
-                   </select>
-                </div>
-                
-                <div className="slider-row" style={{marginTop: '15px'}}>
-                    <span>Duration: {training.userDurationMinutes}m</span>
-                    <input 
-                        type="range" min="1" max="20" step="1"
-                        value={training.userDurationMinutes}
-                        onChange={(e) => training.setUserDurationMinutes(Number(e.target.value))}
-                    />
-                </div>
-            </div>
+          <TrainingHUD 
+            stageLabel={training.stageLabel}
+            sessionTime={training.sessionTime}
+            userDurationMinutes={training.userDurationMinutes}
+            setUserDurationMinutes={training.setUserDurationMinutes}
+            activeLevelId={training.activeLevelId}
+            setActiveLevelId={training.setActiveLevelId}
+            handleLevelChange={handleLevelChange}
+          />
         )}
 
         <Visualizer 
