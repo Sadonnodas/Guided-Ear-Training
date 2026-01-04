@@ -4,17 +4,26 @@
   height: 90px;
   margin: 30px 0; 
   overflow: hidden;
-  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  /* Remove global mask so Static View is clear */
   background: transparent;
   touch-action: pan-y; 
 }
 
+/* Apply fade mask ONLY to Tape View */
+.visualizer-container.tape {
+  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+
 .static-container {
     display: flex; 
-    gap: 15px; 
+    /* FIX: Gap 0 matches Tape View (cells touch) */
+    gap: 0; 
     justify-content: center; 
     margin: 20px 0;
+    width: 100%;
+    /* FIX: Force single line */
+    flex-wrap: nowrap;
 }
 
 .tape-strip {
@@ -27,10 +36,14 @@
   will-change: transform;
 }
 
+/* Shared Cell Styles */
 .tape-cell {
   width: 60px; 
   height: 60px;
-  flex-shrink: 0;
+  /* FIX: Allow shrinking on mobile */
+  flex-shrink: 1;
+  /* FIX: Prevent overflow breaking layout */
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,22 +77,31 @@
 .tape-cell.d-7 span { background: var(--c-7); }
 
 .tape-cell.active span {
-  transform: scale(1.25);
-  box-shadow: 0 0 30px currentColor; 
+  transform: scale(1.15);
+  box-shadow: 0 0 15px currentColor;
   opacity: 1;
-  z-index: 10;
   border: 2px solid white;
+  z-index: 10;
 }
 
 .tape-cell.disabled span {
-  background: #21262d !important; 
-  color: #484f58 !important; 
+  opacity: 0.2;
+  filter: grayscale(0.8);
   box-shadow: none;
-  opacity: 0.5;
 }
 
+/* --- MOBILE RESPONSIVE --- */
 @media (max-width: 600px) {
     .visualizer-container { height: 70px; }
-    .tape-cell { width: 50px; height: 50px; font-size: 0.9rem; }
-    .tape-cell span { width: 40px; height: 40px; }
+    
+    /* Slightly smaller font/circles on mobile if needed */
+    .tape-cell { font-size: 0.9rem; }
+    
+    /* If screen is extremely narrow, the flex-shrink above will handle the width, 
+       but we ensure the circle fits inside */
+    .tape-cell span { 
+        width: 40px; 
+        height: 40px; 
+        max-width: 100%;
+    }
 }

@@ -3,7 +3,7 @@ import { audioEngine } from "./audio/AudioEngine";
 import { generateMelody, generateFixedPattern } from "./core/MelodyGenerator";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
 import { useTrainingMode } from "./hooks/useTrainingMode"; 
-import { useAudioSetup } from "./hooks/useAudioSetup"; // NEW HOOK
+import { useAudioSetup } from "./hooks/useAudioSetup"; 
 import type { MusicalKey, ScaleDegree, MelodyConstraints } from "./types";
 import "./App.css";
 
@@ -11,7 +11,7 @@ import "./App.css";
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import Controls from "./components/Controls/Controls";
-import TrainingHUD from "./components/TrainingHUD"; // NEW COMPONENT
+import TrainingHUD from "./components/TrainingHUD"; 
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
@@ -54,7 +54,6 @@ export default function App() {
   // --- HOOKS ---
   const training = useTrainingMode(); 
   
-  // REFACTORED: Audio Setup Logic moved to hook
   const visualTimeoutRef = useRef<number>(0); 
   useAudioSetup({
     bpm, volMaster, volDrone, volGroove, volVoice, volClick, 
@@ -139,7 +138,6 @@ export default function App() {
 
   const handleLevelChange = (newLevelId: number) => {
       training.setActiveLevelId(newLevelId);
-      // Reset logic flags
       lastPlayedStageIndex.current = -1; 
       hasPlayedScalePreview.current = false;
       hasPlayedIntroSequence.current = false;
@@ -153,6 +151,9 @@ export default function App() {
   };
 
   const startSession = async () => {
+    // FIX: UNLOCK AUDIO IMMEDIATELY (Synchronous)
+    audioEngine.prepareAudio();
+
     if (!isPlaying) {
       try {
         setStatus("Initializing...");
@@ -164,7 +165,6 @@ export default function App() {
         setIsPlaying(true);
         isPlayingRef.current = true;
         
-        // Reset Logic Flags
         lastPlayedStageIndex.current = -1;
         hasPlayedScalePreview.current = false;
         hasPlayedIntroSequence.current = false;
@@ -190,7 +190,6 @@ export default function App() {
     setLastValidStep(0); 
   };
 
-  // --- THE MAIN LOOP ---
   const runCycle = async (keyToUse: MusicalKey, isFirst = false) => {
     if (!isPlayingRef.current) return;
     setActiveMidi(null);
@@ -200,7 +199,7 @@ export default function App() {
     let constraints: MelodyConstraints;
     let limitForModulation = 9999;
     let noteEvents; 
-    let playSilent = false; // By default, don't play silent pass for Intros/Previews
+    let playSilent = false; 
 
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
@@ -208,46 +207,37 @@ export default function App() {
         limitForModulation = config.questionsPerKey;
         const stageIndex = config.stageIndex;
 
-        // UI Updates
         setEnabledDegrees(constraints.allowedDegrees);
         setStatus(`${training.stageLabel}`);
         setStartRoot(constraints.startDegree === '1');
         setEndRoot(constraints.endDegree === '1');
 
-        // --- NEW SEQUENCE LOGIC ---
-        
-        // 1. Detect Stage Change
         if (stageIndex !== lastPlayedStageIndex.current) {
             lastPlayedStageIndex.current = stageIndex;
             hasPlayedScalePreview.current = false;
             hasPlayedIntroSequence.current = false;
         }
 
-        // 2. Priority 1: Scale Preview (One Shot)
         if (config.scalePreview && !hasPlayedScalePreview.current) {
             noteEvents = generateFixedPattern(config.scalePreview, nextKey, "Major");
             setStatus(`Preview Notes: ${config.scalePreview.join("-")}`);
-            hasPlayedScalePreview.current = true; // Mark done
+            hasPlayedScalePreview.current = true; 
         } 
-        // 3. Priority 2: Intro Sequence (One Shot)
         else if (config.introSequence && !hasPlayedIntroSequence.current) {
             noteEvents = generateFixedPattern(config.introSequence, nextKey, "Major");
             setStatus(`Intro Pattern: ${config.introSequence.join("-")}`);
-            hasPlayedIntroSequence.current = true; // Mark done
+            hasPlayedIntroSequence.current = true; 
         }
-        // 4. Priority 3: Random Melody (Looping)
         else {
              noteEvents = generateMelody({
                 key: nextKey, 
                 scaleType: "Major",
                 constraints: constraints
             });
-            // Only use silent practice for the main random loop
-            playSilent = false; // Force false in training for now, or use silentPracticeRef.current if you want
+            playSilent = false; 
         }
 
     } else {
-        // Random Mode Logic
         constraints = {
             allowedDegrees: enabledDegreesRef.current,
             startDegree: startRootRef.current ? "1" : undefined,
@@ -265,7 +255,6 @@ export default function App() {
         });
     }
 
-    // --- MODULATION LOGIC ---
     if (questionCount.current > limitForModulation) {
         questionCount.current = 0;
         const otherKeys = KEYS.filter(k => k !== keyToUse); 

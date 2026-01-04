@@ -44,42 +44,41 @@ body {
   align-items: center;
   width: 100%;
   max-width: 100%;
-  padding: 20px;
+  padding: 16px; /* Reduced outer padding slightly */
   box-sizing: border-box; /* Includes padding in width calculation */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .main-panel {
   background: var(--bg-panel);
-  padding: 30px 40px; 
+  /* Responsive Padding: Less on mobile to save space */
+  padding: 24px 20px; 
   border-radius: 24px;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 20px 40px rgba(0,0,0,0.4);
+  /* Stronger shadow to define edges against dark background */
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 20px 40px rgba(0,0,0,0.6);
   width: 100%;
-  max-width: 500px; /* Slightly tighter for better phone feel */
+  max-width: 500px;
   position: relative;
-  /* IMPORTANT: Remove overflow:hidden so dropdowns/modals don't get clipped */
-  display: flex;
-  flex-direction: column;
+  box-sizing: border-box;
+  
+  /* FORCE VISIBLE MARGINS ON MOBILE */
+  margin: 0 auto; 
+  /* Ensures panel never touches the absolute edge of .app-container */
+  width: calc(100% - 10px); 
 }
 
-/* --- RESPONSIVE ADJUSTMENTS --- */
-@media (max-width: 600px) {
-  #root { 
-    align-items: flex-start; /* Aligns to top so scrolling works naturally */
-  }
-
+/* Media Query for larger screens */
+@media (min-width: 600px) {
   .app-container {
-    padding: 10px; /* Less padding on edges */
-    padding-bottom: 80px; /* Extra space at bottom for scrolling past controls */
+    padding: 20px;
   }
-  
   .main-panel {
-    padding: 20px 15px;
-    margin-top: 10px;
-    margin-bottom: 20px;
-    border-radius: 20px;
+    padding: 30px 40px;
+    width: 100%;
   }
-}.training-hud {
+}
+
+.training-hud {
     background: rgba(74, 222, 128, 0.1); /* Light Green tint */
     border: 1px solid rgba(74, 222, 128, 0.3);
     padding: 15px;

@@ -59,7 +59,7 @@ export default function Visualizer({
                         key={d}
                         className={`tape-cell d-${d} ${isActive ? 'active' : ''} ${isEnabled ? '' : 'disabled'}`}
                         onClick={() => toggleDegree(d)}
-                        style={{width: '50px', height: '50px'}}
+                        // FIX: Removed inline style to allow CSS responsive sizing
                     >
                         <span>{d}</span>
                     </div>
@@ -70,7 +70,7 @@ export default function Visualizer({
   };
 
   return (
-    <div className="visualizer-container">
+    <div className={`visualizer-container ${viewMode}`}>
         {viewMode === 'tape' ? renderTape() : renderStatic()}
     </div>
   );

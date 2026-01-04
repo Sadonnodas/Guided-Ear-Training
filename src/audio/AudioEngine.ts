@@ -24,21 +24,53 @@ export class AudioEngine {
   public onBeat: ((beatNumber: number) => void) | null = null;
 
   private isInitialized = false;
-  private silentHtmlAudio: HTMLAudioElement | null = null;
   private mediaSessionSetup = false;
+  
+  // FIX: Store the audio element for Pocket Mode
+  private silentHtmlAudio: HTMLAudioElement | null = null;
 
-  // FIX 1: Store state in case setters are called before init
   private pendingDebugActive = false;
   private pendingMetronomeVol = 0.5;
 
-  constructor() {}
+  constructor() {
+    this.createSilentAudio();
+  }
+
+  private createSilentAudio() {
+    if (typeof window === 'undefined') return;
+    
+    const audio = document.createElement('audio');
+    // A tiny silent MP3 loop
+    audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//oeAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAJAAAB3AAZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZ//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAAGGluZwAAAA8AAAAJAAAB3AAZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZ//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAATEAMEAAAAAArmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0.01; 
+    
+    // FIX: Append to body to ensure iOS respects it as a media element
+    audio.style.display = 'none';
+    document.body.appendChild(audio);
+    
+    this.silentHtmlAudio = audio;
+  }
+
+  // NEW: Call this SYNCHRONOUSLY on the first click
+  prepareAudio() {
+     // 1. Resume Web Audio Context
+     if (Tone.context.state !== 'running') {
+         Tone.context.resume().catch(() => {});
+     }
+     
+     // 2. Play Silent HTML Audio
+     if (this.silentHtmlAudio) {
+         this.silentHtmlAudio.play().catch(e => console.log("Silent audio start failed:", e));
+     }
+  }
 
   async init(vols: { drone: number, groove: number, voice: number, click: number, master: number }) {
     if (this.isInitialized) return;
 
     await Tone.start();
-    this.initSilentAudio();
-
+    
     // 1. Setup Graph
     this.compressor = new Tone.Compressor({ threshold: -24, ratio: 6, attack: 0.005, release: 0.2 }).toDestination();
     this.masterGain = new Tone.Gain(vols.master).connect(this.compressor);
@@ -49,7 +81,7 @@ export class AudioEngine {
     this.metronome = new Metronome(this.masterGain);
     this.backingTracks = new BackingTracks(this.masterGain);
     
-    // 3. Initialize Scheduler with delegates
+    // 3. Initialize Scheduler
     this.scheduler = new Scheduler({
         onBeat: (b) => { if (this.onBeat) this.onBeat(b); },
         onTick: (t) => this.metronome.playTick(t),
@@ -62,9 +94,13 @@ export class AudioEngine {
     this.backingTracks.setDroneVol(vols.drone);
     this.backingTracks.setDrumVol(vols.groove);
 
-    // FIX 2: Apply pending metronome state immediately
     this.metronome.setDebugVol(this.pendingMetronomeVol);
     this.metronome.setDebugActive(this.pendingDebugActive);
+
+    // Re-trigger silent audio just in case
+    if (this.silentHtmlAudio && this.silentHtmlAudio.paused) {
+        this.silentHtmlAudio.play().catch(() => {});
+    }
 
     this.isInitialized = true;
     console.log("Audio Engine Initialized");
@@ -77,25 +113,22 @@ export class AudioEngine {
     await this.backingTracks.load(key, drumFile);
   }
 
-  // --- UPDATED SCHEDULE ROUTINE TO FIX OVERLAP BUG ---
   scheduleRoutine(notes: NoteEvent[], silentPractice: boolean, isFirstQuestion: boolean, onComplete: () => void) {
     if (!this.isInitialized) return;
-    
-    // FIX: Calculate total duration of the melody in seconds
     const beatSec = 60 / Tone.Transport.bpm.value;
     const totalMelodyBeats = notes.reduce((sum, n) => sum + n.duration, 0);
     const melodyDur = totalMelodyBeats * beatSec; 
-
-    // Send the calculated duration into the scheduler, NOT a hardcoded 8 beats
     this.scheduler.scheduleRoutine(notes, silentPractice, isFirstQuestion, onComplete, melodyDur);
   }
 
   startPlayback() {
     if (!this.isInitialized) return;
     this.setupMediaSession();
-    if (this.silentHtmlAudio?.paused) this.silentHtmlAudio.play().catch(() => {});
     
-    // FIX 3: Prevent doubling
+    if (this.silentHtmlAudio && this.silentHtmlAudio.paused) {
+        this.silentHtmlAudio.play().catch(() => {});
+    }
+    
     if (Tone.Transport.state !== 'started') {
         this.backingTracks.start();
         this.scheduler.start();
@@ -104,13 +137,18 @@ export class AudioEngine {
 
   pausePlayback() {
     this.scheduler.pause();
+    // Do NOT pause silentHtmlAudio here
   }
 
   reset() {
     if (!this.isInitialized) return;
     this.scheduler.stop();
     this.backingTracks.stop();
-    if (this.silentHtmlAudio) this.silentHtmlAudio.pause();
+    
+    if (this.silentHtmlAudio) {
+        this.silentHtmlAudio.pause();
+        this.silentHtmlAudio.currentTime = 0;
+    }
   }
 
   // --- SETTERS ---
@@ -118,13 +156,10 @@ export class AudioEngine {
   setMasterVol(v: number) { if (this.isInitialized) this.masterGain.gain.rampTo(v, 0.1); }
   setReverbMix(v: number) { if (this.isInitialized) this.reverb.wet.value = v; }
   setVocalVol(v: number) { if (this.isInitialized) this.vocalGain.gain.rampTo(v, 0.1); }
-  
-  // Delegated Setters
   setDroneVol(v: number) { this.backingTracks?.setDroneVol(v); }
   setDrumVol(v: number) { this.backingTracks?.setDrumVol(v); }
   setClickVol(v: number) { this.metronome?.setClickVol(v); }
   
-  // FIX 4: Store in pending state
   setMetronomeVol(v: number) { 
       this.pendingMetronomeVol = v;
       this.metronome?.setDebugVol(v); 
@@ -133,8 +168,6 @@ export class AudioEngine {
       this.pendingDebugActive = active;
       this.metronome?.setDebugActive(active); 
   }
-
-  // --- INTERNAL / SAMPLER ---
 
   async preloadNotes(notes: NoteEvent[]) {
     if (!this.isInitialized) return;
@@ -160,15 +193,6 @@ export class AudioEngine {
       source.fadeOut = 0.1; 
       source.start(time, 0, buffer.duration);
     }
-  }
-
-  private initSilentAudio() {
-    if (this.silentHtmlAudio) return;
-    const audio = new Audio();
-    audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//oeAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAJAAAB3AAZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZ//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAAGGluZwAAAA8AAAAJAAAB3AAZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZ//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAATEAMEAAAAAArmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
-    audio.loop = true;
-    audio.volume = 0.01; 
-    this.silentHtmlAudio = audio;
   }
 
   private setupMediaSession() {
