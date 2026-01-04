@@ -46,8 +46,19 @@ export class AudioEngine {
     audio.preload = 'auto';
     audio.volume = 0.01; 
     
-    // FIX: Append to body to ensure iOS respects it as a media element
-    audio.style.display = 'none';
+    // ------------------------------------------------------------------
+    // FIX FOR IOS LOCK SCREEN: 
+    // Do NOT use display: none. Use opacity and fixed position instead.
+    // ------------------------------------------------------------------
+    audio.style.position = 'fixed';
+    audio.style.left = '0';
+    audio.style.top = '0';
+    audio.style.width = '1px';
+    audio.style.height = '1px';
+    audio.style.opacity = '0.001';
+    audio.style.pointerEvents = 'none';
+    audio.style.zIndex = '-999';
+    
     document.body.appendChild(audio);
     
     this.silentHtmlAudio = audio;

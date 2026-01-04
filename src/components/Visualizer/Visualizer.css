@@ -3,27 +3,34 @@
   width: 100%;
   height: 90px;
   margin: 30px 0; 
-  overflow: hidden;
-  /* Remove global mask so Static View is clear */
+  /* FIX 1: Remove global overflow hidden. Tape view will re-add it. */
   background: transparent;
   touch-action: pan-y; 
 }
 
-/* Apply fade mask ONLY to Tape View */
+/* Apply fade mask AND overflow hidden ONLY to Tape View */
 .visualizer-container.tape {
+  overflow: hidden; /* Tape needs this */
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
 }
 
+/* FIX 2: Ensure Static View allows children to "pop out" via scale/glow */
+.visualizer-container.static {
+    overflow: visible;
+}
+
 .static-container {
     display: flex; 
-    /* FIX: Gap 0 matches Tape View (cells touch) */
     gap: 0; 
     justify-content: center; 
-    margin: 20px 0;
+    /* FIX 3: Add padding so scaled circles (active state) don't get cut off at bottom/sides */
+    padding: 10px 15px; 
+    
+    margin: 10px 0; /* Adjusted margin since we added padding */
     width: 100%;
-    /* FIX: Force single line */
     flex-wrap: nowrap;
+    box-sizing: border-box; /* Ensures padding is contained in width */
 }
 
 .tape-strip {
@@ -40,9 +47,7 @@
 .tape-cell {
   width: 60px; 
   height: 60px;
-  /* FIX: Allow shrinking on mobile */
   flex-shrink: 1;
-  /* FIX: Prevent overflow breaking layout */
   min-width: 0;
   display: flex;
   align-items: center;
@@ -94,11 +99,8 @@
 @media (max-width: 600px) {
     .visualizer-container { height: 70px; }
     
-    /* Slightly smaller font/circles on mobile if needed */
     .tape-cell { font-size: 0.9rem; }
     
-    /* If screen is extremely narrow, the flex-shrink above will handle the width, 
-       but we ensure the circle fits inside */
     .tape-cell span { 
         width: 40px; 
         height: 40px; 
