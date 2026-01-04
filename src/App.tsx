@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { audioEngine } from "./audio/AudioEngine";
 import { generateMelody } from "./core/MelodyGenerator";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
-import type { MusicalKey, ScaleDegree } from "./types";
+import { useTrainingMode } from "./hooks/useTrainingMode"; // NEW IMPORT
+import type { MusicalKey, ScaleDegree, MelodyConstraints } from "./types"; // Updated Types
 import "./App.css";
 
 // Components
@@ -40,7 +41,7 @@ export default function App() {
 
   const prevVol = useRef<Record<string, number>>({});
   
-  // Settings
+  // Settings (Random Mode)
   const [startRoot, setStartRoot] = useState(false);
   const [endRoot, setEndRoot] = useState(false);
   const [silentPractice, setSilentPractice] = useState(false);
@@ -48,9 +49,10 @@ export default function App() {
   const [triggerPulse, setTriggerPulse] = useState(false);
   const [debugClick, setDebugClick] = useState(false); 
 
-  // --- REFS (Fix for "Real-time Updates") ---
-  // We use refs so the running loop can access the LATEST values, 
-  // not the stale values from when the loop started.
+  // --- HOOKS ---
+  const training = useTrainingMode(); // NEW HOOK
+
+  // --- REFS ---
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
   const visualTimeoutRef = useRef<number>(0); 
@@ -60,14 +62,15 @@ export default function App() {
   const silentPracticeRef = useRef(silentPractice);
   const questionsPerKeyRef = useRef(questionsPerKey);
   const enabledDegreesRef = useRef(enabledDegrees);
+  const activeTabRef = useRef(activeTab); // Track tab in ref
 
-  // Sync Refs with State
+  // Sync Refs
   useEffect(() => { startRootRef.current = startRoot; }, [startRoot]);
   useEffect(() => { endRootRef.current = endRoot; }, [endRoot]);
   useEffect(() => { silentPracticeRef.current = silentPractice; }, [silentPractice]);
   useEffect(() => { questionsPerKeyRef.current = questionsPerKey; }, [questionsPerKey]);
   useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
-
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
   useEffect(() => {
     audioEngine.onNotePlay = (note, isClick) => {
@@ -89,8 +92,6 @@ export default function App() {
     audioEngine.setClickVol(volClick);
     audioEngine.setReverbMix(volReverb);
     audioEngine.setBpm(bpm);
-    
-    // Metronome Updates
     audioEngine.setDebugClick(debugClick);
     audioEngine.setMetronomeVol(volMetronome);
 
@@ -103,7 +104,17 @@ export default function App() {
     }
   }, [activeMidi, currentKey]);
 
+  // RESET training if tab changes
+  useEffect(() => {
+    if (activeTab === 'random') {
+        training.resetTraining();
+    }
+  }, [activeTab]);
+
   const toggleDegree = (d: ScaleDegree) => {
+    // Only allow toggling in Random Mode
+    if (activeTab !== 'random') return;
+    
     setEnabledDegrees(prev => {
         if (prev.includes(d)) {
             if (prev.length === 1) return prev; 
@@ -147,8 +158,15 @@ export default function App() {
         audioEngine.setBpm(bpm);
         setStatus("Loading...");
         await audioEngine.loadBackingTracks(currentKey, "groove_1_80bpm.mp3");
+        
         setIsPlaying(true);
         isPlayingRef.current = true;
+        
+        // Start Timer if in Training Mode
+        if (activeTab === 'training') {
+            training.startTrainingTimer();
+        }
+
         runCycle(currentKey, true);
       } catch (e) { console.error(e); setStatus("Error"); }
     } else {
@@ -160,6 +178,7 @@ export default function App() {
     setIsPlaying(false);
     isPlayingRef.current = false;
     audioEngine.reset(); 
+    training.pauseTrainingTimer(); // Pause timer
     setStatus("Paused");
     setActiveMidi(null);
     setLastValidStep(0); 
@@ -171,7 +190,7 @@ export default function App() {
     questionCount.current += 1;
     let nextKey = keyToUse;
 
-    // Use REF to get the live value of questionsPerKey
+    // KEY CHANGE LOGIC (Only for Random Mode usually, but keeping simple for now)
     if (questionCount.current > questionsPerKeyRef.current) {
         questionCount.current = 0;
         const otherKeys = KEYS.filter(k => k !== keyToUse); 
@@ -182,27 +201,51 @@ export default function App() {
         await new Promise(r => setTimeout(r, 2000));
     }
     
-    // Use REF for silentPractice
-    const isSilent = silentPracticeRef.current;
-    setStatus(isSilent ? "Listen & Repeat" : "Listen");
+    // --- DETERMINE MODE ---
+    let constraints: MelodyConstraints;
+
+    if (activeTabRef.current === 'training') {
+        // Training Mode Logic
+        constraints = training.getCurrentConstraints();
+        // Update enabled degrees visually (but user can't click them)
+        setEnabledDegrees(constraints.allowedDegrees);
+        setStatus(`Level ${training.activeLevelId}: ${training.stageLabel}`);
+    } else {
+        // Random Mode Logic
+        constraints = {
+            allowedDegrees: enabledDegreesRef.current,
+            startDegree: startRootRef.current ? "1" : undefined,
+            endDegree: endRootRef.current ? "1" : undefined,
+            length: 4 
+        };
+        const isSilent = silentPracticeRef.current;
+        setStatus(isSilent ? "Listen & Repeat" : "Listen");
+    }
     
+    // GENERATE
     const melody = generateMelody({
-        length: 4, 
         key: nextKey, 
         scaleType: "Major",
-        // Use REFS for live generation settings
-        startOnRoot: startRootRef.current,
-        endOnRoot: endRootRef.current,
-        activeDegrees: enabledDegreesRef.current
+        constraints: constraints
     });
     
     await audioEngine.preloadNotes(melody);
     
+    // Use Ref for silent practice in random mode, assume false for training (or add option later)
+    const isSilent = activeTabRef.current === 'random' ? silentPracticeRef.current : false;
+
     audioEngine.scheduleRoutine(melody, isSilent, isFirst, () => {
         if (isPlayingRef.current) runCycle(nextKey, false);
     });
     
     audioEngine.startPlayback();
+  };
+
+  // Helper formatting for timer
+  const formatTime = (s: number) => {
+      const mins = Math.floor(s / 60);
+      const secs = s % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -217,6 +260,22 @@ export default function App() {
           debugClick={debugClick} setDebugClick={setDebugClick}
         />
 
+        {/* TRAINING HUD */}
+        {activeTab === 'training' && (
+            <div style={{
+                textAlign: 'center', 
+                marginBottom: '10px', 
+                color: 'var(--btn-play)', 
+                fontWeight: 'bold',
+                background: 'rgba(74, 222, 128, 0.1)',
+                padding: '10px',
+                borderRadius: '8px'
+            }}>
+                <div>Time: {formatTime(training.sessionTime)}</div>
+                <div style={{fontSize: '0.9em', opacity: 0.8}}>{training.stageLabel}</div>
+            </div>
+        )}
+
         <Visualizer 
           viewMode={viewMode}
           activeMidi={activeMidi}
@@ -225,25 +284,41 @@ export default function App() {
           toggleDegree={toggleDegree}
         />
 
-        <Controls 
-          isPlaying={isPlaying} onPlayToggle={startSession}
-          bpm={bpm} setBpm={setBpm}
-          triggerPulse={triggerPulse} 
-          
-          startRoot={startRoot} setStartRoot={setStartRoot}
-          endRoot={endRoot} setEndRoot={setEndRoot}
-          silentPractice={silentPractice} setSilentPractice={setSilentPractice}
-          questionsPerKey={questionsPerKey} setQuestionsPerKey={setQuestionsPerKey}
-          
-          volMaster={volMaster} setVolMaster={setVolMaster}
-          volVoice={volVoice} setVolVoice={setVolVoice}
-          volDrone={volDrone} setVolDrone={setVolDrone}
-          volGroove={volGroove} setVolGroove={setVolGroove}
-          volReverb={volReverb} setVolReverb={setVolReverb}
-          volMetronome={volMetronome} setVolMetronome={setVolMetronome}
-          
-          toggleMute={toggleMute}
-        />
+        {/* Hide complex controls in training mode to focus user */}
+        {activeTab === 'random' ? (
+            <Controls 
+            isPlaying={isPlaying} onPlayToggle={startSession}
+            bpm={bpm} setBpm={setBpm}
+            triggerPulse={triggerPulse} 
+            
+            startRoot={startRoot} setStartRoot={setStartRoot}
+            endRoot={endRoot} setEndRoot={setEndRoot}
+            silentPractice={silentPractice} setSilentPractice={setSilentPractice}
+            questionsPerKey={questionsPerKey} setQuestionsPerKey={setQuestionsPerKey}
+            
+            volMaster={volMaster} setVolMaster={setVolMaster}
+            volVoice={volVoice} setVolVoice={setVolVoice}
+            volDrone={volDrone} setVolDrone={setVolDrone}
+            volGroove={volGroove} setVolGroove={setVolGroove}
+            volReverb={volReverb} setVolReverb={setVolReverb}
+            volMetronome={volMetronome} setVolMetronome={setVolMetronome}
+            
+            toggleMute={toggleMute}
+            />
+        ) : (
+             <div className="play-btn-container">
+                <button 
+                    className={`play-btn ${isPlaying ? 'playing' : ''}`} 
+                    onClick={startSession}
+                >
+                    {isPlaying ? 
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> 
+                        : 
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    }
+                </button>
+            </div>
+        )}
 
       </div>
     </div>

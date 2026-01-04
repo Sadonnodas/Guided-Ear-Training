@@ -6,18 +6,39 @@ export interface NoteInfo {
   degree: ScaleDegree;
   midi: number;
   frequency: number;
-  label: string; // e.g., "C4"
+  label: string; 
 }
 
 export interface NoteEvent {
   noteInfo: NoteInfo;
-  startTime: number; // In beats (0, 1, 2...)
-  duration: number;  // In beats (1 = quarter note)
+  startTime: number; 
+  duration: number;  
+}
+
+// --- NEW TYPES FOR TRAINING ---
+
+export interface MelodyConstraints {
+  allowedDegrees: ScaleDegree[]; // e.g., ["1", "3", "5"]
+  startDegree?: ScaleDegree;     // If undefined, can start on any allowed
+  endDegree?: ScaleDegree;       // If undefined, can end on any allowed
+  length: number;                // Number of notes
+}
+
+export interface TrainingStage {
+  duration: number; // Seconds to spend in this stage
+  label: string;    // Description for the UI (e.g. "Warm Up")
+  constraints: MelodyConstraints;
+}
+
+export interface TrainingLevel {
+  id: number;
+  name: string;
+  stages: TrainingStage[];
 }
 
 export interface AppSettings {
   bpm: number;
   key: MusicalKey;
   scale: ScaleType;
-  octaveRange: number; // 1 or 2
+  octaveRange: number; 
 }

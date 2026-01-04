@@ -1,56 +1,64 @@
-// Updated path: pointing to ../audio/MusicTheory instead of ./MusicTheory
 import { getNoteForDegree } from "../audio/MusicTheory";
-import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree } from "../types";
+import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints } from "../types";
 
 interface GeneratorOptions {
-  length: number;
   key: MusicalKey;
   scaleType: ScaleType;
-  startOnRoot: boolean;
-  endOnRoot: boolean;
-  activeDegrees: ScaleDegree[];
+  constraints: MelodyConstraints;
 }
 
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
-  const { length, key, scaleType, startOnRoot, endOnRoot, activeDegrees } = options;
+  const { key, scaleType, constraints } = options;
+  const { allowedDegrees, startDegree, endDegree, length } = constraints;
   
   const melody: NoteEvent[] = [];
   
-  // Safety: If no degrees active, fallback to Root
-  const pool = activeDegrees.length > 0 ? activeDegrees : ["1"];
-
-  // 1. First Note
-  let currentDegree: ScaleDegree;
-  if (startOnRoot && pool.includes("1")) {
-    currentDegree = "1";
-  } else {
-    currentDegree = pool[Math.floor(Math.random() * pool.length)] as ScaleDegree;
-  }
+  // Safety: If allowedDegrees is empty (user unchecked everything), fallback to Root
+  const pool = allowedDegrees.length > 0 ? allowedDegrees : ["1"];
 
   let currentBeat = 0;
   let lastMidi: number | null = null;
 
   for (let i = 0; i < length; i++) {
     const duration = 2; // Half Notes
+    let degree: ScaleDegree;
 
-    // --- ENDING LOGIC ---
-    if (endOnRoot && i === length - 1 && pool.includes("1")) {
-        currentDegree = "1";
+    // --- REPETITION GUARD ---
+    // Prevent 3 consecutive identical notes
+    let candidatePool = [...pool];
+    
+    if (i >= 2) {
+        const prev1 = melody[i-1].noteInfo.degree;
+        const prev2 = melody[i-2].noteInfo.degree;
+        
+        // If the last two notes were the same, remove that degree from the options
+        if (prev1 === prev2) {
+            candidatePool = candidatePool.filter(d => d !== prev1);
+            // Safety: If the pool is empty (e.g., user only enabled "1"), we must allow repetition
+            if (candidatePool.length === 0) candidatePool = [...pool];
+        }
     }
 
-    // Create Event
-    const event = createEvent(currentDegree, key, scaleType, currentBeat, duration, lastMidi);
+    // 1. Determine Degree
+    // Priority 1: Start Constraint
+    if (i === 0 && startDegree && pool.includes(startDegree)) {
+      degree = startDegree;
+    } 
+    // Priority 2: End Constraint
+    else if (i === length - 1 && endDegree && pool.includes(endDegree)) {
+      degree = endDegree;
+    } 
+    // Priority 3: Random Selection (using the filtered pool)
+    else {
+      degree = candidatePool[Math.floor(Math.random() * candidatePool.length)] as ScaleDegree;
+    }
+
+    // 2. Create Event
+    const event = createEvent(degree, key, scaleType, currentBeat, duration, lastMidi);
     melody.push(event);
     
     currentBeat += duration;
-    lastMidi = event.noteInfo.midi; // Update history for voice leading
-
-    // --- NEXT NOTE LOGIC ---
-    if (i < length - 1) {
-        // Pick next degree from POOL
-        const nextDegree = pool[Math.floor(Math.random() * pool.length)] as ScaleDegree;
-        currentDegree = nextDegree;
-    }
+    lastMidi = event.noteInfo.midi;
   }
 
   return melody;
