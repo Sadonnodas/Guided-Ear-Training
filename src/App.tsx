@@ -17,7 +17,6 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 };
 
 export default function App() {
-  // --- STATE ---
   const [activeTab, setActiveTab] = useState("random");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentKey, setCurrentKey] = useState<MusicalKey>("C");
@@ -30,6 +29,7 @@ export default function App() {
   const [bpm, setBpm] = useState(80);
   const [enabledDegrees, setEnabledDegrees] = useState<ScaleDegree[]>(["1", "2", "3", "4", "5", "6", "7"]);
   
+  // Volume State
   const [volMaster, setVolMaster] = useState(1.0);
   const [volVoice, setVolVoice] = useState(1.0);
   const [volDrone, setVolDrone] = useState(0.4);
@@ -38,15 +38,19 @@ export default function App() {
   const [volReverb, setVolReverb] = useState(0.3);
 
   const prevVol = useRef<Record<string, number>>({});
+  
+  // Settings
   const [startRoot, setStartRoot] = useState(false);
   const [endRoot, setEndRoot] = useState(false);
   const [silentPractice, setSilentPractice] = useState(false);
+  const [questionsPerKey, setQuestionsPerKey] = useState(10); 
+  const [triggerPulse, setTriggerPulse] = useState(false);
+  const [debugClick, setDebugClick] = useState(false); // NEW
 
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
   const visualTimeoutRef = useRef<number>(0); 
 
-  // --- AUDIO EFFECTS & ENGINE SYNC ---
   useEffect(() => {
     audioEngine.onNotePlay = (note, isClick) => {
       if (isClick) return; 
@@ -58,6 +62,8 @@ export default function App() {
         visualTimeoutRef.current = setTimeout(() => setActiveMidi(null), holdTime);
       }
     };
+    audioEngine.onBeat = (_) => { setTriggerPulse(p => !p); };
+
     audioEngine.setMasterVol(volMaster);
     audioEngine.setDroneVol(volDrone);
     audioEngine.setDrumVol(volGroove);
@@ -65,7 +71,8 @@ export default function App() {
     audioEngine.setClickVol(volClick);
     audioEngine.setReverbMix(volReverb);
     audioEngine.setBpm(bpm);
-  }, [volMaster, volDrone, volGroove, volVoice, volClick, volReverb, bpm]);
+    audioEngine.setDebugClick(debugClick); // NEW
+  }, [volMaster, volDrone, volGroove, volVoice, volClick, volReverb, bpm, debugClick]);
 
   useEffect(() => {
     if (activeMidi !== null) {
@@ -74,7 +81,6 @@ export default function App() {
     }
   }, [activeMidi, currentKey]);
 
-  // --- ACTIONS ---
   const toggleDegree = (d: ScaleDegree) => {
     setEnabledDegrees(prev => {
         if (prev.includes(d)) {
@@ -104,7 +110,7 @@ export default function App() {
     setCurrentKey(k);
     if (isPlaying) {
       setStatus(`Changing to ${KEY_DISPLAY_MAP[k]} next...`);
-      questionCount.current = 10;
+      questionCount.current = questionsPerKey; 
     } else {
       setStatus(`Key: ${KEY_DISPLAY_MAP[k]}`);
       await audioEngine.loadBackingTracks(k, "groove_1_80bpm.mp3");
@@ -121,7 +127,8 @@ export default function App() {
         await audioEngine.loadBackingTracks(currentKey, "groove_1_80bpm.mp3");
         setIsPlaying(true);
         isPlayingRef.current = true;
-        runCycle(currentKey);
+        // IMPORTANT: Pass 'true' to indicate first question (Triggers Settling Measure)
+        runCycle(currentKey, true);
       } catch (e) { console.error(e); setStatus("Error"); }
     } else {
       stopSession();
@@ -137,21 +144,22 @@ export default function App() {
     setLastValidStep(0); 
   };
 
-  const runCycle = async (keyToUse: MusicalKey) => {
+  const runCycle = async (keyToUse: MusicalKey, isFirst = false) => {
     if (!isPlayingRef.current) return;
     setActiveMidi(null);
     questionCount.current += 1;
     let nextKey = keyToUse;
 
-    if (questionCount.current > 10) {
+    if (questionCount.current > questionsPerKey) {
         questionCount.current = 0;
-        const otherKeys = KEYS.filter(k => k !== currentKey);
+        const otherKeys = KEYS.filter(k => k !== keyToUse); 
         nextKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
         setCurrentKey(nextKey);
         setStatus(`Modulating to ${KEY_DISPLAY_MAP[nextKey]}...`);
         await audioEngine.loadBackingTracks(nextKey, "groove_1_80bpm.mp3");
         await new Promise(r => setTimeout(r, 2000));
     }
+    
     setStatus(silentPractice ? "Listen & Repeat" : "Listen");
     
     const melody = generateMelody({
@@ -164,9 +172,11 @@ export default function App() {
     });
     
     await audioEngine.preloadNotes(melody);
-    audioEngine.scheduleRoutine(melody, silentPractice, () => {
-        if (isPlayingRef.current) runCycle(currentKey);
+    
+    audioEngine.scheduleRoutine(melody, silentPractice, isFirst, () => {
+        if (isPlayingRef.current) runCycle(nextKey, false);
     });
+    
     audioEngine.startPlayback();
   };
 
@@ -192,15 +202,21 @@ export default function App() {
         <Controls 
           isPlaying={isPlaying} onPlayToggle={startSession}
           bpm={bpm} setBpm={setBpm}
+          triggerPulse={triggerPulse} 
+          
           startRoot={startRoot} setStartRoot={setStartRoot}
           endRoot={endRoot} setEndRoot={setEndRoot}
           silentPractice={silentPractice} setSilentPractice={setSilentPractice}
+          questionsPerKey={questionsPerKey} setQuestionsPerKey={setQuestionsPerKey}
+          
           volMaster={volMaster} setVolMaster={setVolMaster}
           volVoice={volVoice} setVolVoice={setVolVoice}
           volDrone={volDrone} setVolDrone={setVolDrone}
           volGroove={volGroove} setVolGroove={setVolGroove}
           volReverb={volReverb} setVolReverb={setVolReverb}
           toggleMute={toggleMute}
+          
+          debugClick={debugClick} setDebugClick={setDebugClick}
         />
 
       </div>
