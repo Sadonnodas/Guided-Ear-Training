@@ -2,8 +2,8 @@
 
 // Adjusts when the melody notes play relative to the beat (in seconds)
 export const LATENCY_OFFSET: Record<string, number> = {
-  "1": -0.07, "2": -0.1, "3": -0.1, "4": -0.1, 
-  "5": -0.17, "6": -0.15, "7": -0.15, 
+  "1": -0.08, "2": -0.1, "3": -0.12, "4": -0.1, 
+  "5": -0.18, "6": -0.17, "7": -0.18, 
 };
 
 // GLOBAL VISUAL SYNC

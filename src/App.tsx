@@ -194,17 +194,40 @@ export default function App() {
     if (!isPlayingRef.current) return;
     setActiveMidi(null);
     questionCount.current += 1;
-    let nextKey = keyToUse;
+    
+    // ------------------------------------------------------------------
+    // FIX START: Handle Modulation BEFORE generation
+    // ------------------------------------------------------------------
+    let currentCycleKey = keyToUse;
+
+    if (activeTabRef.current === 'random' && questionCount.current > questionsPerKeyRef.current) {
+        questionCount.current = 1; // Reset counter for the new key
+        
+        const otherKeys = KEYS.filter(k => k !== keyToUse); 
+        const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+        
+        // Update state and visuals immediately
+        setCurrentKey(newKey);
+        setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
+        
+        // Wait for audio to load (simulating a pause/transition)
+        await audioEngine.loadBackingTracks(newKey, "groove_1_80bpm.mp3");
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Use the NEW key for generation in this cycle
+        currentCycleKey = newKey;
+    }
+    // ------------------------------------------------------------------
+    // FIX END
+    // ------------------------------------------------------------------
 
     let constraints: MelodyConstraints;
-    let limitForModulation = 9999;
     let noteEvents; 
     let playSilent = false; 
 
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
         constraints = config.constraints;
-        limitForModulation = config.questionsPerKey;
         const stageIndex = config.stageIndex;
 
         setEnabledDegrees(constraints.allowedDegrees);
@@ -219,18 +242,18 @@ export default function App() {
         }
 
         if (config.scalePreview && !hasPlayedScalePreview.current) {
-            noteEvents = generateFixedPattern(config.scalePreview, nextKey, "Major");
+            noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, "Major");
             setStatus(`Preview Notes: ${config.scalePreview.join("-")}`);
             hasPlayedScalePreview.current = true; 
         } 
         else if (config.introSequence && !hasPlayedIntroSequence.current) {
-            noteEvents = generateFixedPattern(config.introSequence, nextKey, "Major");
+            noteEvents = generateFixedPattern(config.introSequence, currentCycleKey, "Major");
             setStatus(`Intro Pattern: ${config.introSequence.join("-")}`);
             hasPlayedIntroSequence.current = true; 
         }
         else {
              noteEvents = generateMelody({
-                key: nextKey, 
+                key: currentCycleKey, 
                 scaleType: "Major",
                 constraints: constraints
             });
@@ -244,31 +267,24 @@ export default function App() {
             endDegree: endRootRef.current ? "1" : undefined,
             length: 4 
         };
-        limitForModulation = questionsPerKeyRef.current; 
+        
         playSilent = silentPracticeRef.current;
         setStatus(playSilent ? "Listen & Repeat" : "Listen");
         
+        // Generate melody using the (potentially new) key
         noteEvents = generateMelody({
-            key: nextKey, 
+            key: currentCycleKey, 
             scaleType: "Major",
             constraints: constraints
         });
     }
 
-    if (questionCount.current > limitForModulation) {
-        questionCount.current = 0;
-        const otherKeys = KEYS.filter(k => k !== keyToUse); 
-        nextKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
-        setCurrentKey(nextKey);
-        setStatus(`Modulating to ${KEY_DISPLAY_MAP[nextKey]}...`);
-        await audioEngine.loadBackingTracks(nextKey, "groove_1_80bpm.mp3");
-        await new Promise(r => setTimeout(r, 2000));
-    }
-    
     await audioEngine.preloadNotes(noteEvents!);
     
+    // Schedule and loop, passing the CURRENT key to the next iteration
+    // (The next iteration will perform the check at the top to see if it needs to change)
     audioEngine.scheduleRoutine(noteEvents!, playSilent, isFirst, () => {
-        if (isPlayingRef.current) runCycle(nextKey, false);
+        if (isPlayingRef.current) runCycle(currentCycleKey, false);
     });
     
     audioEngine.startPlayback();
