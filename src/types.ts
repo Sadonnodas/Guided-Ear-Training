@@ -15,19 +15,18 @@ export interface NoteEvent {
   duration: number;  
 }
 
-// --- NEW TYPES FOR TRAINING ---
-
 export interface MelodyConstraints {
-  allowedDegrees: ScaleDegree[]; // e.g., ["1", "3", "5"]
-  startDegree?: ScaleDegree;     // If undefined, can start on any allowed
-  endDegree?: ScaleDegree;       // If undefined, can end on any allowed
-  length: number;                // Number of notes
+  allowedDegrees: ScaleDegree[];
+  startDegree?: ScaleDegree;     
+  endDegree?: ScaleDegree;       
+  length: number;                
 }
 
 export interface TrainingStage {
-  duration: number; // Seconds to spend in this stage
-  label: string;    // Description for the UI (e.g. "Warm Up")
+  duration: number; // Duration in seconds (relative to standard time)
+  label: string;
   constraints: MelodyConstraints;
+  questionsPerKey?: number; // NEW: How often to change key (undefined = infinite/no change)
 }
 
 export interface TrainingLevel {

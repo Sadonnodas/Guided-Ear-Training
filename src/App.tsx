@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { audioEngine } from "./audio/AudioEngine";
 import { generateMelody } from "./core/MelodyGenerator";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
-import { useTrainingMode } from "./hooks/useTrainingMode"; // NEW IMPORT
-import type { MusicalKey, ScaleDegree, MelodyConstraints } from "./types"; // Updated Types
+import { useTrainingMode } from "./hooks/useTrainingMode"; 
+import { MAJOR_LEVELS } from "./config/TrainingLevels"; 
+import type { MusicalKey, ScaleDegree, MelodyConstraints } from "./types";
 import "./App.css";
 
 // Components
@@ -50,7 +51,7 @@ export default function App() {
   const [debugClick, setDebugClick] = useState(false); 
 
   // --- HOOKS ---
-  const training = useTrainingMode(); // NEW HOOK
+  const training = useTrainingMode(); 
 
   // --- REFS ---
   const isPlayingRef = useRef(false);
@@ -62,7 +63,7 @@ export default function App() {
   const silentPracticeRef = useRef(silentPractice);
   const questionsPerKeyRef = useRef(questionsPerKey);
   const enabledDegreesRef = useRef(enabledDegrees);
-  const activeTabRef = useRef(activeTab); // Track tab in ref
+  const activeTabRef = useRef(activeTab); 
 
   // Sync Refs
   useEffect(() => { startRootRef.current = startRoot; }, [startRoot]);
@@ -104,7 +105,6 @@ export default function App() {
     }
   }, [activeMidi, currentKey]);
 
-  // RESET training if tab changes
   useEffect(() => {
     if (activeTab === 'random') {
         training.resetTraining();
@@ -112,9 +112,7 @@ export default function App() {
   }, [activeTab]);
 
   const toggleDegree = (d: ScaleDegree) => {
-    // Only allow toggling in Random Mode
     if (activeTab !== 'random') return;
-    
     setEnabledDegrees(prev => {
         if (prev.includes(d)) {
             if (prev.length === 1) return prev; 
@@ -150,6 +148,21 @@ export default function App() {
     }
   };
 
+  // --- NEW: Safe Level Switching ---
+  const handleLevelChange = (newLevelId: number) => {
+      training.setActiveLevelId(newLevelId);
+      
+      // If playing, we must RESTART the session to:
+      // 1. Kill the old loop (prevents double audio)
+      // 2. Apply new level immediately (prevents stale constraints)
+      if (isPlaying) {
+          audioEngine.reset(); // Stop Transport & Clear Schedules
+          training.resetTraining(); // Reset Timer
+          training.startTrainingTimer();
+          runCycle(currentKey, true); // Force new start
+      }
+  };
+
   const startSession = async () => {
     if (!isPlaying) {
       try {
@@ -162,7 +175,6 @@ export default function App() {
         setIsPlaying(true);
         isPlayingRef.current = true;
         
-        // Start Timer if in Training Mode
         if (activeTab === 'training') {
             training.startTrainingTimer();
         }
@@ -178,7 +190,7 @@ export default function App() {
     setIsPlaying(false);
     isPlayingRef.current = false;
     audioEngine.reset(); 
-    training.pauseTrainingTimer(); // Pause timer
+    training.pauseTrainingTimer(); 
     setStatus("Paused");
     setActiveMidi(null);
     setLastValidStep(0); 
@@ -190,8 +202,33 @@ export default function App() {
     questionCount.current += 1;
     let nextKey = keyToUse;
 
-    // KEY CHANGE LOGIC (Only for Random Mode usually, but keeping simple for now)
-    if (questionCount.current > questionsPerKeyRef.current) {
+    // --- DETERMINE MODE & CONFIG ---
+    let constraints: MelodyConstraints;
+    let limitForModulation = 9999;
+
+    if (activeTabRef.current === 'training') {
+        const config = training.getCurrentConfig();
+        constraints = config.constraints;
+        limitForModulation = config.questionsPerKey;
+
+        setEnabledDegrees(constraints.allowedDegrees);
+        setStatus(`${training.stageLabel}`);
+        setStartRoot(constraints.startDegree === '1');
+        setEndRoot(constraints.endDegree === '1');
+    } else {
+        constraints = {
+            allowedDegrees: enabledDegreesRef.current,
+            startDegree: startRootRef.current ? "1" : undefined,
+            endDegree: endRootRef.current ? "1" : undefined,
+            length: 4 
+        };
+        limitForModulation = questionsPerKeyRef.current; 
+        const isSilent = silentPracticeRef.current;
+        setStatus(isSilent ? "Listen & Repeat" : "Listen");
+    }
+
+    // --- MODULATION LOGIC ---
+    if (questionCount.current > limitForModulation) {
         questionCount.current = 0;
         const otherKeys = KEYS.filter(k => k !== keyToUse); 
         nextKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
@@ -199,27 +236,6 @@ export default function App() {
         setStatus(`Modulating to ${KEY_DISPLAY_MAP[nextKey]}...`);
         await audioEngine.loadBackingTracks(nextKey, "groove_1_80bpm.mp3");
         await new Promise(r => setTimeout(r, 2000));
-    }
-    
-    // --- DETERMINE MODE ---
-    let constraints: MelodyConstraints;
-
-    if (activeTabRef.current === 'training') {
-        // Training Mode Logic
-        constraints = training.getCurrentConstraints();
-        // Update enabled degrees visually (but user can't click them)
-        setEnabledDegrees(constraints.allowedDegrees);
-        setStatus(`Level ${training.activeLevelId}: ${training.stageLabel}`);
-    } else {
-        // Random Mode Logic
-        constraints = {
-            allowedDegrees: enabledDegreesRef.current,
-            startDegree: startRootRef.current ? "1" : undefined,
-            endDegree: endRootRef.current ? "1" : undefined,
-            length: 4 
-        };
-        const isSilent = silentPracticeRef.current;
-        setStatus(isSilent ? "Listen & Repeat" : "Listen");
     }
     
     // GENERATE
@@ -231,7 +247,6 @@ export default function App() {
     
     await audioEngine.preloadNotes(melody);
     
-    // Use Ref for silent practice in random mode, assume false for training (or add option later)
     const isSilent = activeTabRef.current === 'random' ? silentPracticeRef.current : false;
 
     audioEngine.scheduleRoutine(melody, isSilent, isFirst, () => {
@@ -241,7 +256,6 @@ export default function App() {
     audioEngine.startPlayback();
   };
 
-  // Helper formatting for timer
   const formatTime = (s: number) => {
       const mins = Math.floor(s / 60);
       const secs = s % 60;
@@ -262,17 +276,36 @@ export default function App() {
 
         {/* TRAINING HUD */}
         {activeTab === 'training' && (
-            <div style={{
-                textAlign: 'center', 
-                marginBottom: '10px', 
-                color: 'var(--btn-play)', 
-                fontWeight: 'bold',
-                background: 'rgba(74, 222, 128, 0.1)',
-                padding: '10px',
-                borderRadius: '8px'
-            }}>
-                <div>Time: {formatTime(training.sessionTime)}</div>
-                <div style={{fontSize: '0.9em', opacity: 0.8}}>{training.stageLabel}</div>
+            <div className="training-hud">
+                <div className="training-info">
+                   <div style={{fontWeight:'bold'}}>{training.stageLabel}</div>
+                   <div style={{fontSize: '0.9em', opacity: 0.8}}>
+                       {formatTime(training.sessionTime)} / {training.userDurationMinutes}:00
+                   </div>
+                </div>
+                
+                {/* LEVEL SELECTOR: Now uses handleLevelChange */}
+                <div style={{display:'flex', gap:'10px', marginTop:'10px', justifyContent:'center'}}>
+                   <select 
+                     value={training.activeLevelId} 
+                     onChange={(e) => handleLevelChange(Number(e.target.value))}
+                     className="key-select"
+                     style={{width: '100%'}}
+                   >
+                       {MAJOR_LEVELS.map(l => (
+                           <option key={l.id} value={l.id}>{l.name}</option>
+                       ))}
+                   </select>
+                </div>
+                
+                <div className="slider-row" style={{marginTop: '15px'}}>
+                    <span>Duration: {training.userDurationMinutes}m</span>
+                    <input 
+                        type="range" min="1" max="20" step="1"
+                        value={training.userDurationMinutes}
+                        onChange={(e) => training.setUserDurationMinutes(Number(e.target.value))}
+                    />
+                </div>
             </div>
         )}
 
@@ -284,41 +317,32 @@ export default function App() {
           toggleDegree={toggleDegree}
         />
 
-        {/* Hide complex controls in training mode to focus user */}
-        {activeTab === 'random' ? (
+        <div style={{ opacity: activeTab === 'training' ? 1 : 1 }}>
             <Controls 
-            isPlaying={isPlaying} onPlayToggle={startSession}
-            bpm={bpm} setBpm={setBpm}
-            triggerPulse={triggerPulse} 
-            
-            startRoot={startRoot} setStartRoot={setStartRoot}
-            endRoot={endRoot} setEndRoot={setEndRoot}
-            silentPractice={silentPractice} setSilentPractice={setSilentPractice}
-            questionsPerKey={questionsPerKey} setQuestionsPerKey={setQuestionsPerKey}
-            
-            volMaster={volMaster} setVolMaster={setVolMaster}
-            volVoice={volVoice} setVolVoice={setVolVoice}
-            volDrone={volDrone} setVolDrone={setVolDrone}
-            volGroove={volGroove} setVolGroove={setVolGroove}
-            volReverb={volReverb} setVolReverb={setVolReverb}
-            volMetronome={volMetronome} setVolMetronome={setVolMetronome}
-            
-            toggleMute={toggleMute}
+                isPlaying={isPlaying} onPlayToggle={startSession}
+                bpm={bpm} setBpm={setBpm}
+                triggerPulse={triggerPulse} 
+                
+                startRoot={startRoot} setStartRoot={activeTab === 'random' ? setStartRoot : () => {}}
+                endRoot={endRoot} setEndRoot={activeTab === 'random' ? setEndRoot : () => {}}
+                silentPractice={silentPractice} setSilentPractice={activeTab === 'random' ? setSilentPractice : () => {}}
+                questionsPerKey={questionsPerKey} setQuestionsPerKey={activeTab === 'random' ? setQuestionsPerKey : () => {}}
+                
+                volMaster={volMaster} setVolMaster={setVolMaster}
+                volVoice={volVoice} setVolVoice={setVolVoice}
+                volDrone={volDrone} setVolDrone={setVolDrone}
+                volGroove={volGroove} setVolGroove={setVolGroove}
+                volReverb={volReverb} setVolReverb={setVolReverb}
+                volMetronome={volMetronome} setVolMetronome={setVolMetronome}
+                
+                toggleMute={toggleMute}
             />
-        ) : (
-             <div className="play-btn-container">
-                <button 
-                    className={`play-btn ${isPlaying ? 'playing' : ''}`} 
-                    onClick={startSession}
-                >
-                    {isPlaying ? 
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> 
-                        : 
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                    }
-                </button>
-            </div>
-        )}
+            {activeTab === 'training' && (
+                <div style={{textAlign:'center', fontSize:'0.75em', opacity:0.5, marginTop:'5px'}}>
+                    * Some settings are managed by the Level
+                </div>
+            )}
+        </div>
 
       </div>
     </div>
