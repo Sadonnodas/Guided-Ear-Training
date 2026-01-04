@@ -1,0 +1,129 @@
+/* ... existing tabs styles ... */
+
+.tabs {
+  display: flex;
+  background: var(--bg-tabs);
+  padding: 4px;
+  border-radius: 8px;
+  width: 100%;
+  margin-bottom: 25px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 10px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover { color: var(--text-main); }
+.tab-btn.active { background: var(--bg-tab-active); color: var(--text-main); }
+
+/* ... existing info-display styles ... */
+
+.info-display {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.key-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #21262d;
+  padding: 5px 15px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.key-select {
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: center;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.key-select:focus { outline: none; }
+.key-select option { background: var(--bg-panel); }
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+.icon-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
+
+.separator {
+    width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 5px;
+}
+
+.status-text {
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: 10px;
+  min-height: 24px;
+}
+
+/* --- NEW TOGGLE SWITCH STYLES --- */
+.view-toggle {
+  display: flex;
+  position: relative;
+  background: rgba(0,0,0,0.3);
+  border-radius: 12px;
+  padding: 2px;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.toggle-option {
+  position: relative;
+  z-index: 2; /* Sit above the pill */
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+
+.toggle-option.active {
+  color: #fff;
+}
+
+/* The sliding background pill */
+.toggle-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 28px; /* Matches option width */
+  background: var(--text-muted);
+  border-radius: 10px;
+  opacity: 0.3;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 1;
+}
+
+/* Move pill based on state */
+.toggle-pill.tape { transform: translateX(0); }
+.toggle-pill.static { transform: translateX(30px); } /* 28px width + 2px gap */

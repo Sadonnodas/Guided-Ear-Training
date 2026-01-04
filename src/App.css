@@ -1,21 +1,28 @@
 :root {
-  --bg-dark: #1e1e24;
-  --panel-dark: #2b2b36;
-  --text-main: #ffffff;
-  --text-muted: #a0a0b0;
+  /* --- THEME COLORS --- */
+  --bg-app: #0d1117;       
+  --bg-panel: #161b22;     
+  --bg-tabs: #010409;      
+  --bg-tab-active: #21262d;
   
-  /* --- MATCHING YOUR SCREENSHOT COLORS --- */
-  --c-1: #ff6b6b; /* Salmon Red */
-  --c-2: #ff9f43; /* Orange */
-  --c-3: #feca57; /* Yellow */
-  --c-4: #4cd137; /* Green */
-  --c-5: #54a0ff; /* Blue */
-  --c-6: #a29bfe; /* Periwinkle Purple */
-  --c-7: #fd79a8; /* Pink */
+  --text-main: #f0f6fc;
+  --text-muted: #8b949e;
+  
+  --btn-play: #4ade80;     /* Mint Green */
+  --btn-stop: #ff6b6b;     /* Red */
+
+  /* --- RAINBOW SCALE COLORS --- */
+  --c-1: #ff867c; /* Salmon */
+  --c-2: #ffb74d; /* Orange */
+  --c-3: #ffd54f; /* Yellow */
+  --c-4: #81c784; /* Green */
+  --c-5: #64b5f6; /* Blue */
+  --c-6: #9575cd; /* Purple */
+  --c-7: #f06292; /* Pink */
 }
 
 body {
-  background-color: var(--bg-dark);
+  background-color: var(--bg-app);
   margin: 0;
   color: var(--text-main);
 }
@@ -25,6 +32,7 @@ body {
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  overscroll-behavior: none;
 }
 
 .app-container {
@@ -32,311 +40,23 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 20px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  width: 100%;
 }
 
 .main-panel {
-  background: var(--panel-dark);
-  padding: 30px;
+  background: var(--bg-panel);
+  padding: 40px;
   border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 20px 40px rgba(0,0,0,0.4);
   width: 100%;
-  max-width: 600px; /* INCREASED: Fits 7 bubbles comfortably */
+  max-width: 600px;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.05);
+  box-sizing: border-box; 
 }
 
-/* --- TAPE VISUALIZER --- */
-.visualizer-container {
-  position: relative;
-  width: 100%;
-  height: 90px;
-  margin: 20px 0;
-  overflow: hidden;
-  /* Very subtle fade only at the absolute edges */
-  mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
-  background: rgba(0,0,0,0.2);
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.05);
+@media (max-width: 600px) {
+  #root { padding: 1rem; padding-top: 2rem; }
+  .main-panel { padding: 20px 15px; border-radius: 20px; width: 100%; }
 }
-
-.tape-strip {
-  display: flex;
-  align-items: center;
-  position: absolute;
-  left: 50%; 
-  height: 100%;
-  /* Smooth slide animation */
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: transform;
-}
-
-.tape-cell {
-  width: 60px; 
-  height: 60px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.3rem; /* Slightly larger numbers */
-  font-weight: 800;
-  cursor: pointer;
-  position: relative;
-}
-
-/* The colored bubble */
-.tape-cell span {
-  width: 50px; /* Slightly larger bubbles */
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #444; 
-  color: rgba(0,0,0,0.6); /* Dark text on bright bubbles looks cleaner */
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-  border: 2px solid transparent; 
-  transition: all 0.2s;
-}
-
-/* --- ALWAYS COLORED (Active or Passive) --- */
-.tape-cell.d-1 span { background: var(--c-1); }
-.tape-cell.d-2 span {background: var(--c-2); }
-.tape-cell.d-3 span { background: var(--c-3); }
-.tape-cell.d-4 span { background: var(--c-4); }
-.tape-cell.d-5 span { background: var(--c-5); }
-.tape-cell.d-6 span { background: var(--c-6); }
-.tape-cell.d-7 span { background: var(--c-7); }
-
-/* --- ACTIVE STATE (The "Playing" Note) --- */
-.tape-cell.active span {
-  color: white; 
-  transform: scale(1.15);
-  box-shadow: 0 0 25px currentColor; /* Glow matches the bubble color */
-  border-color: white;
-  z-index: 10;
-}
-
-/* Disabled degrees (ghosted/greyed out) */
-.tape-cell.disabled span {
-  background: #3a3a45 !important;
-  color: #555 !important;
-  box-shadow: none;
-  border-color: transparent;
-}
-
-/* --- CONTROLS --- */
-.tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  justify-content: center;
-  background: rgba(0,0,0,0.2);
-  padding: 5px;
-  border-radius: 25px;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.tab-btn {
-  background: none;
-  border: none;
-  padding: 8px 20px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: 20px;
-  transition: all 0.2s;
-}
-
-.tab-btn.active {
-  background: #ffffff;
-  color: #2b2b36;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-
-.info-display {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.key-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.key-select {
-  font-size: 1.5rem;
-  font-weight: 700;
-  padding: 5px 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-main);
-  cursor: pointer;
-  text-align: center;
-}
-.key-select option {
-    background: var(--panel-dark);
-}
-
-.icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 8px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.icon-btn:hover { background: rgba(255,255,255,0.1); color: white; }
-
-.status-text {
-  font-size: 0.9rem;
-  color: var(--c-5); /* Blue status */
-  height: 20px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-}
-
-.play-btn {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ffffff, #e0e0e0);
-  color: #2b2b36;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 20px auto;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  transition: transform 0.1s, box-shadow 0.2s;
-}
-
-.play-btn:hover { transform: scale(1.05); box-shadow: 0 15px 40px rgba(255,255,255,0.1); }
-.play-btn:active { transform: scale(0.95); }
-.play-btn.playing {
-    background: var(--c-1); /* Red for stop */
-    color: white;
-    box-shadow: 0 0 30px rgba(255, 82, 82, 0.4);
-}
-
-.settings-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  padding: 15px;
-  margin-top: 10px;
-}
-.settings-trigger:hover { color: white; }
-
-.controls-accordion {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.4s cubic-bezier(0, 1, 0, 1);
-}
-.controls-accordion.open {
-  max-height: 500px;
-  transition: max-height 0.5s ease-in-out;
-}
-
-.controls-content {
-  padding-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  margin-top: 10px;
-}
-
-.slider-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.slider-row input[type="range"] {
-  flex: 1;
-  accent-color: var(--c-5); /* Blue sliders */
-  height: 4px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 2px;
-  appearance: none;
-}
-.slider-row input[type="range"]::-webkit-slider-thumb {
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    background: white;
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.toggle-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-}
-
-.toggle-card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid transparent;
-  padding: 10px 5px;
-  font-size: 0.8rem;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: var(--text-muted);
-  text-align: center;
-}
-.toggle-card:hover { background: rgba(255,255,255,0.1); }
-.toggle-card.active {
-  background: rgba(64, 196, 255, 0.2);
-  color: white;
-  border-color: var(--c-5);
-}
-
-.tempo-row {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-.tempo-btn {
-  border: 1px solid rgba(255,255,255,0.1);
-  background: transparent;
-  color: var(--text-muted);
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-.tempo-btn.active {
-  background: var(--text-main);
-  color: var(--bg-dark);
-  border-color: white;
-  font-weight: bold;
-}
-.tempo-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.muted-label { text-decoration: line-through; opacity: 0.5; cursor: pointer; }
-.active-label { cursor: pointer; color: white; }
