@@ -36,6 +36,7 @@ export default function App() {
   const [volGroove, setVolGroove] = useState(0.5);
   const [volClick] = useState(0.5); 
   const [volReverb, setVolReverb] = useState(0.3);
+  const [volMetronome, setVolMetronome] = useState(0.8);
 
   const prevVol = useRef<Record<string, number>>({});
   
@@ -45,11 +46,28 @@ export default function App() {
   const [silentPractice, setSilentPractice] = useState(false);
   const [questionsPerKey, setQuestionsPerKey] = useState(10); 
   const [triggerPulse, setTriggerPulse] = useState(false);
-  const [debugClick, setDebugClick] = useState(false); // NEW
+  const [debugClick, setDebugClick] = useState(false); 
 
+  // --- REFS (Fix for "Real-time Updates") ---
+  // We use refs so the running loop can access the LATEST values, 
+  // not the stale values from when the loop started.
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
   const visualTimeoutRef = useRef<number>(0); 
+  
+  const startRootRef = useRef(startRoot);
+  const endRootRef = useRef(endRoot);
+  const silentPracticeRef = useRef(silentPractice);
+  const questionsPerKeyRef = useRef(questionsPerKey);
+  const enabledDegreesRef = useRef(enabledDegrees);
+
+  // Sync Refs with State
+  useEffect(() => { startRootRef.current = startRoot; }, [startRoot]);
+  useEffect(() => { endRootRef.current = endRoot; }, [endRoot]);
+  useEffect(() => { silentPracticeRef.current = silentPractice; }, [silentPractice]);
+  useEffect(() => { questionsPerKeyRef.current = questionsPerKey; }, [questionsPerKey]);
+  useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
+
 
   useEffect(() => {
     audioEngine.onNotePlay = (note, isClick) => {
@@ -71,8 +89,12 @@ export default function App() {
     audioEngine.setClickVol(volClick);
     audioEngine.setReverbMix(volReverb);
     audioEngine.setBpm(bpm);
-    audioEngine.setDebugClick(debugClick); // NEW
-  }, [volMaster, volDrone, volGroove, volVoice, volClick, volReverb, bpm, debugClick]);
+    
+    // Metronome Updates
+    audioEngine.setDebugClick(debugClick);
+    audioEngine.setMetronomeVol(volMetronome);
+
+  }, [volMaster, volDrone, volGroove, volVoice, volClick, volReverb, bpm, debugClick, volMetronome]);
 
   useEffect(() => {
     if (activeMidi !== null) {
@@ -127,7 +149,6 @@ export default function App() {
         await audioEngine.loadBackingTracks(currentKey, "groove_1_80bpm.mp3");
         setIsPlaying(true);
         isPlayingRef.current = true;
-        // IMPORTANT: Pass 'true' to indicate first question (Triggers Settling Measure)
         runCycle(currentKey, true);
       } catch (e) { console.error(e); setStatus("Error"); }
     } else {
@@ -150,7 +171,8 @@ export default function App() {
     questionCount.current += 1;
     let nextKey = keyToUse;
 
-    if (questionCount.current > questionsPerKey) {
+    // Use REF to get the live value of questionsPerKey
+    if (questionCount.current > questionsPerKeyRef.current) {
         questionCount.current = 0;
         const otherKeys = KEYS.filter(k => k !== keyToUse); 
         nextKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
@@ -160,20 +182,23 @@ export default function App() {
         await new Promise(r => setTimeout(r, 2000));
     }
     
-    setStatus(silentPractice ? "Listen & Repeat" : "Listen");
+    // Use REF for silentPractice
+    const isSilent = silentPracticeRef.current;
+    setStatus(isSilent ? "Listen & Repeat" : "Listen");
     
     const melody = generateMelody({
         length: 4, 
         key: nextKey, 
         scaleType: "Major",
-        startOnRoot: startRoot,
-        endOnRoot: endRoot,
-        activeDegrees: enabledDegrees
+        // Use REFS for live generation settings
+        startOnRoot: startRootRef.current,
+        endOnRoot: endRootRef.current,
+        activeDegrees: enabledDegreesRef.current
     });
     
     await audioEngine.preloadNotes(melody);
     
-    audioEngine.scheduleRoutine(melody, silentPractice, isFirst, () => {
+    audioEngine.scheduleRoutine(melody, isSilent, isFirst, () => {
         if (isPlayingRef.current) runCycle(nextKey, false);
     });
     
@@ -189,6 +214,7 @@ export default function App() {
           currentKey={currentKey} setKeyManually={setKeyManually}
           pickRandomKey={pickRandomKey} status={status}
           viewMode={viewMode} setViewMode={setViewMode}
+          debugClick={debugClick} setDebugClick={setDebugClick}
         />
 
         <Visualizer 
@@ -214,9 +240,9 @@ export default function App() {
           volDrone={volDrone} setVolDrone={setVolDrone}
           volGroove={volGroove} setVolGroove={setVolGroove}
           volReverb={volReverb} setVolReverb={setVolReverb}
-          toggleMute={toggleMute}
+          volMetronome={volMetronome} setVolMetronome={setVolMetronome}
           
-          debugClick={debugClick} setDebugClick={setDebugClick}
+          toggleMute={toggleMute}
         />
 
       </div>

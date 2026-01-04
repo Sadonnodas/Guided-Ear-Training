@@ -1,4 +1,4 @@
-/* ... existing tabs styles ... */
+/* ... (Keep existing styles) ... */
 
 .tabs {
   display: flex;
@@ -25,8 +25,6 @@
 
 .tab-btn:hover { color: var(--text-main); }
 .tab-btn.active { background: var(--bg-tab-active); color: var(--text-main); }
-
-/* ... existing info-display styles ... */
 
 .info-display {
   display: flex;
@@ -69,8 +67,15 @@
   display: flex;
   align-items: center;
   border-radius: 4px;
+  transition: all 0.2s;
 }
 .icon-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
+
+/* New pulse effect for active metronome */
+.icon-btn.active-pulse {
+  background: rgba(74, 222, 128, 0.1);
+  border-radius: 50%; /* CHANGED: Makes the background a circle */
+}
 
 .separator {
     width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 5px;
@@ -84,7 +89,7 @@
   min-height: 24px;
 }
 
-/* --- NEW TOGGLE SWITCH STYLES --- */
+/* --- TOGGLE SWITCH STYLES --- */
 .view-toggle {
   display: flex;
   position: relative;
@@ -97,7 +102,7 @@
 
 .toggle-option {
   position: relative;
-  z-index: 2; /* Sit above the pill */
+  z-index: 2; 
   width: 28px;
   height: 24px;
   display: flex;
@@ -111,12 +116,11 @@
   color: #fff;
 }
 
-/* The sliding background pill */
 .toggle-pill {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  width: 28px; /* Matches option width */
+  width: 28px; 
   background: var(--text-muted);
   border-radius: 10px;
   opacity: 0.3;
@@ -124,6 +128,5 @@
   z-index: 1;
 }
 
-/* Move pill based on state */
 .toggle-pill.tape { transform: translateX(0); }
-.toggle-pill.static { transform: translateX(30px); } /* 28px width + 2px gap */
+.toggle-pill.static { transform: translateX(30px); }
