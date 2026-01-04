@@ -8,8 +8,22 @@ export class AudioEngine {
   // Main Graph
   private masterGain!: Tone.Gain;
   private compressor!: Tone.Compressor;
+  
+  // 1. VOCAL REVERB (Clean/Tight)
   private reverb!: Tone.Reverb;
   private vocalGain!: Tone.Gain;
+
+  // 2. SFX CHAIN (Parallel Routing)
+  private sfxReverb!: Tone.Reverb;
+  private sfxGain!: Tone.Gain;
+  
+  // Delay Loop
+  private chimeDelay!: Tone.FeedbackDelay; 
+  private delayGain!: Tone.Gain; 
+  private transitionSynth!: Tone.MetalSynth;
+
+  // State
+  private currentTonic: string = "C"; 
 
   // Modules
   private metronome!: Metronome;
@@ -25,10 +39,7 @@ export class AudioEngine {
 
   private isInitialized = false;
   private mediaSessionSetup = false;
-  
-  // FIX: Store the audio element for Pocket Mode
   private silentHtmlAudio: HTMLAudioElement | null = null;
-
   private pendingDebugActive = false;
   private pendingMetronomeVol = 0.5;
 
@@ -38,18 +49,11 @@ export class AudioEngine {
 
   private createSilentAudio() {
     if (typeof window === 'undefined') return;
-    
     const audio = document.createElement('audio');
-    // A tiny silent MP3 loop
     audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//oeAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAJAAAB3AAZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZ//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAAGGluZwAAAA8AAAAJAAAB3AAZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZ//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAATEAMEAAAAAArmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//oeAAAB3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
     audio.loop = true;
     audio.preload = 'auto';
     audio.volume = 0.01; 
-    
-    // ------------------------------------------------------------------
-    // FIX FOR IOS LOCK SCREEN: 
-    // Do NOT use display: none. Use opacity and fixed position instead.
-    // ------------------------------------------------------------------
     audio.style.position = 'fixed';
     audio.style.left = '0';
     audio.style.top = '0';
@@ -58,20 +62,14 @@ export class AudioEngine {
     audio.style.opacity = '0.001';
     audio.style.pointerEvents = 'none';
     audio.style.zIndex = '-999';
-    
     document.body.appendChild(audio);
-    
     this.silentHtmlAudio = audio;
   }
 
-  // NEW: Call this SYNCHRONOUSLY on the first click
   prepareAudio() {
-     // 1. Resume Web Audio Context
      if (Tone.context.state !== 'running') {
          Tone.context.resume().catch(() => {});
      }
-     
-     // 2. Play Silent HTML Audio
      if (this.silentHtmlAudio) {
          this.silentHtmlAudio.play().catch(e => console.log("Silent audio start failed:", e));
      }
@@ -82,25 +80,59 @@ export class AudioEngine {
 
     await Tone.start();
     
-    // 1. Setup Graph
+    // --- MASTER CHAIN ---
     this.compressor = new Tone.Compressor({ threshold: -24, ratio: 6, attack: 0.005, release: 0.2 }).toDestination();
     this.masterGain = new Tone.Gain(vols.master).connect(this.compressor);
-    this.reverb = new Tone.Reverb({ decay: 2.5, wet: 0.3 }).connect(this.masterGain);
+
+    // --- 1. VOCAL REVERB (Clean) ---
+    this.reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).connect(this.masterGain);
     this.vocalGain = new Tone.Gain(vols.voice).connect(this.reverb);
 
-    // 2. Initialize Modules
+    // --- 2. SFX REVERB (Dreamy) ---
+    this.sfxReverb = new Tone.Reverb({ decay: 5.0, wet: 0.6 }).connect(this.masterGain);
+    
+    // Main SFX Volume (0.1)
+    this.sfxGain = new Tone.Gain(0.1).connect(this.sfxReverb); 
+
+    // --- 3. DELAY PATH (Vintage Echo) ---
+    // FIXED TIME in Seconds (0.562 = 562ms)
+    // 562ms is approx dotted 8th note at 80 BPM
+    // Adjust this number to taste (e.g. 0.400 for 400ms)
+    this.chimeDelay = new Tone.FeedbackDelay(0.564, 0.4); 
+    
+    this.chimeDelay.wet.value = 1; // 100% Wet (Only output echoes)
+    
+    // Delay Volume: 0.5 (Echoes are quieter than the main hit)
+    this.delayGain = new Tone.Gain(0.3).connect(this.sfxGain);
+    this.chimeDelay.connect(this.delayGain);
+
+    // --- 4. SYNTH ---
+    this.transitionSynth = new Tone.MetalSynth({
+        envelope: { attack: 0.001, decay: 0.3, release: 0.1 }, 
+        harmonicity: 3.1,    
+        modulationIndex: 16, 
+        resonance: 3000,     
+        octaves: 1.0
+    });
+
+    // --- PARALLEL ROUTING ---
+    // Path A: Direct Hit
+    this.transitionSynth.connect(this.sfxGain);
+    
+    // Path B: Delay
+    this.transitionSynth.connect(this.chimeDelay);
+
     this.metronome = new Metronome(this.masterGain);
     this.backingTracks = new BackingTracks(this.masterGain);
     
-    // 3. Initialize Scheduler
     this.scheduler = new Scheduler({
         onBeat: (b) => { if (this.onBeat) this.onBeat(b); },
         onTick: (t) => this.metronome.playTick(t),
         onNotePlay: (n, c) => { if (this.onNotePlay) this.onNotePlay(n, c); },
-        playNoteAudio: (n, t) => this.playOneShot(n, t)
+        playNoteAudio: (n, t) => this.playOneShot(n, t),
+        onStart: (t) => this.playTransitionSound(t)
     });
 
-    // 4. Set Initial Volumes
     this.metronome.setClickVol(vols.click);
     this.backingTracks.setDroneVol(vols.drone);
     this.backingTracks.setDrumVol(vols.groove);
@@ -108,7 +140,6 @@ export class AudioEngine {
     this.metronome.setDebugVol(this.pendingMetronomeVol);
     this.metronome.setDebugActive(this.pendingDebugActive);
 
-    // Re-trigger silent audio just in case
     if (this.silentHtmlAudio && this.silentHtmlAudio.paused) {
         this.silentHtmlAudio.play().catch(() => {});
     }
@@ -121,14 +152,28 @@ export class AudioEngine {
 
   async loadBackingTracks(key: MusicalKey, drumFile: string) {
     if (!this.isInitialized) return;
+    
+    // Capture tonic
+    if (key && typeof key === 'object' && 'tonic' in key) {
+        this.currentTonic = (key as any).tonic;
+    } else if (typeof key === 'string') {
+        this.currentTonic = key;
+    }
+
     await this.backingTracks.load(key, drumFile);
   }
 
   scheduleRoutine(notes: NoteEvent[], silentPractice: boolean, isFirstQuestion: boolean, onComplete: () => void) {
     if (!this.isInitialized) return;
+
+    Tone.Transport.stop();
+    Tone.Transport.position = 0;
+    this.backingTracks.stop(); 
+    
     const beatSec = 60 / Tone.Transport.bpm.value;
     const totalMelodyBeats = notes.reduce((sum, n) => sum + n.duration, 0);
     const melodyDur = totalMelodyBeats * beatSec; 
+    
     this.scheduler.scheduleRoutine(notes, silentPractice, isFirstQuestion, onComplete, melodyDur);
   }
 
@@ -141,14 +186,13 @@ export class AudioEngine {
     }
     
     if (Tone.Transport.state !== 'started') {
-        this.backingTracks.start();
+        this.backingTracks.start(); 
         this.scheduler.start();
     }
   }
 
   pausePlayback() {
     this.scheduler.pause();
-    // Do NOT pause silentHtmlAudio here
   }
 
   reset() {
@@ -204,6 +248,14 @@ export class AudioEngine {
       source.fadeOut = 0.1; 
       source.start(time, 0, buffer.duration);
     }
+  }
+
+  // --- TRIGGER CHIME ---
+  private playTransitionSound(time: number) {
+      if (this.transitionSynth) {
+          const noteToPlay = `${this.currentTonic}3`;
+          this.transitionSynth.triggerAttackRelease(noteToPlay, "16n", time, 0.5);
+      }
   }
 
   private setupMediaSession() {

@@ -7,6 +7,7 @@ type SchedulerCallbacks = {
   onTick: (time: number) => void;
   onNotePlay: (note: NoteEvent | null, isCountIn: boolean) => void;
   playNoteAudio: (note: NoteEvent, time: number) => void;
+  onStart: (time: number) => void;
 };
 
 export class Scheduler {
@@ -21,6 +22,11 @@ export class Scheduler {
   }
 
   start() {
+    // Ensure Context is running (fixes potential suspend issues on mobile/tab switch)
+    if (Tone.context.state !== 'running') {
+        Tone.context.resume();
+    }
+
     if (Tone.Transport.state !== 'started') {
       Tone.Transport.position = 0;
       this.ensureSystemEvents();
@@ -35,6 +41,10 @@ export class Scheduler {
   stop() {
     Tone.Transport.stop();
     Tone.Transport.position = 0;
+    
+    // FIX: Clear any pending visual events so they don't get stuck
+    Tone.Draw.cancel(0);
+
     this.clearMelody();
     this.clearSystemEvents();
     Tone.Transport.cancel();
@@ -44,54 +54,36 @@ export class Scheduler {
     Tone.Transport.bpm.value = bpm;
   }
 
-  // UPDATED: Now accepts 'calculatedMelodyDur'
   scheduleRoutine(
       notes: NoteEvent[], 
       silentPractice: boolean, 
-      isFirstQuestion: boolean, 
+      _isFirstQuestion: boolean, 
       onComplete: () => void,
-      calculatedMelodyDur: number // NEW PARAMETER
+      calculatedMelodyDur: number 
   ): number {
-    this.clearMelody();
-    
-    if (this.pulseEventId === null && Tone.Transport.state === 'started') {
-        this.ensureSystemEvents();
-    }
+    this.stop(); // Ensure clean slate (includes Draw.cancel)
+    this.ensureSystemEvents();
 
     const beatSec = 60 / Tone.Transport.bpm.value;
     const measureSec = 4 * beatSec;
 
-    // --- GRID ALIGNMENT ---
-    let startPoint = 0;
-    if (Tone.Transport.state === 'started') {
-        const currentTime = Tone.Transport.seconds;
-        const nextGridBoundary = Math.ceil(currentTime / measureSec) * measureSec;
-        const bufferNeeded = 0.5;
-        
-        startPoint = (nextGridBoundary - currentTime < bufferNeeded) 
-          ? nextGridBoundary + measureSec 
-          : nextGridBoundary;
-    } else {
-        startPoint = measureSec;
-    }
-
-    if (isFirstQuestion && startPoint < measureSec) {
-        startPoint = measureSec;
-    }
+    // Start melody after 1 measure of count-in
+    const startPoint = measureSec; 
 
     const schedule = (callback: (time: number) => void, time: number) => {
-        if (time >= Tone.Transport.seconds - 0.1) {
-             const id = Tone.Transport.schedule(callback, time);
-             this.melodyEventIds.push(id);
-        }
+        const id = Tone.Transport.schedule(callback, time);
+        this.melodyEventIds.push(id);
     };
 
-    // 1. Count In
+    // 1. Count In (Visuals)
     for (let i = 0; i < 4; i++) {
         const offsetBeats = 4 - i;
         const t = startPoint - (offsetBeats * beatSec);
         schedule((time) => {
-             Tone.Draw.schedule(() => this.callbacks.onNotePlay(null, true), time);
+             // FIX: Only draw if document is visible to prevent queue clogging
+             Tone.Draw.schedule(() => {
+                 if (!document.hidden) this.callbacks.onNotePlay(null, true);
+             }, time);
         }, t);
     }
 
@@ -108,14 +100,16 @@ export class Scheduler {
             }
 
             schedule((time) => {
-                Tone.Draw.schedule(() => this.callbacks.onNotePlay(note, false), time);
+                Tone.Draw.schedule(() => {
+                    if (!document.hidden) this.callbacks.onNotePlay(note, false);
+                }, time);
             }, beatTime);
         });
     };
 
     let cursor = startPoint;
     schedulePass(cursor, true); // Pass 1
-    cursor += calculatedMelodyDur; // USE CALCULATED DURATION
+    cursor += calculatedMelodyDur;
     
     schedulePass(cursor, true); // Pass 2
     cursor += calculatedMelodyDur;
@@ -125,7 +119,24 @@ export class Scheduler {
         cursor += calculatedMelodyDur;
     }
 
-    schedule(() => setTimeout(() => onComplete(), 0), cursor);
+    // --- CHIME AT END OF LOOP (PICKUP) ---
+    const chimeOffset = 0.01; 
+    const chimeTime = Math.max(0, cursor - chimeOffset); // Prevent negative time
+
+    if (chimeTime > 0) {
+        schedule((time) => {
+            this.callbacks.onStart(time);
+        }, chimeTime);
+    }
+
+    // --- LOOP TRIGGER ---
+    // FIX: Schedule onComplete slightly BEFORE the absolute end (e.g., 50ms).
+    // This ensures it fires reliably before the Transport stops/loops.
+    // Also removes dependence on setTimeout which is unreliable in background tabs.
+    schedule(() => {
+        onComplete();
+    }, Math.max(0, cursor - 0.05)); 
+
     return cursor;
   }
 
@@ -147,11 +158,13 @@ export class Scheduler {
     // Pulse (Visual)
     this.pulseEventId = Tone.Transport.scheduleRepeat((time) => {
         Tone.Draw.schedule(() => {
-             this.callbacks.onBeat(Math.floor(Tone.Transport.position as number));
+             if (!document.hidden) {
+                 this.callbacks.onBeat(Math.floor(Tone.Transport.position as number));
+             }
         }, time);
     }, "4n");
 
-    // Metronome (Audio)
+    // Metronome (Audio) - Visual check not needed for audio
     this.clickEventId = Tone.Transport.scheduleRepeat((time) => {
         this.callbacks.onTick(time);
     }, "4n");

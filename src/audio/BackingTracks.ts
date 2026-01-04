@@ -12,13 +12,13 @@ export class BackingTracks {
   
   private drumPlayer: Tone.Player;
 
-  // FIX: Changed Tone.AudioNode to Tone.ToneAudioNode
   constructor(destination: Tone.ToneAudioNode) {
     this.droneGain = new Tone.Gain(0).connect(destination);
     this.drumGain = new Tone.Gain(0).connect(destination);
 
-    this.dronePlayerA = new Tone.Player({ loop: true, fadeIn: 2, fadeOut: 2 }).connect(this.droneGain);
-    this.dronePlayerB = new Tone.Player({ loop: true, fadeIn: 2, fadeOut: 2 }).connect(this.droneGain);
+    // Longer fade times for smoother key transitions
+    this.dronePlayerA = new Tone.Player({ loop: true, fadeIn: 6, fadeOut: 6 }).connect(this.droneGain);
+    this.dronePlayerB = new Tone.Player({ loop: true, fadeIn: 6, fadeOut: 6 }).connect(this.droneGain);
     this.dronePlayerB.volume.value = -Infinity;
 
     this.drumPlayer = new Tone.Player({ loop: true, fadeIn: 0.05, fadeOut: 0.05 }).connect(this.drumGain);
@@ -40,6 +40,7 @@ export class BackingTracks {
       const currentPlayer = this.activeDrone === 'A' ? this.dronePlayerA : this.dronePlayerB;
       const nextPlayer = this.activeDrone === 'A' ? this.dronePlayerB : this.dronePlayerA;
 
+      // CRITICAL: Load the new drone FIRST, before starting any crossfade
       await nextPlayer.load(droneUrl);
 
       if (!this.drumPlayer.loaded) await this.drumPlayer.load(drumUrl);
@@ -47,18 +48,25 @@ export class BackingTracks {
       const settings = GROOVE_SETTINGS[drumFile] || GROOVE_DEFAULTS;
       this.drumPlayer.playbackRate = settings.playbackRate;
 
-      // Crossfade logic
+      // Crossfade logic - now guaranteed that nextPlayer is fully loaded
       if (Tone.Transport.state === 'started') {
         // Sync new drum settings live
         if (this.drumPlayer.state !== 'started') {
            this.drumPlayer.sync().start(0, settings.nudge || 0);
         }
 
+        // Start new drone at silence, then fade in over 6 seconds
         nextPlayer.volume.value = -Infinity;
         nextPlayer.start(0, 0);
-        nextPlayer.volume.rampTo(0, 4);
-        currentPlayer.volume.rampTo(-Infinity, 4);
-        setTimeout(() => { currentPlayer.stop(); }, 4000);
+        
+        // Use setTimeout to ensure the ramp starts AFTER the player has actually started
+        setTimeout(() => {
+          nextPlayer.volume.rampTo(0, 6);
+        }, 50);
+        
+        // Fade out old drone over 6 seconds
+        currentPlayer.volume.rampTo(-Infinity, 6);
+        setTimeout(() => { currentPlayer.stop(); }, 6000);
       } else {
         // Prepare for next start
         currentPlayer.stop();
