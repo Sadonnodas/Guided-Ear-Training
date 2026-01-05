@@ -1,6 +1,9 @@
 import * as Tone from "tone";
 import type { MusicalKey } from "../types";
-import { GROOVE_SETTINGS, GROOVE_DEFAULTS } from "../config/AudioConfig";
+
+// FIX: Define local defaults since AudioConfig does not export them
+const GROOVE_DEFAULTS = { playbackRate: 1.0, nudge: 0 };
+const GROOVE_SETTINGS: Record<string, { playbackRate: number; nudge?: number }> = {};
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 
@@ -75,6 +78,7 @@ export class BackingTracks {
 
       // 2. Prepare Drum
       await this.drumPlayer.load(drumUrl);
+      // FIX: Uses local constant now
       const settings = GROOVE_SETTINGS[drumFile] || GROOVE_DEFAULTS;
       this.drumPlayer.playbackRate = settings.playbackRate;
 
