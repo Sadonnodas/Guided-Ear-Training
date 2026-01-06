@@ -31,9 +31,9 @@ export function useSessionLogic() {
   const [volMaster, setVolMaster] = useState(1.0);
   const [volVoice, setVolVoice] = useState(1.0);
   const [volDrone, setVolDrone] = useState(0.4);
-  const [volGroove, setVolGroove] = useState(0.5);
+  // CHANGE: Increased groove volume slightly as Lofi beats are softer than the old standard rock beat
+  const [volGroove, setVolGroove] = useState(0.6); 
   const [volMetronome, setVolMetronome] = useState(0.8);
-  // CHANGED: Increased default guide volume from 0.3 to 0.8
   const [volTraining, setVolTraining] = useState(0.8); 
 
   // Visualizer State

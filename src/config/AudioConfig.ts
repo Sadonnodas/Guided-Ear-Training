@@ -65,56 +65,69 @@ export const DRUM_OFFSETS: Record<string, number> = {
 /**
  * STABLE DRUM PATTERNS
  * Defined by beat positions (0 = Beat 1, 1 = Beat 2, 2 = Beat 3, 3 = Beat 4).
+ * Decimals represent subdivisions (0.5 = 8th note, 0.25 = 16th note).
  */
 export const DRUM_PATTERNS = {
-  "Standard Groove": {
-    kick:  [0, 2],           // Beats 1 and 3
-    snare: [1, 3],           // Beats 2 and 4
-    hihat: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] // Straight 8th notes
+  // --- CLASSIC ---
+  "Classic Groove": {
+    kick:  [0, 2],           
+    snare: [1, 3],           
+    hihat: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] 
   },
-  "Steady Pulse": {
-    kick:  [0, 1, 2, 3],     // Four on the floor
-    hihat: [0.5, 1.5, 2.5, 3.5] // Off-beat hats
-  },
-  "Acoustic Training": {
-    kick_soft: [0, 2],
-    stick: [1, 3],
-    hihat_foot: [0, 1, 2, 3]
-  },
-  "Minimalist": {
-    kick_soft: [0],
-    triangle:  [1, 2, 3]
-  },
-  
-  // --- NEW PATTERNS BASED ON SAMPLES ---
-  "Disco Fever": {
-    kick_goat: [0, 1, 2, 3],
-    snare: [1, 3],
-    hats_open: [0.5, 1.5, 2.5, 3.5], // Offbeats
-    hats_foot: [0, 1, 2, 3]          // Pedal on beats
-  },
-  "Lofi Chill": {
-    kick_soft: [0, 1.5, 2.25],       // Syncopated kick
+
+  // --- LOFI CHILL ---
+  "Lofi Chill": { // The Original
+    kick_soft: [0, 1.5, 2.25],       
     snap: [1, 3],
     hats_vinyl_edge: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
-    shaker: [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75] // 16th note texture
+    shaker: [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75] 
   },
-  "Bossa Vibe": {
-    kick_soft: [0, 1.5, 2, 3.5],     // Classic dotted pattern
-    rimshot: [0, 0.75, 1.5, 2.5, 3.25], // Clave-like pattern
+  "Lofi Chill B": { // Laid back, spacious
+    kick_soft: [0, 2.5], // Kick on 1 and the "and of 3"
+    snap: [1, 3],
+    hats_vinyl_edge: [0, 1, 2, 3], // Quarter notes only for space
+    shaker: [0.5, 1.5, 2.5, 3.5]   // Offbeats
+  },
+  "Lofi Chill C": { // Busy, rolling kick
+    kick_soft: [0, 0.75, 2, 2.75], 
+    snap: [1, 3],
+    hats_vinyl_edge: [0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.25, 2.5, 2.75, 3, 3.5] // Syncopated 16ths
+  },
+
+  // --- BOSSA VIBE ---
+  "Bossa Vibe": { // The Original (Classic Clave)
+    kick_soft: [0, 1.5, 2, 3.5],     
+    rimshot: [0, 0.75, 1.5, 2.5, 3.25], 
     shaker: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75]
   },
-  "Rock Anthem": {
-    kick_goat: [0, 1.5, 2, 2.5],
-    snare: [1, 3],
-    crash: [0],                      // Crash on 1
-    ride: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]
+  "Bossa Vibe B": { // Reverse Clave feel
+    kick_soft: [0, 1.5, 2, 3.5],
+    rimshot: [0.5, 1.25, 2, 2.75, 3.5], // Different accents
+    shaker: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5] // Straighter shaker
   },
-  "Percussion Only": {
+  "Bossa Vibe C": { // Sparse, "Samba-lite"
+    kick_soft: [0, 1, 2, 3], // Four on floor (Surdo style)
+    rimshot: [0.75, 2.25, 3.75], // Minimal syncopation
+    shaker: [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75]
+  },
+
+  // --- PERCUSSION ONLY ---
+  "Percussion Only": { // The Original (No Triangle)
     woodblock: [0, 1, 2, 3],
     tambourine: [0.5, 1.5, 2.5, 3.5],
     clave: [0.75, 2.25, 3.75],
     floortom: [3.5]
+  },
+  "Percussion Only B": { // Stick & Snap Groove
+    stick: [0, 0.75, 1.5, 2.25, 3],
+    snap: [1, 3],
+    woodblock: [0.5, 2.5],
+    shaker: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]
+  },
+  "Percussion Only C": { // Driving Shaker
+    shaker: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75],
+    clave: [0, 1.5, 2, 3.5], // Son Clave 3-2
+    floortom: [0, 2] // Heavy accents
   }
 };
 

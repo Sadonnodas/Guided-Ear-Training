@@ -3,7 +3,8 @@ import { DRUM_OFFSETS, DRUM_PATTERNS } from "../config/AudioConfig";
 
 export class DrumMachine {
   private players: Tone.Players;
-  private currentPatternName: keyof typeof DRUM_PATTERNS = "Standard Groove";
+  // CHANGE: Default to "Lofi Chill"
+  private currentPatternName: keyof typeof DRUM_PATTERNS = "Lofi Chill"; 
   private scheduledEvents: number[] = [];
 
   constructor(destination: Tone.ToneAudioNode) {
