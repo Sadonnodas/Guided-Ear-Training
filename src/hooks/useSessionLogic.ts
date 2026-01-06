@@ -5,6 +5,7 @@ import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
 import type { MusicalKey, ScaleDegree, MelodyConstraints } from "../types";
 
+// ... (Keep existing KEYS and KEY_DISPLAY_MAP) ...
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
   "C": "C", "Cs": "D♭", "D": "D", "Ds": "E♭", "E": "E", "F": "F",
@@ -12,13 +13,14 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 };
 
 export function useSessionLogic() {
-  // --- STATE ---
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentKey, setCurrentKey] = useState<MusicalKey>("C");
   const [status, setStatus] = useState("Start Session");
   const [bpm, setBpm] = useState(80);
   
-  // Settings
+  // NEW: Track the active pattern so UI defaults match AudioEngine
+  const [currentPattern, setCurrentPattern] = useState("Lofi Chill"); 
+
   const [activeTab, setActiveTab] = useState("random");
   const [enabledDegrees, setEnabledDegrees] = useState<ScaleDegree[]>(["1", "2", "3", "4", "5", "6", "7"]);
   const [startRoot, setStartRoot] = useState(false);
@@ -31,23 +33,20 @@ export function useSessionLogic() {
   const [volMaster, setVolMaster] = useState(1.0);
   const [volVoice, setVolVoice] = useState(1.0);
   const [volDrone, setVolDrone] = useState(0.4);
-  // CHANGE: Increased groove volume slightly as Lofi beats are softer than the old standard rock beat
-  const [volGroove, setVolGroove] = useState(0.6); 
+  const [volGroove, setVolGroove] = useState(0.6); // Default slightly higher for Lofi
   const [volMetronome, setVolMetronome] = useState(0.8);
   const [volTraining, setVolTraining] = useState(0.8); 
 
-  // Visualizer State
+  // ... (Rest of state: activeMidi, triggerPulse, refs, etc.) ...
   const [activeMidi, setActiveMidi] = useState<number | null>(null);
   const [triggerPulse, setTriggerPulse] = useState(false);
   const [debugClick, setDebugClick] = useState(false);
   const visualTimeoutRef = useRef<number>(0);
 
-  // --- REFS ---
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
   const activeTabRef = useRef(activeTab);
   
-  // Setting Refs (Ensures settings update live during playback)
   const startRootRef = useRef(startRoot);
   const endRootRef = useRef(endRoot);
   const questionsPerKeyRef = useRef(questionsPerKey);
@@ -57,7 +56,6 @@ export function useSessionLogic() {
   const silentPracticeRef = useRef(silentPractice);
   const enabledDegreesRef = useRef(enabledDegrees);
 
-  // Training specific refs
   const training = useTrainingMode();
   const lastPlayedStageIndex = useRef<number>(-1);
   const hasPlayedScalePreview = useRef(false);
@@ -77,7 +75,6 @@ export function useSessionLogic() {
   useEffect(() => { silentPracticeRef.current = silentPractice; }, [silentPractice]);
   useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
 
-  // Bind the status change callback from AudioEngine
   useEffect(() => {
     audioEngine.onStatusChange = (text) => setStatus(text);
     return () => { audioEngine.onStatusChange = null; };
@@ -88,13 +85,11 @@ export function useSessionLogic() {
     debugClick, setTriggerPulse, setActiveMidi, visualTimeoutRef
   });
 
-  // Reset training on tab switch
   useEffect(() => {
     if (activeTab === 'random') training.resetTraining();
   }, [activeTab]);
 
-  // --- ACTIONS ---
-
+  // Actions
   const toggleDegree = (d: ScaleDegree) => {
     if (activeTab !== 'random') return;
     setEnabledDegrees(prev => {
@@ -104,6 +99,12 @@ export function useSessionLogic() {
         }
         return [...prev, d].sort();
     });
+  };
+
+  // NEW: Handler for pattern change
+  const setPattern = (name: string) => {
+    setCurrentPattern(name);
+    audioEngine.setDrumPattern(name);
   };
 
   const setKeyManually = async (k: MusicalKey) => {
@@ -151,6 +152,9 @@ export function useSessionLogic() {
         await audioEngine.loadBackingTracks(currentKey, ""); 
         
         audioEngine.setBpm(bpm);
+        // Ensure the pattern is set on start just in case
+        audioEngine.setDrumPattern(currentPattern);
+
         setIsPlaying(true);
         isPlayingRef.current = true;
         
@@ -163,6 +167,7 @@ export function useSessionLogic() {
   };
 
   const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: number) => {
+    // ... (Keep existing runCycle logic) ...
     if (!isPlayingRef.current) return;
     setActiveMidi(null);
     questionCount.current += 1;
@@ -170,7 +175,6 @@ export function useSessionLogic() {
     let currentCycleKey = keyToUse;
     let forceOneThreeFive = false;
 
-    // --- MODULATION LOGIC ---
     if (activeTabRef.current === 'random' && questionCount.current > questionsPerKeyRef.current) {
         questionCount.current = 1; 
         const otherKeys = KEYS.filter(k => k !== keyToUse); 
@@ -190,7 +194,6 @@ export function useSessionLogic() {
     
     let playSilent = silentPracticeRef.current; 
 
-    // --- GENERATION LOGIC ---
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
         constraints = config.constraints;
@@ -218,7 +221,6 @@ export function useSessionLogic() {
         }
 
     } else {
-        // --- RANDOM MODE ---
         if (forceOneThreeFive) {
             noteEvents = generateFixedPattern(["1", "3", "5", "1"], currentCycleKey, "Major");
             setStatus("New Key: Settling In");
@@ -266,6 +268,9 @@ export function useSessionLogic() {
     triggerPulse,
     debugClick, setDebugClick,
     
+    // NEW Props
+    currentPattern, setPattern,
+
     startRoot, setStartRoot,
     endRoot, setEndRoot,
     silentPractice, setSilentPractice,

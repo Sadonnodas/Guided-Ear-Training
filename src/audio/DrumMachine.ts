@@ -1,10 +1,43 @@
 import * as Tone from "tone";
 import { DRUM_OFFSETS, DRUM_PATTERNS } from "../config/AudioConfig";
 
+/**
+ * INDIVIDUAL SAMPLE GAINS (in Decibels)
+ * Adjust these values to mix the kit. 
+ * Negative values reduce volume, positive values increase it.
+ * 0 is the default volume.
+ */
+const SAMPLE_GAINS: Record<string, number> = {
+  // Elements that often need taming
+  hihat: -6,          
+  hihat_open: -4,
+  hihat_vinyl: -2,
+  shaker: -3,
+  tambourine: -6,
+  crash: -4,
+  ride: -3,
+  
+  // Core elements
+  kick: 0,
+  kick_soft: 0,
+  snare: 0,
+  rimshot: -1,
+  clap: -1,
+  snap: -1,
+  
+  // Percussion
+  clave: -2,
+  woodblock: -2,
+  triangle: -4,
+  
+  // Toms (NEW)
+  racktom: -2,
+  floortom: -2
+};
+
 export class DrumMachine {
   private players: Tone.Players;
-  // CHANGE: Default to "Lofi Chill"
-  private currentPatternName: keyof typeof DRUM_PATTERNS = "Lofi Chill"; 
+  private currentPatternName: keyof typeof DRUM_PATTERNS = "Lofi Chill";
   private scheduledEvents: number[] = [];
 
   constructor(destination: Tone.ToneAudioNode) {
@@ -35,6 +68,13 @@ export class DrumMachine {
       baseUrl: `${import.meta.env.BASE_URL}samples/drums/`,
       fadeOut: "64n"
     }).connect(destination);
+
+    // APPLY INDIVIDUAL GAINS
+    Object.entries(SAMPLE_GAINS).forEach(([name, db]) => {
+      if (this.players.has(name)) {
+        this.players.player(name).volume.value = db;
+      }
+    });
   }
 
   public setVolume(v: number) {
@@ -55,23 +95,17 @@ export class DrumMachine {
     Object.entries(pattern).forEach(([instrument, beats]) => {
       if (this.players.has(instrument)) {
         beats.forEach(beatInfo => {
-          // Handle cases where beatInfo might be complex later, but assuming number for now
           const beatNum = typeof beatInfo === 'number' ? beatInfo : 0;
           
-          // Convert decimal beats (0, 0.5, 1) into "0:0:0" format
-          // beatNum is in Quarter Notes.
-          // 0.25 = 1 sixteenth note
           const quarters = Math.floor(beatNum);
           const sixteenths = (beatNum % 1) * 4;
           const timeString = `0:${quarters}:${sixteenths}`;
 
-          // Apply offset (converting seconds to Tone time is tricky in scheduleRepeat, 
-          // so we add it inside the callback)
           const offset = DRUM_OFFSETS[instrument] || 0;
           
           const id = Tone.Transport.scheduleRepeat((time) => {
             this.players.player(instrument).start(time + offset);
-          }, "1m", timeString); // Repeat every 1m, starting at timeString
+          }, "1m", timeString); 
           
           this.scheduledEvents.push(id as number);
         });

@@ -29,7 +29,7 @@ export default function App() {
     }
   };
 
-  // Update visualizer steps (Purely visual, so kept in App or could move to hook)
+  // Update visualizer steps
   useEffect(() => {
     if (session.activeMidi !== null) {
         const steps = getScaleStepsFromRoot(session.activeMidi, session.currentKey, "Major");
@@ -72,6 +72,11 @@ export default function App() {
             bpm={session.bpm} setBpm={session.setBpm} 
             triggerPulse={session.triggerPulse} 
             
+            // --- NEW PROPS CONNECTED HERE ---
+            currentPattern={session.currentPattern}
+            setPattern={session.setPattern}
+            // -------------------------------
+
             startRoot={session.startRoot} setStartRoot={session.setStartRoot}
             endRoot={session.endRoot} setEndRoot={session.setEndRoot}
             silentPractice={session.silentPractice} setSilentPractice={session.setSilentPractice}
@@ -83,12 +88,10 @@ export default function App() {
             volGroove={session.volGroove} setVolGroove={session.setVolGroove}
             volMetronome={session.volMetronome} setVolMetronome={session.setVolMetronome}
             volDrone={session.volDrone} setVolDrone={session.setVolDrone}
-            // NEW
+            
             volTraining={session.volTraining} setVolTraining={session.setVolTraining}
             toggleMute={toggleMute}
         />
-
-        {/* DEBUG WINDOW REMOVED */}
       </div>
     </div>
   );

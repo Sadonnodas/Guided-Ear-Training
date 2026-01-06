@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { DRUM_PATTERNS } from '../../config/AudioConfig';
-import { audioEngine } from '../../audio/AudioEngine';
 import './Controls.css';
 
 // --- ICONS ---
@@ -28,9 +27,12 @@ interface ControlsProps {
   volDrone: number; setVolDrone: (v: number) => void;
   volGroove: number; setVolGroove: (v: number) => void;
   volMetronome: number; setVolMetronome: (v: number) => void;
-  // NEW: Training Vol
   volTraining: number; setVolTraining: (v: number) => void;
   toggleMute: (type: string, val: number, setter: (v: number) => void) => void;
+  
+  // NEW: State for controlled select
+  currentPattern: string;
+  setPattern: (name: string) => void;
 }
 
 export default function Controls(props: ControlsProps) {
@@ -100,7 +102,12 @@ export default function Controls(props: ControlsProps) {
              </div>
              <div className="row-split">
                 <span className="stepper-label">Groove</span>
-                <select className="pattern-select" onChange={(e) => audioEngine.setDrumPattern(e.target.value)}>
+                {/* FIX: Controlled Input */}
+                <select 
+                  className="pattern-select" 
+                  value={props.currentPattern}
+                  onChange={(e) => props.setPattern(e.target.value)}
+                >
                     {Object.keys(DRUM_PATTERNS).map(name => (<option key={name} value={name}>{name}</option>))}
                 </select>
              </div>
@@ -110,7 +117,6 @@ export default function Controls(props: ControlsProps) {
           <div className="control-section no-border">
             <h3 className="section-title">Mixer</h3>
             
-            {/* Show Training Vol if active */}
             {props.trainingWheels && (
                 <div className="slider-row">
                     <span style={{color:'var(--c-3)'}}>Guide</span>

@@ -6,7 +6,6 @@ import { Scheduler } from "./Scheduler";
 import { TRAINING_WHEELS_CONFIG, DRUM_PATTERNS, LATENCY_OFFSET } from "../config/AudioConfig";
 
 export class AudioEngine {
-  // ... (Keep existing properties)
   private masterGain!: Tone.Gain;
   private compressor!: Tone.Compressor;
   private reverb!: Tone.Reverb;
@@ -27,14 +26,12 @@ export class AudioEngine {
   // CALLBACKS
   public onNotePlay: ((note: NoteEvent | null, isClick?: boolean) => void) | null = null;
   public onBeat: ((beatNumber: number) => void) | null = null;
-  // NEW
   public onStatusChange: ((text: string) => void) | null = null;
 
   public async init(vols: { groove: number, voice: number, click: number, master: number, drone: number }) {
     if (this.isInitialized) return;
     await Tone.start();
     
-    // ... (Keep existing audio graph setup: compressor, gains, synths, etc.)
     this.compressor = new Tone.Compressor({ threshold: -24, ratio: 6 }).toDestination();
     this.masterGain = new Tone.Gain(vols.master).connect(this.compressor);
 
@@ -44,8 +41,9 @@ export class AudioEngine {
     this.reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).connect(this.masterGain);
     this.vocalGain = new Tone.Gain(vols.voice).connect(this.reverb);
 
+    // FIX: Cast oscillator to 'any' to bypass strict Tone.js type mismatch
     this.trainingSynth = new Tone.Synth({
-        oscillator: TRAINING_WHEELS_CONFIG.oscillator,
+        oscillator: TRAINING_WHEELS_CONFIG.oscillator as any, 
         envelope: TRAINING_WHEELS_CONFIG.envelope
     });
     this.trainingGain = new Tone.Gain(0).connect(this.masterGain);
@@ -59,14 +57,12 @@ export class AudioEngine {
     this.metronome = new Metronome(this.masterGain);
     this.drumMachine = new DrumMachine(this.masterGain);
     
-    // UPDATE SCHEDULER INITIALIZATION
     this.scheduler = new Scheduler({
         onBeat: (b) => { if (this.onBeat) this.onBeat(b); },
         onTick: (t) => this.metronome.playTick(t),
         onNotePlay: (n, c) => { if (this.onNotePlay) this.onNotePlay(n, c); },
         playNoteAudio: (n, t, useSynth) => this.playMelodyNote(n, t, useSynth),
         onStart: (t) => this.playTransitionSound(t),
-        // Connect the new status callback
         onStatusChange: (text) => { if (this.onStatusChange) this.onStatusChange(text); }
     });
 
@@ -75,10 +71,10 @@ export class AudioEngine {
     this.isInitialized = true;
   }
 
-  // ... (Keep existing playMelodyNote, setDrumPattern, setBpm, loadBackingTracks methods)
-  // ... (Keep existing startPlayback, reset, volume setters, preloadNotes, playTransitionSound)
-  
-  // COPY-PASTE helpers from previous file to ensure completeness if you are overwriting:
+  // ... (Keep existing playMelodyNote, setDrumPattern, setBpm, etc.)
+  // ... (Keep the rest of the file identical to previous upload)
+
+  // Explicitly keeping the rest of the methods to ensure file is complete:
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
     if (useSynth) {
         this.trainingGain.gain.setValueAtTime(this.trainingVol, time);
