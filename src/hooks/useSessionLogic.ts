@@ -3,9 +3,9 @@ import { audioEngine } from "../audio/AudioEngine";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
 import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
-import type { MusicalKey, ScaleDegree, MelodyConstraints } from "../types";
+import { getAvailableDegrees } from "../audio/MusicTheory"; 
+import type { MusicalKey, ScaleDegree, MelodyConstraints, ScaleType } from "../types";
 
-// ... (Keep existing KEYS and KEY_DISPLAY_MAP) ...
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
   "C": "C", "Cs": "D♭", "D": "D", "Ds": "E♭", "E": "E", "F": "F",
@@ -15,10 +15,13 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 export function useSessionLogic() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentKey, setCurrentKey] = useState<MusicalKey>("C");
+  // NEW: Scale Type State
+  const [scaleType, setScaleType] = useState<ScaleType>("Major"); 
+  
   const [status, setStatus] = useState("Start Session");
   const [bpm, setBpm] = useState(80);
   
-  // NEW: Track the active pattern so UI defaults match AudioEngine
+  // Track the active pattern so UI defaults match AudioEngine
   const [currentPattern, setCurrentPattern] = useState("Lofi Chill"); 
 
   const [activeTab, setActiveTab] = useState("random");
@@ -33,16 +36,17 @@ export function useSessionLogic() {
   const [volMaster, setVolMaster] = useState(1.0);
   const [volVoice, setVolVoice] = useState(1.0);
   const [volDrone, setVolDrone] = useState(0.4);
-  const [volGroove, setVolGroove] = useState(0.6); // Default slightly higher for Lofi
+  const [volGroove, setVolGroove] = useState(0.6); 
   const [volMetronome, setVolMetronome] = useState(0.8);
   const [volTraining, setVolTraining] = useState(0.8); 
 
-  // ... (Rest of state: activeMidi, triggerPulse, refs, etc.) ...
+  // Visualizer State
   const [activeMidi, setActiveMidi] = useState<number | null>(null);
   const [triggerPulse, setTriggerPulse] = useState(false);
   const [debugClick, setDebugClick] = useState(false);
   const visualTimeoutRef = useRef<number>(0);
 
+  // --- REFS ---
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
   const activeTabRef = useRef(activeTab);
@@ -75,6 +79,7 @@ export function useSessionLogic() {
   useEffect(() => { silentPracticeRef.current = silentPractice; }, [silentPractice]);
   useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
 
+  // Bind the status change callback from AudioEngine
   useEffect(() => {
     audioEngine.onStatusChange = (text) => setStatus(text);
     return () => { audioEngine.onStatusChange = null; };
@@ -85,11 +90,25 @@ export function useSessionLogic() {
     debugClick, setTriggerPulse, setActiveMidi, visualTimeoutRef
   });
 
+  // Reset training on tab switch
   useEffect(() => {
     if (activeTab === 'random') training.resetTraining();
   }, [activeTab]);
 
-  // Actions
+  // --- ACTIONS ---
+
+  // NEW: Change Scale Type and reset degrees
+  const handleScaleChange = (type: ScaleType) => {
+    setScaleType(type);
+    const defaults = getAvailableDegrees(type);
+    setEnabledDegrees(defaults);
+    
+    // If playing, show status update
+    if (isPlaying) {
+        setStatus(`Switched to ${type}`);
+    }
+  };
+
   const toggleDegree = (d: ScaleDegree) => {
     if (activeTab !== 'random') return;
     setEnabledDegrees(prev => {
@@ -97,11 +116,10 @@ export function useSessionLogic() {
             if (prev.length === 1) return prev;
             return prev.filter(x => x !== d);
         }
-        return [...prev, d].sort();
+        return [...prev, d].sort(); // NOTE: simple sort works for basic strings, for chromatic accurate sorting you might need a custom sort function later
     });
   };
 
-  // NEW: Handler for pattern change
   const setPattern = (name: string) => {
     setCurrentPattern(name);
     audioEngine.setDrumPattern(name);
@@ -152,7 +170,7 @@ export function useSessionLogic() {
         await audioEngine.loadBackingTracks(currentKey, ""); 
         
         audioEngine.setBpm(bpm);
-        // Ensure the pattern is set on start just in case
+        // Ensure the pattern is set on start
         audioEngine.setDrumPattern(currentPattern);
 
         setIsPlaying(true);
@@ -167,7 +185,6 @@ export function useSessionLogic() {
   };
 
   const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: number) => {
-    // ... (Keep existing runCycle logic) ...
     if (!isPlayingRef.current) return;
     setActiveMidi(null);
     questionCount.current += 1;
@@ -175,6 +192,7 @@ export function useSessionLogic() {
     let currentCycleKey = keyToUse;
     let forceOneThreeFive = false;
 
+    // --- MODULATION LOGIC ---
     if (activeTabRef.current === 'random' && questionCount.current > questionsPerKeyRef.current) {
         questionCount.current = 1; 
         const otherKeys = KEYS.filter(k => k !== keyToUse); 
@@ -194,6 +212,7 @@ export function useSessionLogic() {
     
     let playSilent = silentPracticeRef.current; 
 
+    // --- GENERATION LOGIC ---
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
         constraints = config.constraints;
@@ -221,8 +240,14 @@ export function useSessionLogic() {
         }
 
     } else {
+        // --- RANDOM MODE ---
         if (forceOneThreeFive) {
-            noteEvents = generateFixedPattern(["1", "3", "5", "1"], currentCycleKey, "Major");
+             // Adjust settling pattern based on scale type
+            const pattern: ScaleDegree[] = scaleType === 'Minor' 
+            ? ["1", "b3", "5", "1"] 
+            : ["1", "3", "5", "1"];
+
+            noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleType);
             setStatus("New Key: Settling In");
             playSilent = silentPracticeRef.current;
         } else {
@@ -233,7 +258,8 @@ export function useSessionLogic() {
                 length: 4 
             };
             playSilent = silentPracticeRef.current;
-            noteEvents = generateMelody({ key: currentCycleKey, scaleType: "Major", constraints });
+            // PASS THE SELECTED SCALE TYPE HERE
+            noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleType, constraints });
         }
     }
 
@@ -268,7 +294,6 @@ export function useSessionLogic() {
     triggerPulse,
     debugClick, setDebugClick,
     
-    // NEW Props
     currentPattern, setPattern,
 
     startRoot, setStartRoot,
@@ -288,6 +313,9 @@ export function useSessionLogic() {
     setKeyManually,
     
     training,
-    handleLevelChange
+    handleLevelChange,
+    
+    // EXPOSE NEW PROPS
+    scaleType, handleScaleChange
   };
 }
