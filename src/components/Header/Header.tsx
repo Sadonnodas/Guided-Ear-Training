@@ -65,7 +65,7 @@ export default function Header({
             <option value="Major">Major</option>
             <option value="Minor">Minor</option>
             {/* Hide Chromatic in Training */}
-            {activeTab !== 'training' && <option value="Chromatic">Chromatic</option>}
+            {/*{activeTab !== 'training' && <option value="Chromatic">Chromatic</option>}*/}
           </select>
 
           <div className="separator"></div>
