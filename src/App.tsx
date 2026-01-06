@@ -32,10 +32,10 @@ export default function App() {
   // Update visualizer steps
   useEffect(() => {
     if (session.activeMidi !== null) {
-        const steps = getScaleStepsFromRoot(session.activeMidi, session.currentKey, "Major");
+        const steps = getScaleStepsFromRoot(session.activeMidi, session.currentKey, session.scaleType);
         setLastValidStep(steps);
     }
-  }, [session.activeMidi, session.currentKey]);
+  }, [session.activeMidi, session.currentKey, session.scaleType]);
 
   return (
     <div className="app-container">
@@ -47,6 +47,8 @@ export default function App() {
           pickRandomKey={() => session.setKeyManually(KEYS[Math.floor(Math.random() * KEYS.length)])} 
           status={session.status} viewMode={viewMode} setViewMode={setViewMode}
           debugClick={session.debugClick} setDebugClick={session.setDebugClick}
+          scaleType={session.scaleType}
+          setScaleType={session.handleScaleChange}
         />
 
         {session.activeTab === 'training' && (
@@ -65,30 +67,26 @@ export default function App() {
           viewMode={viewMode} activeMidi={session.activeMidi}
           lastValidStep={lastValidStep} enabledDegrees={session.enabledDegrees}
           toggleDegree={session.toggleDegree}
+          // NEW: Pass the scaleType prop here
+          scaleType={session.scaleType}
         />
 
         <Controls 
             isPlaying={session.isPlaying} onPlayToggle={session.startSession}
             bpm={session.bpm} setBpm={session.setBpm} 
             triggerPulse={session.triggerPulse} 
-            
-            // --- NEW PROPS CONNECTED HERE ---
             currentPattern={session.currentPattern}
             setPattern={session.setPattern}
-            // -------------------------------
-
             startRoot={session.startRoot} setStartRoot={session.setStartRoot}
             endRoot={session.endRoot} setEndRoot={session.setEndRoot}
             silentPractice={session.silentPractice} setSilentPractice={session.setSilentPractice}
             trainingWheels={session.trainingWheels} setTrainingWheels={session.setTrainingWheels}
             questionsPerKey={session.questionsPerKey} setQuestionsPerKey={session.setQuestionsPerKey}
-            
             volMaster={session.volMaster} setVolMaster={session.setVolMaster}
             volVoice={session.volVoice} setVolVoice={session.setVolVoice}
             volGroove={session.volGroove} setVolGroove={session.setVolGroove}
             volMetronome={session.volMetronome} setVolMetronome={session.setVolMetronome}
             volDrone={session.volDrone} setVolDrone={session.setVolDrone}
-            
             volTraining={session.volTraining} setVolTraining={session.setVolTraining}
             toggleMute={toggleMute}
         />

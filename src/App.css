@@ -11,27 +11,57 @@
   --btn-play: #4ade80;     /* Mint Green */
   --btn-stop: #ff6b6b;     /* Red */
 
-  /* --- RAINBOW SCALE COLORS --- */
-  --c-1: #ff867c; /* Salmon */
-  --c-2: #ffb74d; /* Orange */
-  --c-3: #ffd54f; /* Yellow */
-  --c-4: #81c784; /* Green */
-  --c-5: #64b5f6; /* Blue */
-  --c-6: #9575cd; /* Purple */
-  --c-7: #f06292; /* Pink */
+  /* --- 12-TONE SOFT PALETTE --- */
+  
+  /* 1: WARM SALMON/CORAL (Distinctly warm to separate from 7) */
+  --c-1: #ff8a65; 
+
+  /* b2: SOFT PEACH/TERRACOTTA */
+  --c-b2: #ffab91; 
+
+  /* 2: SOFT ORANGE */
+  --c-2: #ffb74d; 
+
+  /* b3: HONEY/AMBER (Darker/Warmer than 3) */
+  --c-b3: #ffd54f; 
+
+  /* 3: PALE YELLOW (Bright and open) */
+  --c-3: #fff176; 
+
+  /* 4: SOFT SAGE GREEN */
+  --c-4: #a5d6a7; 
+
+  /* #4/b5: SOFT TEAL/SEAFOAM */
+  --c-s4: #80cbc4; 
+  --c-b5: #80cbc4;
+
+  /* 5: SOFT SKY BLUE */
+  --c-5: #90caf9; 
+
+  /* b6: SOFT PERIWINKLE/INDIGO */
+  --c-b6: #9fa8da; 
+
+  /* 6: SOFT LAVENDER (Major 6th) */
+  --c-6: #b39ddb; 
+
+  /* b7: SOFT VIOLET (Minor 7th) */
+  --c-b7: #ce93d8; 
+
+  /* 7: COOL ORCHID/MAGENTA (Distinctly cooler/purpler to separate from 1) */
+  --c-7: #f06292; 
 }
 
 body {
   background-color: var(--bg-app);
   margin: 0;
   color: var(--text-main);
-  overscroll-behavior: none; /* Prevents "bounce" on Mac/iOS */
+  overscroll-behavior: none; 
 }
 
 /* --- LAYOUT FIXES FOR MOBILE --- */
 #root {
   width: 100%;
-  min-height: 100vh; /* Allow growing beyond screen height */
+  min-height: 100vh; 
   margin: 0;
   padding: 0;
   display: flex;
@@ -44,30 +74,24 @@ body {
   align-items: center;
   width: 100%;
   max-width: 100%;
-  padding: 16px; /* Reduced outer padding slightly */
-  box-sizing: border-box; /* Includes padding in width calculation */
+  padding: 16px; 
+  box-sizing: border-box; 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .main-panel {
   background: var(--bg-panel);
-  /* Responsive Padding: Less on mobile to save space */
   padding: 24px 20px; 
   border-radius: 24px;
-  /* Stronger shadow to define edges against dark background */
   box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 20px 40px rgba(0,0,0,0.6);
   width: 100%;
   max-width: 500px;
   position: relative;
   box-sizing: border-box;
-  
-  /* FORCE VISIBLE MARGINS ON MOBILE */
   margin: 0 auto; 
-  /* Ensures panel never touches the absolute edge of .app-container */
   width: calc(100% - 10px); 
 }
 
-/* Media Query for larger screens */
 @media (min-width: 600px) {
   .app-container {
     padding: 20px;
@@ -79,7 +103,7 @@ body {
 }
 
 .training-hud {
-    background: rgba(74, 222, 128, 0.1); /* Light Green tint */
+    background: rgba(74, 222, 128, 0.1); 
     border: 1px solid rgba(74, 222, 128, 0.3);
     padding: 15px;
     border-radius: 12px;

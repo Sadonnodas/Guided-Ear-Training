@@ -74,11 +74,24 @@
 
 /* Colors */
 .tape-cell.d-1 span { background: var(--c-1); }
+
+.tape-cell.d-b2 span { background: var(--c-b2); }
 .tape-cell.d-2 span { background: var(--c-2); }
+
+.tape-cell.d-b3 span { background: var(--c-b3); }
 .tape-cell.d-3 span { background: var(--c-3); }
+
 .tape-cell.d-4 span { background: var(--c-4); }
+.tape-cell.d-s4 span, 
+.tape-cell.d-\#4 span,
+.tape-cell.d-b5 span { background: var(--c-s4); } /* Handles #4 and b5 */
+
 .tape-cell.d-5 span { background: var(--c-5); }
+
+.tape-cell.d-b6 span { background: var(--c-b6); }
 .tape-cell.d-6 span { background: var(--c-6); }
+
+.tape-cell.d-b7 span { background: var(--c-b7); }
 .tape-cell.d-7 span { background: var(--c-7); }
 
 .tape-cell.active span {

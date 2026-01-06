@@ -2,20 +2,19 @@ import * as Tone from "tone";
 
 /**
  * VOCAL SAMPLE LATENCY OFFSETS
- * Adjusts when melody notes play relative to the beat (in seconds).
  */
 export const LATENCY_OFFSET: Record<string, number> = {
   "1":  -0.070, 
-  "b2": -0.085, 
+  "b2": -0.085, // New
   "2":  -0.100, 
-  "b3": -0.110, 
+  "b3": -0.110, // New
   "3":  -0.120, 
   "4":  -0.100, 
-  "#4": -0.130, 
+  "#4": -0.130, // New
   "5":  -0.180, 
-  "b6": -0.150, 
+  "b6": -0.150, // New
   "6":  -0.160, 
-  "b7": -0.170, 
+  "b7": -0.170, // New
   "7":  -0.170, 
 };
 

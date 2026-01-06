@@ -1,29 +1,28 @@
 export type MusicalKey = "C" | "Cs" | "D" | "Ds" | "E" | "F" | "Fs" | "G" | "Gs" | "A" | "As" | "B";
 
-// ADD ALL CHROMATIC DEGREES HERE
 export type ScaleDegree = "1" | "b2" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7";
 
-// Ensure Chromatic is an option if you plan to use it later
-export type ScaleType = "Major" | "Minor" | "PentatonicMajor" | "PentatonicMinor" | "Chromatic";
+// UPDATE: Added "Minor" (and "NaturalMinor" as an alias if you prefer, but "Minor" matches MusicTheory.ts)
+export type ScaleType = "Major" | "Minor" | "PentatonicMajor" | "PentatonicMinor" | "Chromatic"; 
 
 export interface NoteInfo {
   degree: ScaleDegree;
   midi: number;
   frequency: number;
-  label: string; 
+  label: string;
 }
 
 export interface NoteEvent {
   noteInfo: NoteInfo;
   startTime: number; 
-  duration: number;  
+  duration: number;
 }
 
 export interface MelodyConstraints {
   allowedDegrees: ScaleDegree[];
-  startDegree?: ScaleDegree;     
-  endDegree?: ScaleDegree;       
-  length: number;                
+  startDegree?: ScaleDegree;
+  endDegree?: ScaleDegree;
+  length: number;
 }
 
 export interface TrainingStage {

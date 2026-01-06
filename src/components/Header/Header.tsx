@@ -1,4 +1,4 @@
-import type { MusicalKey } from '../../types';
+import type { MusicalKey, ScaleType } from '../../types';
 import './Header.css';
 
 // --- ICONS ---
@@ -22,13 +22,17 @@ interface HeaderProps {
   status: string;
   viewMode: 'tape' | 'static';
   setViewMode: (mode: 'tape' | 'static') => void;
-  // NEW
   debugClick: boolean; 
   setDebugClick: (v: boolean) => void;
+  
+  // NEW
+  scaleType: ScaleType;
+  setScaleType: (s: ScaleType) => void;
 }
 
 export default function Header({ 
-  activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, status, viewMode, setViewMode, debugClick, setDebugClick
+  activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, status, viewMode, setViewMode, debugClick, setDebugClick,
+  scaleType, setScaleType
 }: HeaderProps) {
   return (
     <>
@@ -39,8 +43,23 @@ export default function Header({
 
       <div className="info-display">
         <div className="key-container">
+          
+          {/* SCALE TYPE SELECTOR */}
+          <select 
+            className="key-select" 
+            value={scaleType} 
+            onChange={(e) => setScaleType(e.target.value as ScaleType)}
+            style={{ marginRight: '5px' }}
+          >
+            <option value="Major">Major</option>
+            <option value="Minor">Minor</option>
+          </select>
+
+          <div className="separator"></div>
+
+          {/* KEY SELECTOR */}
           <select className="key-select" value={currentKey} onChange={(e) => setKeyManually(e.target.value as MusicalKey)}>
-            {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]} Major</option>))}
+            {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]}</option>))}
           </select>
           
           <button className="icon-btn" onClick={pickRandomKey} title="Random Key">

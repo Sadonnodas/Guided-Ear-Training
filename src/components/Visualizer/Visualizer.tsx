@@ -1,5 +1,5 @@
-import { getDegreeLabelFromStep } from '../../audio/MusicTheory';
-import type { ScaleDegree } from '../../types';
+import { getDegreeLabelFromStep, getAvailableDegrees } from '../../audio/MusicTheory';
+import type { ScaleDegree, ScaleType } from '../../types';
 import './Visualizer.css';
 
 const CELL_WIDTH = 60; 
@@ -11,10 +11,12 @@ interface VisualizerProps {
   lastValidStep: number;
   enabledDegrees: ScaleDegree[];
   toggleDegree: (d: ScaleDegree) => void;
+  // NEW: Need scaleType to know which degrees to show
+  scaleType: ScaleType; 
 }
 
 export default function Visualizer({ 
-  viewMode, activeMidi, lastValidStep, enabledDegrees, toggleDegree 
+  viewMode, activeMidi, lastValidStep, enabledDegrees, toggleDegree, scaleType
 }: VisualizerProps) {
 
   // --- Tape Logic ---
@@ -27,7 +29,8 @@ export default function Visualizer({
     return (
         <div className="tape-strip" style={{ transform: `translateX(${totalTranslate}px)` }}>
             {staticCells.map((stepIndex) => {
-                const label = getDegreeLabelFromStep(stepIndex, "Major");
+                // Pass scaleType so the tape knows if step 2 is a '3' (Major) or 'b3' (Minor)
+                const label = getDegreeLabelFromStep(stepIndex, scaleType);
                 const isActive = stepIndex === lastValidStep && activeMidi !== null;
                 const isEnabled = enabledDegrees.includes(label as ScaleDegree);
                 
@@ -47,19 +50,23 @@ export default function Visualizer({
 
   // --- Static Logic ---
   const renderStatic = () => {
-    const degrees: ScaleDegree[] = ["1", "2", "3", "4", "5", "6", "7"];
+    // FIX: Get degrees dynamically based on the selected Scale Type (Major vs Minor)
+    // This ensures we see "1, 2, b3..." instead of always "1, 2, 3..."
+    const degrees = getAvailableDegrees(scaleType);
+
     return (
         <div className="static-container">
             {degrees.map(d => {
                 const isEnabled = enabledDegrees.includes(d);
-                const isActive = activeMidi !== null && getDegreeLabelFromStep(lastValidStep, "Major") === d;
+                // Compare labels using the current scale context
+                const isActive = activeMidi !== null && getDegreeLabelFromStep(lastValidStep, scaleType) === d;
                 
                 return (
                     <div 
                         key={d}
+                        // The class d-{label} triggers the specific color defined in CSS
                         className={`tape-cell d-${d} ${isActive ? 'active' : ''} ${isEnabled ? '' : 'disabled'}`}
                         onClick={() => toggleDegree(d)}
-                        // FIX: Removed inline style to allow CSS responsive sizing
                     >
                         <span>{d}</span>
                     </div>
