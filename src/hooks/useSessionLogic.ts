@@ -5,7 +5,7 @@ import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
 import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
 import { getAvailableDegrees } from "../audio/MusicTheory"; 
-import type { MusicalKey, ScaleDegree, MelodyConstraints, ScaleType } from "../types";
+import type { MusicalKey, ScaleDegree, MelodyConstraints, ScaleType, MelodyDifficulty } from "../types";
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
@@ -32,6 +32,7 @@ export function useSessionLogic() {
   const [silentPractice, setSilentPractice] = useState(true);
   const [trainingWheels, setTrainingWheels] = useState(false);
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
+  const [difficulty, setDifficulty] = useState<MelodyDifficulty>("normal"); //
   
   const [volMaster, setVolMaster] = useState(1.0);
   const [volVoice, setVolVoice] = useState(1.0);
@@ -317,7 +318,8 @@ export function useSessionLogic() {
                 focusedDegrees: focusedDegreesRef.current, 
                 startDegree: startRootRef.current ? "1" : undefined,
                 endDegree: endRootRef.current ? "1" : undefined,
-                length: 4 
+                length: 4,
+                difficulty: difficulty // Pass the state value here
             };
             playSilent = silentPracticeRef.current;
             noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleType, constraints });
@@ -370,7 +372,9 @@ export function useSessionLogic() {
     volGroove, setVolGroove,
     volMetronome, setVolMetronome,
     volTraining, setVolTraining,
-    volReverb, setVolReverb, 
+    volReverb, setVolReverb,
+    difficulty,     // Add this
+    setDifficulty, 
     startSession,
     setKeyManually,
     training,

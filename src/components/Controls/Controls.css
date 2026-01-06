@@ -295,3 +295,29 @@
     .slider-row span { min-width: 60px; }
     .settings-trigger { padding: 20px 10px; }
 }
+
+/* Ensure the input doesn't look like a standard box */
+.stepper-input {
+    width: 35px;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+}
+
+/* Hide standard number input arrows */
+.stepper-input::-webkit-inner-spin-button,
+.stepper-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Category spacing */
+.control-section {
+    padding: 15px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}

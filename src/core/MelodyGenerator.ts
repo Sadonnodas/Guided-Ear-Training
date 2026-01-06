@@ -1,5 +1,5 @@
 import { getNoteForDegree } from "../audio/MusicTheory";
-import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints } from "../types";
+import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints, MelodyDifficulty } from "../types";
 
 interface GeneratorOptions {
   key: MusicalKey;
@@ -76,15 +76,30 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
   const melody: NoteEvent[] = [];
   let currentBeat = 0;
   let lastMidi: number | null = null;
-  const noteDur = 2; // Fixed duration (Half notes) for now
+  let hasLeaped = false; // Internal flag to track if we've already done a big leap
+  const noteDur = 2; 
 
   degrees.forEach(d => {
-      // d should effectively never be null here, but for TypeScript safety:
       const safeDegree = d || "1"; 
       
-      const event = createEvent(safeDegree, key, scaleType, currentBeat, noteDur, lastMidi);
+      // Pass the difficulty and current leap status
+      const event = createEvent(
+          safeDegree, 
+          key, 
+          scaleType, 
+          currentBeat, 
+          noteDur, 
+          lastMidi, 
+          constraints.difficulty || "normal", 
+          hasLeaped
+      );
+
+      // If this specific note created a leap > 7 semitones, trip the flag
+      if (lastMidi !== null && Math.abs(event.noteInfo.midi - lastMidi) > 7) {
+          hasLeaped = true;
+      }
+
       melody.push(event);
-      
       currentBeat += noteDur;
       lastMidi = event.noteInfo.midi;
   });
@@ -120,9 +135,12 @@ function createEvent(
   scale: ScaleType, 
   startTime: number, 
   duration: number,
-  prevMidi: number | null
+  prevMidi: number | null,
+  difficulty: MelodyDifficulty = "normal", // Add
+  hasLeaped: boolean = false                // Add
 ): NoteEvent {
-  const info = getNoteForDegree(key, degree, scale, prevMidi);
+  // Pass the new difficulty and hasLeaped flags
+  const info = getNoteForDegree(key, degree, scale, prevMidi, difficulty, hasLeaped);
   return {
     noteInfo: info,
     startTime: startTime,

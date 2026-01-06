@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DRUM_PATTERNS } from '../../config/AudioConfig';
+import type { MelodyDifficulty } from '../../types'; // Add this line
 import './Controls.css';
 
 // --- ICONS ---
@@ -22,6 +23,10 @@ interface ControlsProps {
   silentPractice: boolean; setSilentPractice: (v: boolean) => void;
   trainingWheels: boolean; setTrainingWheels: (v: boolean) => void;
   questionsPerKey: number; setQuestionsPerKey: (n: number) => void;
+  difficulty: MelodyDifficulty; 
+  setDifficulty: (d: MelodyDifficulty) => void;
+  
+  // MIXER
   volMaster: number; setVolMaster: (v: number) => void;
   volVoice: number; setVolVoice: (v: number) => void;
   volDrone: number; setVolDrone: (v: number) => void;
@@ -71,28 +76,79 @@ export default function Controls(props: ControlsProps) {
       </div>
 
       <div className={`controls-accordion ${settingsOpen ? 'open' : ''}`}>
-        <div className="controls-content">
-          
-          {/* SESSION SETTINGS */}
-          <div className="control-section">
-            <h3 className="section-title">Session</h3>
-            <div className="toggle-grid-sleek">
-               <div className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} onClick={() => props.setStartRoot(!props.startRoot)}>Start on 1</div>
-               <div className={`toggle-pill-btn ${props.endRoot ? 'active' : ''}`} onClick={() => props.setEndRoot(!props.endRoot)}>End on 1</div>
-               <div className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} onClick={() => props.setTrainingWheels(!props.trainingWheels)} title="Pitch Guide">
-                  <TrainingWheelsIcon />
-               </div>
-            </div>
-            
-            <div className="row-split" style={{marginTop:'12px'}}>
-                <div className="stepper-label">Melodies Per Key</div>
-                <div className="stepper-control">
-                    <button className="stepper-btn" onClick={() => adjustQuestions(-1)}><MinusIcon/></button>
-                    <div className="stepper-value">{props.questionsPerKey}</div>
-                    <button className="stepper-btn" onClick={() => adjustQuestions(1)}><PlusIcon/></button>
-                </div>
-            </div>
-          </div>
+  <div className="controls-content">
+    
+    {/* CATEGORY: MELODY DIFFICULTY */}
+    <div className="control-section">
+      <h3 className="section-title">Melody Difficulty</h3>
+      <div className="toggle-grid-sleek">
+        <div 
+          className={`toggle-pill-btn ${props.difficulty === 'easy' ? 'active' : ''}`} 
+          onClick={() => props.setDifficulty('easy')}
+        >
+          Easy
+        </div>
+        <div 
+          className={`toggle-pill-btn ${props.difficulty === 'normal' ? 'active' : ''}`} 
+          onClick={() => props.setDifficulty('normal')}
+        >
+          Normal
+        </div>
+        <div 
+          className={`toggle-pill-btn ${props.difficulty === 'hard' ? 'active' : ''}`} 
+          onClick={() => props.setDifficulty('hard')}
+        >
+          Hard
+        </div>
+      </div>
+    </div>
+
+    {/* CATEGORY: MELODY FLOW */}
+    <div className="control-section">
+      <h3 className="section-title">Melody Flow</h3>
+      <div className="toggle-grid-sleek">
+         <div 
+           className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} 
+           onClick={() => props.setStartRoot(!props.startRoot)}
+         >
+           Start on 1
+         </div>
+         <div 
+           className={`toggle-pill-btn ${props.endRoot ? 'active' : ''}`} 
+           onClick={() => props.setEndRoot(!props.endRoot)}
+         >
+           End on 1
+         </div>
+         <div 
+           className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
+           onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
+           title="Pitch Guide"
+         >
+            <TrainingWheelsIcon />
+         </div>
+      </div>
+    </div>
+
+{/* CATEGORY: REPETITION */}
+<div className="control-section">
+  <h3 className="section-title">Repetition</h3>
+  <div className="row-split">
+      <div className="stepper-label">Melodies Per Key</div>
+      <div className="stepper-control">
+          <button className="stepper-btn" onClick={() => adjustQuestions(-1)}><MinusIcon/></button>
+          <input 
+            type="number" 
+            className="stepper-input" 
+            value={props.questionsPerKey}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              if (!isNaN(val)) props.setQuestionsPerKey(Math.max(1, Math.min(50, val)));
+            }}
+          />
+          <button className="stepper-btn" onClick={() => adjustQuestions(1)}><PlusIcon/></button>
+      </div>
+  </div>
+</div>
 
           {/* RHYTHM */}
           <div className="control-section">

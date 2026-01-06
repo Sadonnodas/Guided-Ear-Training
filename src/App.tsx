@@ -72,6 +72,8 @@ export default function App() {
         <Controls 
             isPlaying={session.isPlaying} onPlayToggle={session.startSession}
             bpm={session.bpm} setBpm={session.setBpm} 
+            difficulty={session.difficulty}
+            setDifficulty={session.setDifficulty}
             triggerPulse={session.triggerPulse} 
             currentPattern={session.currentPattern}
             setPattern={session.setPattern}

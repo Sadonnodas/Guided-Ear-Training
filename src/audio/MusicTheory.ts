@@ -1,5 +1,5 @@
 import * as Tone from "tone";
-import type { MusicalKey, ScaleDegree, ScaleType, NoteInfo } from "../types";
+import type { MusicalKey, ScaleDegree, ScaleType, NoteInfo, MelodyDifficulty } from "../types";
 
 const ROOT_MIDI: Record<MusicalKey, number> = {
   "C": 48, "Cs": 49, "D": 50, "Ds": 51, "E": 52, "F": 53,
@@ -41,7 +41,9 @@ export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
   _scaleType: ScaleType, 
-  previousMidi: number | null = null
+  previousMidi: number | null = null,
+  difficulty: MelodyDifficulty = "normal", // New
+  hasLeaped: boolean = false                // New
 ): NoteInfo {
   const rootMidi = ROOT_MIDI[key];
   const interval = DEGREE_TO_SEMITONE[degree]; 
@@ -51,28 +53,30 @@ export function getNoteForDegree(
   if (previousMidi !== null) {
     const candidates = [targetMidi - 12, targetMidi, targetMidi + 12];
     
-    // 1. Filter by Absolute Vocal Range
-    let valid = candidates.filter(m => m >= MIN_MIDI && m <= MAX_MIDI);
-
-    // 2. Filter by Singability (Don't jump more than an octave)
-    // If we have options, filter down. If not, we take what we can get.
-    const strictValid = valid.filter(m => Math.abs(m - previousMidi) <= 12);
-    if (strictValid.length > 0) {
-        valid = strictValid;
+    // 1. Determine the jump limit based on difficulty settings
+    let jumpLimit = 12; 
+    if (difficulty === "easy") {
+        jumpLimit = 7; // Strictly restrict to a 5th
+    } else if (difficulty === "normal" && hasLeaped) {
+        jumpLimit = 7; // Restrict after the first big leap
     }
 
+    // 2. Filter candidates by both vocal range AND the jump limit
+    let valid = candidates.filter(m => {
+        const withinRange = m >= MIN_MIDI && m <= MAX_MIDI;
+        const jumpDist = Math.abs(m - previousMidi);
+        return withinRange && jumpDist <= jumpLimit;
+    });
+
     if (valid.length > 0) {
-      // FIX: Pick RANDOMLY from valid options instead of always picking the closest.
-      // This allows 1->5 to go UP (7 semitones) or DOWN (5 semitones).
+      // Pick randomly from all valid options to avoid prioritizing big jumps
       targetMidi = valid[Math.floor(Math.random() * valid.length)];
     }
   } else {
-    // Initial note placement logic
     if (targetMidi < 48) targetMidi += 12;
     if (targetMidi > 60) targetMidi -= 12;
   }
 
-  // Final Safety Clamp
   if (targetMidi < MIN_MIDI) targetMidi += 12;
   if (targetMidi > MAX_MIDI) targetMidi -= 12;
 
