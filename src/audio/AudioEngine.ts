@@ -3,7 +3,7 @@ import type { NoteEvent, MusicalKey } from "../types";
 import { Metronome } from "./Metronome";
 import { DrumMachine } from "./DrumMachine";
 import { Scheduler } from "./Scheduler";
-import { TRAINING_WHEELS_CONFIG, DRUM_PATTERNS, LATENCY_OFFSET } from "../config/AudioConfig";
+import { TRAINING_WHEELS_CONFIG } from "../config/AudioConfig";
 
 export class AudioEngine {
   private masterGain!: Tone.Gain;
@@ -41,9 +41,8 @@ export class AudioEngine {
     this.reverb = new Tone.Reverb({ decay: 1.5, wet: 0.2 }).connect(this.masterGain);
     this.vocalGain = new Tone.Gain(vols.voice).connect(this.reverb);
 
-    // FIX: Cast oscillator to 'any' to bypass strict Tone.js type mismatch
     this.trainingSynth = new Tone.Synth({
-        oscillator: TRAINING_WHEELS_CONFIG.oscillator as any, 
+        oscillator: TRAINING_WHEELS_CONFIG.oscillator as any,
         envelope: TRAINING_WHEELS_CONFIG.envelope
     });
     this.trainingGain = new Tone.Gain(0).connect(this.masterGain);
@@ -71,10 +70,7 @@ export class AudioEngine {
     this.isInitialized = true;
   }
 
-  // ... (Keep existing playMelodyNote, setDrumPattern, setBpm, etc.)
-  // ... (Keep the rest of the file identical to previous upload)
-
-  // Explicitly keeping the rest of the methods to ensure file is complete:
+  // --- CHANGED: Removed offset calculation (handled in Scheduler) ---
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
     if (useSynth) {
         this.trainingGain.gain.setValueAtTime(this.trainingVol, time);
@@ -84,15 +80,15 @@ export class AudioEngine {
         const id = `${degree}_${note.noteInfo.midi}`;
         const buffer = this.noteBuffers.get(id);
         if (buffer) {
-            const offset = LATENCY_OFFSET[degree] || 0;
-            const triggerTime = time + offset;
+            // FIX: Removed LATENCY_OFFSET addition here. 
+            // The 'time' passed in is already shifted by the Scheduler.
             const source = new Tone.ToneBufferSource(buffer).connect(this.vocalGain);
-            source.start(Math.max(0, triggerTime), 0, buffer.duration);
+            source.start(Math.max(0, time), 0, buffer.duration);
         }
     }
   }
 
-  public setDrumPattern(name: string) { if (this.isInitialized) this.drumMachine.setPattern(name as keyof typeof DRUM_PATTERNS); }
+  public setDrumPattern(name: string) { if (this.isInitialized) this.drumMachine.setPattern(name as any); }
   public setBpm(bpm: number) { if (this.isInitialized) this.scheduler.setBpm(bpm); }
 
   public async loadBackingTracks(key: MusicalKey, _unused: string) {

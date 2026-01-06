@@ -103,9 +103,10 @@ export function useSessionLogic() {
     const defaults = getAvailableDegrees(type);
     setEnabledDegrees(defaults);
     
-    // If playing, show status update
     if (isPlaying) {
-        setStatus(`Switched to ${type}`);
+        // FIX: Force reset and restart cycle immediately
+        audioEngine.reset();
+        runCycle(currentKey, true); // true = treats it as the "First" cycle to restart Transport
     }
   };
 

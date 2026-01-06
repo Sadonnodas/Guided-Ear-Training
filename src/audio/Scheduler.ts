@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import type { NoteEvent } from "../types";
+import { LATENCY_OFFSET } from "../config/AudioConfig";
 
 type SchedulerCallbacks = {
   onBeat: (beat: number) => void;
@@ -7,7 +8,6 @@ type SchedulerCallbacks = {
   onNotePlay: (note: NoteEvent | null, isCountIn: boolean) => void;
   playNoteAudio: (note: NoteEvent, time: number, useSynth: boolean) => void;
   onStart: (time: number) => void;
-  // NEW: Callback for text updates
   onStatusChange: (text: string) => void;
 };
 
@@ -71,7 +71,7 @@ export class Scheduler {
      * Helper to schedule a pass
      */
     const schedulePass = (start: number, playAudio: boolean, isSilentPass: boolean, label: string) => {
-        // Schedule the status text update at the start of the pass
+        // Schedule status update exactly on start
         schedule((time) => {
             Tone.Draw.schedule(() => {
                 this.callbacks.onStatusChange(label);
@@ -81,10 +81,18 @@ export class Scheduler {
         notes.forEach(note => {
             const noteTime = start + (note.startTime * beatSec);
             
+            // --- AUDIO SCHEDULING ---
+            // We shift the audio trigger time backward by the offset so the sample's peak hits on the beat.
             if (playAudio) {
-                schedule((time) => this.callbacks.playNoteAudio(note, time, isSilentPass), noteTime);
+                // Only apply offset for Vocal Samples (Pass 1 & 2), not for the Synth (Pass 3)
+                const offset = isSilentPass ? 0 : (LATENCY_OFFSET[note.noteInfo.degree] || 0);
+                const triggerTime = noteTime + offset;
+                
+                schedule((time) => this.callbacks.playNoteAudio(note, time, isSilentPass), triggerTime);
             }
 
+            // --- VISUAL SCHEDULING ---
+            // Visuals should always happen exactly on the grid (noteTime)
             schedule((time) => {
                 Tone.Draw.schedule(() => {
                     if (!document.hidden) this.callbacks.onNotePlay(note, false);
