@@ -71,7 +71,6 @@ export class Scheduler {
      * Helper to schedule a pass
      */
     const schedulePass = (start: number, playAudio: boolean, isSilentPass: boolean, label: string) => {
-        // Schedule status update exactly on start
         schedule((time) => {
             Tone.Draw.schedule(() => {
                 this.callbacks.onStatusChange(label);
@@ -81,18 +80,12 @@ export class Scheduler {
         notes.forEach(note => {
             const noteTime = start + (note.startTime * beatSec);
             
-            // --- AUDIO SCHEDULING ---
-            // We shift the audio trigger time backward by the offset so the sample's peak hits on the beat.
             if (playAudio) {
-                // Only apply offset for Vocal Samples (Pass 1 & 2), not for the Synth (Pass 3)
                 const offset = isSilentPass ? 0 : (LATENCY_OFFSET[note.noteInfo.degree] || 0);
                 const triggerTime = noteTime + offset;
-                
                 schedule((time) => this.callbacks.playNoteAudio(note, time, isSilentPass), triggerTime);
             }
 
-            // --- VISUAL SCHEDULING ---
-            // Visuals should always happen exactly on the grid (noteTime)
             schedule((time) => {
                 Tone.Draw.schedule(() => {
                     if (!document.hidden) this.callbacks.onNotePlay(note, false);
@@ -117,9 +110,21 @@ export class Scheduler {
         cursor += calculatedMelodyDur;
     }
 
+    // --- FIX: Schedule "Prepare" visual & Logic separately ---
+
+    // 1. Visual Status Update: "Prepare..."
+    // Scheduled slightly before the end so it appears right as the user finishes singing.
+    schedule((time) => {
+        Tone.Draw.schedule(() => {
+            this.callbacks.onStatusChange("Prepare...");
+        }, time);
+    }, cursor - 0.1);
+
+    // 2. Logic: Next Cycle Trigger
+    // CRITICAL: NOT wrapped in Tone.Draw. This ensures the game continues even if the tab is hidden.
     schedule(() => {
-        onComplete(cursor);
-    }, cursor - 0.1); 
+        onComplete(cursor); 
+    }, cursor - 0.05); 
   }
 
   private clearMelody() {

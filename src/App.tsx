@@ -8,7 +8,6 @@ import "./App.css";
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import Controls from "./components/Controls/Controls";
-// TrainingHUD Removed
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 
@@ -31,10 +30,11 @@ export default function App() {
 
   useEffect(() => {
     if (session.activeMidi !== null) {
-        const steps = getScaleStepsFromRoot(session.activeMidi, session.currentKey, session.scaleType);
+        // FIX: Use session.visualizerKey here to prevent visual mismatch during key changes
+        const steps = getScaleStepsFromRoot(session.activeMidi, session.visualizerKey, session.scaleType);
         setLastValidStep(steps);
     }
-  }, [session.activeMidi, session.currentKey, session.scaleType]);
+  }, [session.activeMidi, session.visualizerKey, session.scaleType]);
 
   return (
     <div className="app-container">
@@ -49,7 +49,6 @@ export default function App() {
           scaleType={session.scaleType}
           setScaleType={session.handleScaleChange}
           
-          // Pass training data to header
           activeLevelId={session.training.activeLevelId}
           setActiveLevelId={session.training.setActiveLevelId}
           levels={session.training.levels}

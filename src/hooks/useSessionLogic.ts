@@ -15,13 +15,14 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 export function useSessionLogic() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentKey, setCurrentKey] = useState<MusicalKey>("C");
+  const [visualizerKey, setVisualizerKey] = useState<MusicalKey>("C");
+
   const [scaleType, setScaleType] = useState<ScaleType>("Major"); 
   const [status, setStatus] = useState("Start Session");
   const [bpm, setBpm] = useState(80);
   const [currentPattern, setCurrentPattern] = useState("Lofi Chill"); 
   const [activeTab, setActiveTab] = useState("random");
 
-  // STATE
   const [enabledDegrees, setEnabledDegrees] = useState<ScaleDegree[]>(["1", "2", "3", "4", "5", "6", "7"]);
   const [focusedDegrees, setFocusedDegrees] = useState<ScaleDegree[]>([]);
 
@@ -31,22 +32,19 @@ export function useSessionLogic() {
   const [trainingWheels, setTrainingWheels] = useState(false);
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
   
-  // Volumes
   const [volMaster, setVolMaster] = useState(1.0);
   const [volVoice, setVolVoice] = useState(1.0);
   const [volDrone, setVolDrone] = useState(0.4);
   const [volGroove, setVolGroove] = useState(0.6); 
   const [volMetronome, setVolMetronome] = useState(0.8);
   const [volTraining, setVolTraining] = useState(0.8); 
-  const [volReverb, setVolReverb] = useState(0.3); // NEW: Reverb
+  const [volReverb, setVolReverb] = useState(0.3); 
 
-  // Visualizer
   const [activeMidi, setActiveMidi] = useState<number | null>(null);
   const [triggerPulse, setTriggerPulse] = useState(false);
   const [debugClick, setDebugClick] = useState(false);
   const visualTimeoutRef = useRef<number>(0);
 
-  // Refs
   const isPlayingRef = useRef(false);
   const questionCount = useRef(0);
   const activeTabRef = useRef(activeTab);
@@ -58,14 +56,15 @@ export function useSessionLogic() {
   const silentPracticeRef = useRef(silentPractice);
   const enabledDegreesRef = useRef(enabledDegrees);
   const focusedDegreesRef = useRef(focusedDegrees);
+  
+  // FIX: Track manual key changes
+  const currentKeyRef = useRef(currentKey);
 
-  // Training Hook (Updated to accept scaleType)
   const training = useTrainingMode(scaleType);
   const lastPlayedStageIndex = useRef<number>(-1);
   const hasPlayedScalePreview = useRef(false);
   const hasPlayedIntroSequence = useRef(false);
 
-  // Sync Refs
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   useEffect(() => { startRootRef.current = startRoot; }, [startRoot]);
   useEffect(() => { endRootRef.current = endRoot; }, [endRoot]);
@@ -75,8 +74,7 @@ export function useSessionLogic() {
   useEffect(() => { silentPracticeRef.current = silentPractice; }, [silentPractice]);
   useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
   useEffect(() => { focusedDegreesRef.current = focusedDegrees; }, [focusedDegrees]);
-  
-  // Sync Reverb
+  useEffect(() => { currentKeyRef.current = currentKey; }, [currentKey]);
   useEffect(() => { audioEngine.setReverbAmt(volReverb); }, [volReverb]);
 
   useEffect(() => {
@@ -93,21 +91,14 @@ export function useSessionLogic() {
     if (activeTab === 'random') training.resetTraining();
   }, [activeTab]);
 
-  // --- ACTIONS ---
-
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
-    
-    // Auto-update enabled degrees based on scale type
     const defaults = getAvailableDegrees(type);
     setEnabledDegrees(defaults);
-    setFocusedDegrees([]); // Reset focus
-    
-    // Reset training if we switch scales
+    setFocusedDegrees([]); 
     training.resetTraining();
     
     if (isPlaying) {
-        // Soft reset: Keep playing but restart cycle with new scale
         audioEngine.reset();
         runCycle(currentKey, true); 
     }
@@ -152,8 +143,8 @@ export function useSessionLogic() {
     setCurrentKey(k);
     if (isPlaying) {
       setStatus(`Changing to ${KEY_DISPLAY_MAP[k]} next...`);
-      questionCount.current = questionsPerKey; // Force modulation/refresh on next cycle
     } else {
+      setVisualizerKey(k);
       setStatus(`Key: ${KEY_DISPLAY_MAP[k]}`);
       await audioEngine.loadBackingTracks(k, "");
     }
@@ -174,14 +165,9 @@ export function useSessionLogic() {
   };
 
   const stopSession = () => {
-    // 1. Update State & Ref Immediately
     setIsPlaying(false);
     isPlayingRef.current = false; 
-
-    // 2. Stop Audio
     audioEngine.reset(); 
-    
-    // 3. Reset UI/Timers
     training.pauseTrainingTimer(); 
     setStatus("Paused");
     setActiveMidi(null);
@@ -191,20 +177,18 @@ export function useSessionLogic() {
     if (!isPlaying) {
       try {
         setStatus("Initializing...");
-        
-        // 1. Set Flag FIRST
         setIsPlaying(true);
         isPlayingRef.current = true;
 
-        // 2. Init Audio
         await audioEngine.init({ 
           groove: volGroove, voice: volVoice, click: volMetronome, 
           master: volMaster, drone: volDrone 
         });
         
-        // 3. Load Tracks
         if (!isPlayingRef.current) return; 
         
+        setVisualizerKey(currentKey); 
+
         await audioEngine.loadBackingTracks(currentKey, ""); 
         audioEngine.setBpm(bpm);
         audioEngine.setDrumPattern(currentPattern);
@@ -212,7 +196,6 @@ export function useSessionLogic() {
 
         if (activeTab === 'training') training.startTrainingTimer();
         
-        // 4. Start Cycle
         runCycle(currentKey, true);
 
       } catch (e) { 
@@ -226,9 +209,10 @@ export function useSessionLogic() {
   };
 
   const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: number) => {
-    // CRITICAL: Abort if stop was pressed
     if (!isPlayingRef.current) return;
     
+    setVisualizerKey(keyToUse);
+
     setActiveMidi(null);
     questionCount.current += 1;
     
@@ -236,7 +220,19 @@ export function useSessionLogic() {
     let forceOneThreeFive = false;
 
     // --- MODULATION LOGIC ---
-    if (activeTabRef.current === 'random' && questionCount.current > questionsPerKeyRef.current) {
+    if (currentKeyRef.current !== keyToUse) {
+        currentCycleKey = currentKeyRef.current;
+        setStatus(`Key Change: ${KEY_DISPLAY_MAP[currentCycleKey]}`);
+        
+        if (!isPlayingRef.current) return;
+        await audioEngine.loadBackingTracks(currentCycleKey, "");
+        if (!isPlayingRef.current) return;
+        
+        setVisualizerKey(currentCycleKey);
+        forceOneThreeFive = true;
+        questionCount.current = 1; 
+    } 
+    else if (activeTabRef.current === 'random' && questionCount.current > questionsPerKeyRef.current) {
         questionCount.current = 1; 
         const otherKeys = KEYS.filter(k => k !== keyToUse); 
         const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
@@ -247,28 +243,26 @@ export function useSessionLogic() {
         setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
         
         await audioEngine.loadBackingTracks(newKey, "");
-        
         if (!isPlayingRef.current) return;
 
         currentCycleKey = newKey;
+        setVisualizerKey(newKey);
         forceOneThreeFive = true;
     }
 
     let constraints: MelodyConstraints;
     let noteEvents; 
     let playSilent = silentPracticeRef.current; 
-    let useTrainingWheels = trainingWheelsRef.current; // Default to user toggle
+    let useTrainingWheels = trainingWheelsRef.current; 
 
-    // --- GENERATION LOGIC ---
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
         constraints = config.constraints;
         const stageIndex = config.stageIndex;
 
-        // Apply Forced Training Wheels if stage demands it
         if (config.forceTrainingWheels !== undefined) {
              useTrainingWheels = config.forceTrainingWheels;
-             setTrainingWheels(config.forceTrainingWheels); // Sync UI
+             setTrainingWheels(config.forceTrainingWheels); 
         }
 
         setEnabledDegrees(constraints.allowedDegrees);
@@ -280,7 +274,7 @@ export function useSessionLogic() {
         }
 
         if (config.scalePreview && !hasPlayedScalePreview.current) {
-            noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, "Major"); // Always major shape for preview/intro usually
+            noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, "Major"); 
             hasPlayedScalePreview.current = true; 
         } 
         else if (config.introSequence && !hasPlayedIntroSequence.current) {
@@ -293,9 +287,7 @@ export function useSessionLogic() {
         }
 
     } else {
-        // --- RANDOM MODE ---
         if (forceOneThreeFive) {
-            // Adapt pattern for Minor/Major
             const pattern: ScaleDegree[] = scaleType === 'Minor' 
                 ? ["1", "b3", "5", "1"] 
                 : ["1", "3", "5", "1"];
@@ -316,7 +308,6 @@ export function useSessionLogic() {
         }
     }
 
-    // FINAL CHECK before scheduling
     if (noteEvents && isPlayingRef.current) {
         await audioEngine.preloadNotes(noteEvents);
         
@@ -342,7 +333,8 @@ export function useSessionLogic() {
   return {
     activeTab, setActiveTab,
     isPlaying,
-    currentKey,
+    currentKey, 
+    visualizerKey,
     status,
     bpm, setBpm,
     enabledDegrees, toggleDegree,
