@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: "/Guided-Ear-Training/", // EXACT repo name with slashes
-})
+  // FIX: Only use the repo name in production. Use '/' locally.
+  base: mode === 'production' ? "/Guided-Ear-Training/" : "/",
+}))

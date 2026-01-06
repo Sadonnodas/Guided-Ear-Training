@@ -5,6 +5,9 @@ import { DrumMachine } from "./DrumMachine";
 import { Scheduler } from "./Scheduler";
 import { TRAINING_WHEELS_CONFIG } from "../config/AudioConfig";
 
+// 1. IMPORT KEEP ALIVE
+import { initKeepAlive, startKeepAlive, stopKeepAlive } from "./KeepAlive";
+
 export class AudioEngine {
   private masterGain!: Tone.Gain;
   private compressor!: Tone.Compressor;
@@ -30,6 +33,10 @@ export class AudioEngine {
 
   public async init(vols: { groove: number, voice: number, click: number, master: number, drone: number }) {
     if (this.isInitialized) return;
+    
+    // 2. INIT KEEP ALIVE
+    initKeepAlive();
+    
     await Tone.start();
     
     this.compressor = new Tone.Compressor({ threshold: -24, ratio: 6 }).toDestination();
@@ -70,7 +77,6 @@ export class AudioEngine {
     this.isInitialized = true;
   }
 
-  // --- CHANGED: Removed offset calculation (handled in Scheduler) ---
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
     if (useSynth) {
         this.trainingGain.gain.setValueAtTime(this.trainingVol, time);
@@ -79,11 +85,14 @@ export class AudioEngine {
         const degree = note.noteInfo.degree;
         const id = `${degree}_${note.noteInfo.midi}`;
         const buffer = this.noteBuffers.get(id);
+        
+        // FIX: Check if buffer exists to prevent "buffer not set" error
         if (buffer) {
-            // FIX: Removed LATENCY_OFFSET addition here. 
-            // The 'time' passed in is already shifted by the Scheduler.
             const source = new Tone.ToneBufferSource(buffer).connect(this.vocalGain);
             source.start(Math.max(0, time), 0, buffer.duration);
+        } else {
+            // Optional: Log missing buffer locally
+            // console.warn(`Buffer missing for ${id}`);
         }
     }
   }
@@ -94,9 +103,12 @@ export class AudioEngine {
   public async loadBackingTracks(key: MusicalKey, _unused: string) {
     if (!this.isInitialized) return;
     this.currentTonic = typeof key === 'string' ? key : (key as any).tonic;
+    
+    // Path Logic preserved from your working file
     const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
     const tonicLower = this.currentTonic.toLowerCase();
     const droneUrl = `${baseUrl}loops/drones/${tonicLower}_drone.mp3`;
+    
     try {
         await this.dronePlayer.load(droneUrl);
         if (Tone.Transport.state === 'started') this.dronePlayer.stop().start(0);
@@ -114,6 +126,9 @@ export class AudioEngine {
   public startPlayback() {
     if (!this.isInitialized) return;
     if (Tone.Transport.state !== 'started') {
+        // 3. START KEEP ALIVE
+        startKeepAlive();
+
         if (this.dronePlayer.loaded) this.dronePlayer.start(0);
         this.drumMachine.sync();
         this.scheduler.start();
@@ -122,6 +137,10 @@ export class AudioEngine {
 
   public reset() {
     if (!this.isInitialized) return;
+    
+    // 4. STOP KEEP ALIVE
+    stopKeepAlive();
+
     this.scheduler.stop(); 
     this.drumMachine.unsync();
     this.dronePlayer.stop(); 
@@ -141,13 +160,23 @@ export class AudioEngine {
     const uniqueIds = Array.from(new Set(notes.map(n => `${n.noteInfo.degree}_${n.noteInfo.midi}`)));
     const promises = uniqueIds.map(async (id) => {
       if (this.noteBuffers.has(id)) return;
+      
       const degree = id.split('_')[0]; 
-      const url = `${import.meta.env.BASE_URL}samples/${degree}/${id}.mp3`;
+      
+      // Sanitization: Convert # to s for file path, but KEEP original id for the map
+      const safeDegree = degree.replace('#', 's');
+      const safeId = id.replace('#', 's');
+      
+      const url = `${import.meta.env.BASE_URL}samples/${safeDegree}/${safeId}.mp3`;
+      
       try {
         const buffer = new Tone.ToneAudioBuffer();
         await buffer.load(url);
-        this.noteBuffers.set(id, buffer);
-      } catch (e) { console.error("Sample load failed:", url); }
+        this.noteBuffers.set(id, buffer); // Map key uses original ID (e.g. #4_66)
+      } catch (e) { 
+          // Log warning but do not crash
+          console.warn("Sample load failed:", url); 
+      }
     });
     await Promise.all(promises);
   }
