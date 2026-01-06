@@ -10,40 +10,47 @@ const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAE
 let audioEl: HTMLAudioElement | null = null;
 let mediaSource: MediaElementAudioSourceNode | null = null;
 
-export function initKeepAlive() {
+export function initKeepAlive(onTogglePlay?: () => void) {
   if (audioEl) return;
 
-  // 1. Create the HTML Audio Element
   audioEl = document.createElement("audio");
   audioEl.src = SILENT_WAV;
   audioEl.loop = true;
   audioEl.preload = "auto";
-  audioEl.volume = 0.01; // iOS needs non-zero volume
+  audioEl.volume = 0.01; 
   
-  // Critical Attributes for iOS
+  // Keep all your critical attributes
   audioEl.setAttribute("playsinline", "true");
   audioEl.setAttribute("webkit-playsinline", "true");
   audioEl.crossOrigin = "anonymous";
-
-  // Add to DOM (hidden)
   audioEl.style.display = "none";
   document.body.appendChild(audioEl);
 
-  // 2. Lock Screen Metadata
   if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: "Ear Training",
-      artist: "Active Session",
-      album: "Guided Ear Training",
-      artwork: []
-    });
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: "Ear Training",
+    artist: "Active Session",
+    album: "Guided Ear Training",
+    // Update this array with your icon path
+    artwork: [
+      { src: `${import.meta.env.BASE_URL}icon.png`, sizes: '512x512', type: 'image/png' }
+    ]
+  });
+
+   // UPDATED: Only call toggle if the handler was provided
     navigator.mediaSession.setActionHandler('play', () => {
-        audioEl?.play();
-        Tone.context.resume();
+        if (onTogglePlay) onTogglePlay();
     });
     navigator.mediaSession.setActionHandler('pause', () => {
-        // Do nothing to prevent stopping
+        if (onTogglePlay) onTogglePlay();
     });
+  }
+}
+
+// Add this helper to update the lock screen icon (Play vs Pause)
+export function updateMediaSessionState(isPlaying: boolean) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
   }
 }
 

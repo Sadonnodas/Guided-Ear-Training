@@ -4,7 +4,7 @@ import { Metronome } from "./Metronome";
 import { DrumMachine } from "./DrumMachine";
 import { Scheduler } from "./Scheduler";
 import { TRAINING_WHEELS_CONFIG } from "../config/AudioConfig";
-import { initKeepAlive, startKeepAlive, stopKeepAlive } from "./KeepAlive";
+import { startKeepAlive, stopKeepAlive } from "./KeepAlive";
 
 export class AudioEngine {
   private masterGain!: Tone.Gain;
@@ -34,7 +34,8 @@ export class AudioEngine {
   public async init(vols: { groove: number, voice: number, click: number, master: number, drone: number }) {
     if (this.isInitialized) return;
     
-    initKeepAlive();
+    // We remove initKeepAlive() from here. 
+    // It is now handled by the useEffect in useSessionLogic.ts
     await Tone.start();
 
     // --- SETUP NODES ---
@@ -145,26 +146,46 @@ export class AudioEngine {
 
   public startPlayback() {
     if (!this.isInitialized) return;
-    this.shouldBePlaying = true; // MARK AS PLAYING
+    this.shouldBePlaying = true; 
 
     if (Tone.context.state !== 'running') Tone.context.resume();
 
+    // Ensure the background bridge is active
+    startKeepAlive();
+
     if (Tone.Transport.state !== 'started') {
-        startKeepAlive();
         if (this.dronePlayer.loaded) this.dronePlayer.start(0);
         this.drumMachine.sync();
         this.scheduler.start();
     }
   }
 
-  public reset() {
+  // NEW: Use this ONLY for the physical STOP button in the UI
+  public stopAndKillBridge() {
     if (!this.isInitialized) return;
     this.shouldBePlaying = false; // MARK AS STOPPED
 
-    stopKeepAlive();
+    stopKeepAlive(); // This pauses the HTML5 audio, allowing iOS to suspend
     this.scheduler.stop(); 
     this.drumMachine.unsync();
-    this.dronePlayer.stop(); // Stop immediately
+    this.dronePlayer.stop(); 
+    Tone.Transport.cancel();
+    this.trainingSynth.triggerRelease();
+  }
+
+  // NEW: Use this for internal changes (Key/Scale changes)
+  // This stops the music logic but keeps the background "bridge" open
+  public softReset() {
+    if (!this.isInitialized) return;
+    // We do NOT set shouldBePlaying to false here
+    
+    this.scheduler.stop(); 
+    this.drumMachine.unsync();
+    this.dronePlayer.stop(); 
+    
+    // CRITICAL: We do NOT call stopKeepAlive() here.
+    // This is what keeps the app alive in "Pocket Mode" during transitions.
+    
     Tone.Transport.cancel();
     this.trainingSynth.triggerRelease();
   }

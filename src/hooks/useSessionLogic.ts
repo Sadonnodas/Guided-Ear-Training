@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { audioEngine } from "../audio/AudioEngine";
+import { initKeepAlive, updateMediaSessionState } from "../audio/KeepAlive"; // New
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
 import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
@@ -87,9 +88,13 @@ export function useSessionLogic() {
     debugClick, setTriggerPulse, setActiveMidi, visualTimeoutRef
   });
 
+  // Initialize the background bridge and link it to startSession
   useEffect(() => {
-    if (activeTab === 'random') training.resetTraining();
-  }, [activeTab]);
+    // We pass a wrapper function to ensure startSession is called correctly
+    initKeepAlive(() => {
+      startSession();
+    });
+  }, []);
 
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
@@ -99,7 +104,8 @@ export function useSessionLogic() {
     training.resetTraining();
     
     if (isPlaying) {
-        audioEngine.reset();
+        // Use softReset to change music without killing the background bridge
+        audioEngine.softReset();
         runCycle(currentKey, true); 
     }
   };
@@ -157,7 +163,8 @@ export function useSessionLogic() {
       hasPlayedIntroSequence.current = false;
       
       if (isPlaying) {
-          audioEngine.reset(); 
+          // Use softReset to keep the pocket mode alive during level changes
+          audioEngine.softReset(); 
           training.resetTraining(); 
           training.startTrainingTimer();
           runCycle(currentKey, true); 
@@ -167,7 +174,13 @@ export function useSessionLogic() {
   const stopSession = () => {
     setIsPlaying(false);
     isPlayingRef.current = false; 
-    audioEngine.reset(); 
+    
+    // Stop the music AND the background process
+    audioEngine.stopAndKillBridge(); 
+    
+    // Update lock screen icon to "Play"
+    updateMediaSessionState(false);
+
     training.pauseTrainingTimer(); 
     setStatus("Paused");
     setActiveMidi(null);
@@ -196,6 +209,9 @@ export function useSessionLogic() {
 
         if (activeTab === 'training') training.startTrainingTimer();
         
+        // Update lock screen icon to "Pause"
+        updateMediaSessionState(true);
+
         runCycle(currentKey, true);
 
       } catch (e) { 
