@@ -1,4 +1,4 @@
-import type { MusicalKey, ScaleType } from '../../types';
+import type { MusicalKey, ScaleType, TrainingLevel } from '../../types';
 import './Header.css';
 
 // --- ICONS ---
@@ -19,32 +19,43 @@ interface HeaderProps {
   currentKey: MusicalKey;
   setKeyManually: (k: MusicalKey) => void;
   pickRandomKey: () => void;
-  status: string;
   viewMode: 'tape' | 'static';
   setViewMode: (mode: 'tape' | 'static') => void;
   debugClick: boolean; 
   setDebugClick: (v: boolean) => void;
-  
-  // NEW
   scaleType: ScaleType;
   setScaleType: (s: ScaleType) => void;
+  
+  // Training Props
+  activeLevelId?: number;
+  setActiveLevelId?: (id: number) => void;
+  levels?: TrainingLevel[];
 }
 
 export default function Header({ 
-  activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, status, viewMode, setViewMode, debugClick, setDebugClick,
-  scaleType, setScaleType
+  activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, 
+  viewMode, setViewMode, debugClick, setDebugClick, scaleType, setScaleType,
+  activeLevelId, setActiveLevelId, levels
 }: HeaderProps) {
+
+  const handleTabChange = (tab: string) => {
+      setActiveTab(tab);
+      if (tab === 'training' && scaleType === 'Chromatic') {
+          setScaleType('Major');
+      }
+  };
+
   return (
     <>
       <div className="tabs">
-        <button className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} onClick={() => setActiveTab("random")}>Random</button>
-        <button className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} onClick={() => setActiveTab("training")}>Training</button>
+        <button className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} onClick={() => handleTabChange("random")}>Random</button>
+        <button className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} onClick={() => handleTabChange("training")}>Training</button>
       </div>
 
       <div className="info-display">
         <div className="key-container">
           
-          {/* SCALE TYPE SELECTOR */}
+          {/* SCALE TYPE */}
           <select 
             className="key-select" 
             value={scaleType} 
@@ -53,6 +64,8 @@ export default function Header({
           >
             <option value="Major">Major</option>
             <option value="Minor">Minor</option>
+            {/* Hide Chromatic in Training */}
+            {activeTab !== 'training' && <option value="Chromatic">Chromatic</option>}
           </select>
 
           <div className="separator"></div>
@@ -67,6 +80,22 @@ export default function Header({
           </button>
           
           <div className="separator"></div>
+
+          {/* LEVEL SELECTOR (TRAINING ONLY) */}
+          {activeTab === 'training' && levels && setActiveLevelId && (
+            <>
+                <select 
+                    className="level-select"
+                    value={activeLevelId}
+                    onChange={(e) => setActiveLevelId(Number(e.target.value))}
+                >
+                    {levels.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                </select>
+                <div className="separator"></div>
+            </>
+          )}
           
           {/* VIEW TOGGLE */}
           <div className="view-toggle">
@@ -81,7 +110,7 @@ export default function Header({
 
           <div className="separator"></div>
 
-          {/* METRONOME TOGGLE */}
+          {/* METRONOME */}
           <button 
             className={`icon-btn ${debugClick ? 'active-pulse' : ''}`} 
             onClick={() => setDebugClick(!debugClick)} 
@@ -90,9 +119,7 @@ export default function Header({
           >
             <MetronomeIcon />
           </button>
-
         </div>
-        <div className="status-text">{status}</div>
       </div>
     </>
   );

@@ -35,12 +35,12 @@ const SCALES: Record<ScaleType, { degrees: ScaleDegree[], intervals: number[] }>
 };
 
 const MIN_MIDI = 43; // G2
-const MAX_MIDI = 64; // E4
+const MAX_MIDI = 67; // G4 (Increased slightly to allow 1->5 up from C)
 
 export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
-  _scaleType: ScaleType, // Prefix with underscore to ignore "unused" warning
+  _scaleType: ScaleType, 
   previousMidi: number | null = null
 ): NoteInfo {
   const rootMidi = ROOT_MIDI[key];
@@ -50,17 +50,29 @@ export function getNoteForDegree(
 
   if (previousMidi !== null) {
     const candidates = [targetMidi - 12, targetMidi, targetMidi + 12];
-    const valid = candidates.filter(m => m >= MIN_MIDI && m <= MAX_MIDI);
+    
+    // 1. Filter by Absolute Vocal Range
+    let valid = candidates.filter(m => m >= MIN_MIDI && m <= MAX_MIDI);
+
+    // 2. Filter by Singability (Don't jump more than an octave)
+    // If we have options, filter down. If not, we take what we can get.
+    const strictValid = valid.filter(m => Math.abs(m - previousMidi) <= 12);
+    if (strictValid.length > 0) {
+        valid = strictValid;
+    }
+
     if (valid.length > 0) {
-      targetMidi = valid.reduce((prev, curr) => 
-        Math.abs(curr - previousMidi) < Math.abs(prev - previousMidi) ? curr : prev
-      );
+      // FIX: Pick RANDOMLY from valid options instead of always picking the closest.
+      // This allows 1->5 to go UP (7 semitones) or DOWN (5 semitones).
+      targetMidi = valid[Math.floor(Math.random() * valid.length)];
     }
   } else {
+    // Initial note placement logic
     if (targetMidi < 48) targetMidi += 12;
     if (targetMidi > 60) targetMidi -= 12;
   }
 
+  // Final Safety Clamp
   if (targetMidi < MIN_MIDI) targetMidi += 12;
   if (targetMidi > MAX_MIDI) targetMidi -= 12;
 
@@ -88,7 +100,6 @@ export function getScaleStepsFromRoot(midi: number, key: MusicalKey, scaleType: 
   let stepIndex = scaleDef.degrees.indexOf(degree);
   
   if (stepIndex === -1) {
-      // If the note isn't in the specific scale (chromatic), find it in the degree map
       stepIndex = remainder; 
   }
 

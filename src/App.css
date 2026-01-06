@@ -91,3 +91,13 @@ body {
     align-items: center;
     color: var(--btn-play);
 }
+.status-text-container {
+  text-align: center;
+  font-size: 1.1rem; /* Slightly larger for readability */
+  font-weight: 500;
+  color: var(--text-main); /* Brighter text */
+  min-height: 28px; /* Prevent layout jump */
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}

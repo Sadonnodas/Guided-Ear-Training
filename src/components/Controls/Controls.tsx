@@ -28,9 +28,11 @@ interface ControlsProps {
   volGroove: number; setVolGroove: (v: number) => void;
   volMetronome: number; setVolMetronome: (v: number) => void;
   volTraining: number; setVolTraining: (v: number) => void;
-  toggleMute: (type: string, val: number, setter: (v: number) => void) => void;
   
-  // NEW: State for controlled select
+  // FIX: Added Reverb Props here
+  volReverb: number; setVolReverb: (v: number) => void;
+  
+  toggleMute: (type: string, val: number, setter: (v: number) => void) => void;
   currentPattern: string;
   setPattern: (name: string) => void;
 }
@@ -102,7 +104,6 @@ export default function Controls(props: ControlsProps) {
              </div>
              <div className="row-split">
                 <span className="stepper-label">Groove</span>
-                {/* FIX: Controlled Input */}
                 <select 
                   className="pattern-select" 
                   value={props.currentPattern}
@@ -131,6 +132,10 @@ export default function Controls(props: ControlsProps) {
             <div className="slider-row">
                 <span onClick={() => props.toggleMute('voice', props.volVoice, props.setVolVoice)} className={props.volVoice === 0 ? 'muted-label' : 'active-label'}>Voice</span>
                 <input type="range" min="0" max="1.5" step="0.1" value={props.volVoice} onChange={e => props.setVolVoice(parseFloat(e.target.value))} />
+            </div>
+            <div className="slider-row">
+                <span>Reverb</span>
+                <input type="range" min="0" max="1" step="0.05" value={props.volReverb} onChange={e => props.setVolReverb(parseFloat(e.target.value))} />
             </div>
             <div className="slider-row">
                 <span onClick={() => props.toggleMute('drone', props.volDrone, props.setVolDrone)} className={props.volDrone === 0 ? 'muted-label' : 'active-label'}>Drone</span>

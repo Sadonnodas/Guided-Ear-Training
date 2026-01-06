@@ -1,8 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { MAJOR_LEVELS } from '../config/TrainingLevels';
-import type { MelodyConstraints, ScaleDegree } from '../types';
+import { MAJOR_LEVELS, MINOR_LEVELS, CHROMATIC_LEVELS } from '../config/TrainingLevels';
+import type { MelodyConstraints, ScaleDegree, ScaleType, TrainingLevel } from '../types';
 
-export function useTrainingMode() {
+// ACCEPT scaleType as an argument
+export function useTrainingMode(scaleType: ScaleType) {
+  
+  // 1. Determine which levels array to use
+  let currentLevels: TrainingLevel[] = MAJOR_LEVELS;
+  if (scaleType === 'Minor') currentLevels = MINOR_LEVELS;
+  else if (scaleType === 'Chromatic') currentLevels = CHROMATIC_LEVELS; // or fallback to MAJOR if empty
+
   const [activeLevelId, setActiveLevelId] = useState<number>(1);
   const activeLevelIdRef = useRef(1); 
   
@@ -17,9 +24,18 @@ export function useTrainingMode() {
     activeLevelIdRef.current = activeLevelId;
   }, [activeLevelId]);
 
+  // SAFETY: If we switch scales, ensure ID 1 is valid, or reset if needed
+  useEffect(() => {
+      // If the current ID doesn't exist in the new scale (e.g. switching Major Lvl 10 -> Minor), reset to 1
+      const exists = currentLevels.find(l => l.id === activeLevelId);
+      if (!exists) setActiveLevelId(1);
+  }, [scaleType]);
+
   const getCurrentConfig = () => {
     const currentId = activeLevelIdRef.current;
-    const level = MAJOR_LEVELS.find(l => l.id === currentId);
+    
+    // 2. Look up level in the DYNAMIC list, not the hardcoded MAJOR list
+    const level = currentLevels.find(l => l.id === currentId);
     
     // Default fallback
     if (!level) return { 
@@ -27,7 +43,7 @@ export function useTrainingMode() {
         questionsPerKey: Infinity,
         stageIndex: -1,
         introSequence: undefined as ScaleDegree[] | undefined,
-        scalePreview: undefined as ScaleDegree[] | undefined // FIX: Added this
+        scalePreview: undefined as ScaleDegree[] | undefined 
     };
 
     const defaultTotal = level.stages.reduce((acc, s) => acc + s.duration, 0);
@@ -37,7 +53,6 @@ export function useTrainingMode() {
     let timeAccumulator = 0;
     const currentTime = timeRef.current; 
 
-    // Find Active Stage
     for (let i = 0; i < level.stages.length; i++) {
       const stage = level.stages[i];
       const scaledDuration = stage.duration * scaleFactor;
@@ -49,14 +64,14 @@ export function useTrainingMode() {
             constraints: stage.constraints,
             questionsPerKey: stage.questionsPerKey ?? Infinity,
             introSequence: stage.introSequence,
-            scalePreview: stage.scalePreview, // FIX: Added this
-            stageIndex: i
+            scalePreview: stage.scalePreview, 
+            stageIndex: i,
+            forceTrainingWheels: stage.forceTrainingWheels
         };
       }
       timeAccumulator += scaledDuration;
     }
     
-    // Last Stage
     const lastIndex = level.stages.length - 1;
     const lastStage = level.stages[lastIndex];
     if (stageLabel !== "Level Complete") setStageLabel("Level Complete");
@@ -65,11 +80,12 @@ export function useTrainingMode() {
         constraints: lastStage.constraints,
         questionsPerKey: lastStage.questionsPerKey ?? Infinity,
         introSequence: lastStage.introSequence,
-        scalePreview: lastStage.scalePreview, // FIX: Added this
+        scalePreview: lastStage.scalePreview, 
         stageIndex: lastIndex
     };
   };
 
+  // ... (keep startTrainingTimer, pauseTrainingTimer, resetTraining exactly the same) ...
   const startTrainingTimer = () => {
     if (!timerInterval.current) {
         timerInterval.current = setInterval(() => {
@@ -93,15 +109,11 @@ export function useTrainingMode() {
     setStageLabel("Ready");
   };
 
-  useEffect(() => {
-    return () => pauseTrainingTimer();
-  }, []);
-
-  useEffect(() => {
-    resetTraining();
-  }, [activeLevelId]);
+  useEffect(() => { return () => pauseTrainingTimer(); }, []);
+  useEffect(() => { resetTraining(); }, [activeLevelId]);
 
   return {
+    levels: currentLevels, // EXPORT THIS so UI can see it
     activeLevelId,
     setActiveLevelId,
     sessionTime: uiSessionTime,

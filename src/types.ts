@@ -1,8 +1,5 @@
 export type MusicalKey = "C" | "Cs" | "D" | "Ds" | "E" | "F" | "Fs" | "G" | "Gs" | "A" | "As" | "B";
-
 export type ScaleDegree = "1" | "b2" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7";
-
-// UPDATE: Added "Minor" (and "NaturalMinor" as an alias if you prefer, but "Minor" matches MusicTheory.ts)
 export type ScaleType = "Major" | "Minor" | "PentatonicMajor" | "PentatonicMinor" | "Chromatic"; 
 
 export interface NoteInfo {
@@ -31,8 +28,11 @@ export interface TrainingStage {
   label: string;
   constraints: MelodyConstraints;
   questionsPerKey?: number; 
-  introSequence?: ScaleDegree[]; // The 1-6-6-1 pattern
-  scalePreview?: ScaleDegree[];  // NEW: The linear 1-2-3-4-5 pattern
+  introSequence?: ScaleDegree[]; 
+  scalePreview?: ScaleDegree[];
+  
+  // NEW: Pedagogical tools
+  forceTrainingWheels?: boolean; // If true, pitch guide is forced ON
 }
 
 export interface TrainingLevel {

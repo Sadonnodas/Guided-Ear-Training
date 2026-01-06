@@ -1,5 +1,5 @@
 import { getDegreeLabelFromStep, getAvailableDegrees } from '../../audio/MusicTheory';
-import { useLongPress } from '../../hooks/useLongPress'; // Import Hook
+import { useLongPress } from '../../hooks/useLongPress';
 import type { ScaleDegree, ScaleType } from '../../types';
 import './Visualizer.css';
 
@@ -13,30 +13,24 @@ interface VisualizerProps {
   enabledDegrees: ScaleDegree[];
   focusedDegrees: ScaleDegree[]; 
   toggleDegree: (d: ScaleDegree) => void;
-  toggleFocus: (d: ScaleDegree) => void; // Add this prop
+  toggleFocus: (d: ScaleDegree) => void;
   scaleType: ScaleType; 
 }
 
-// Sub-component for individual notes to handle hooks cleanly
-const NoteCell = ({ label, isActive, isEnabled, isFocused, onToggle, onFocus }: any) => {
-    
-    // Wire up the hook
+const NoteCell = ({ label, isActive, isEnabled, isFocused, onToggle, onFocus, extraClass = '' }: any) => {
     const handlers = useLongPress({
         onClick: () => onToggle(label),
         onLongPress: () => onFocus(label),
-        ms: 400 // 400ms hold time
+        ms: 400
     });
 
-    let classes = `tape-cell d-${label}`;
+    let classes = `tape-cell d-${label} ${extraClass}`;
     if (isActive) classes += ' active';
     if (isFocused) classes += ' focused';
     if (!isEnabled && !isFocused) classes += ' disabled';
 
     return (
-        <div 
-            className={classes}
-            {...handlers} // Apply mouse/touch handlers
-        >
+        <div className={classes} {...handlers}>
             <span>{label}</span>
         </div>
     );
@@ -79,24 +73,43 @@ export default function Visualizer({
 
   // --- Static Logic ---
   const renderStatic = () => {
-    const degrees = getAvailableDegrees(scaleType);
+    if (scaleType === 'Chromatic') {
+        const whites: ScaleDegree[] = ["1", "2", "3", "4", "5", "6", "7"];
+        
+        // FIX: Removed unused 'topRow' variable and 'blacks' variable.
+        // FIX: Hardcoded JSX children to ensure valid types (#4 instead of b5).
 
+        return (
+            <div className="static-container chromatic-grid">
+                <div className="piano-row top">
+                    <div className="spacer half"></div>
+                    <NoteCell label="b2" {...getCellProps("b2")} />
+                    <NoteCell label="b3" {...getCellProps("b3")} />
+                    <div className="spacer full"></div> 
+                    <NoteCell label="#4" {...getCellProps("#4")} /> 
+                    <NoteCell label="b6" {...getCellProps("b6")} />
+                    <NoteCell label="b7" {...getCellProps("b7")} />
+                    <div className="spacer half"></div>
+                </div>
+                <div className="piano-row bottom">
+                    {whites.map(d => (
+                         <NoteCell key={d} label={d} {...getCellProps(d)} />
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    // Default Linear (Major/Minor)
+    const degrees = getAvailableDegrees(scaleType);
     return (
         <div className="static-container">
             {degrees.map(d => {
-                const isActive = activeMidi !== null && getDegreeLabelFromStep(lastValidStep, scaleType) === d;
-                const isEnabled = enabledDegrees.includes(d);
-                const isFocused = focusedDegrees.includes(d);
-
                 return (
                     <NoteCell 
                         key={d}
                         label={d}
-                        isActive={isActive}
-                        isEnabled={isEnabled}
-                        isFocused={isFocused}
-                        onToggle={toggleDegree}
-                        onFocus={toggleFocus}
+                        {...getCellProps(d)}
                     />
                 )
             })}
@@ -104,8 +117,16 @@ export default function Visualizer({
     )
   };
 
+  const getCellProps = (d: ScaleDegree) => ({
+      isActive: activeMidi !== null && getDegreeLabelFromStep(lastValidStep, scaleType) === d,
+      isEnabled: enabledDegrees.includes(d),
+      isFocused: focusedDegrees.includes(d),
+      onToggle: toggleDegree,
+      onFocus: toggleFocus
+  });
+
   return (
-    <div className={`visualizer-container ${viewMode}`}>
+    <div className={`visualizer-container ${viewMode} ${scaleType.toLowerCase()}`}>
         {viewMode === 'tape' ? renderTape() : renderStatic()}
     </div>
   );

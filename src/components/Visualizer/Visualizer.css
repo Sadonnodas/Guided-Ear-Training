@@ -131,3 +131,33 @@
         height: 40px; 
     }
 }
+/* PIANO GRID */
+.chromatic-grid {
+    flex-direction: column;
+    gap: 5px;
+}
+
+.piano-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.piano-row.top {
+    margin-bottom: -10px; /* Overlap slightly or just tight packing */
+    z-index: 2; /* Black keys sit on top */
+    pointer-events: none; /* Let clicks pass through spacers */
+}
+.piano-row.top .tape-cell {
+    pointer-events: auto; /* Re-enable pointer on actual keys */
+}
+
+/* Adjust cell size for chromatic view to fit 12 keys */
+.visualizer-container.chromatic .tape-cell {
+    width: 45px; /* Smaller cells */
+    font-size: 0.9rem;
+}
+
+.spacer { pointer-events: none; }
+.spacer.half { width: 22px; }
+.spacer.full { width: 45px; }

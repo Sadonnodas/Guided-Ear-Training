@@ -8,7 +8,7 @@ import "./App.css";
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import Controls from "./components/Controls/Controls";
-import TrainingHUD from "./components/TrainingHUD"; 
+// TrainingHUD Removed
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 
@@ -44,23 +44,21 @@ export default function App() {
           activeTab={session.activeTab} setActiveTab={session.setActiveTab}
           currentKey={session.currentKey} setKeyManually={session.setKeyManually}
           pickRandomKey={() => session.setKeyManually(KEYS[Math.floor(Math.random() * KEYS.length)])} 
-          status={session.status} viewMode={viewMode} setViewMode={setViewMode}
+          viewMode={viewMode} setViewMode={setViewMode}
           debugClick={session.debugClick} setDebugClick={session.setDebugClick}
           scaleType={session.scaleType}
           setScaleType={session.handleScaleChange}
+          
+          // Pass training data to header
+          activeLevelId={session.training.activeLevelId}
+          setActiveLevelId={session.training.setActiveLevelId}
+          levels={session.training.levels}
         />
 
-        {session.activeTab === 'training' && (
-          <TrainingHUD 
-            stageLabel={session.training.stageLabel}
-            sessionTime={session.training.sessionTime}
-            userDurationMinutes={session.training.userDurationMinutes}
-            setUserDurationMinutes={session.training.setUserDurationMinutes}
-            activeLevelId={session.training.activeLevelId}
-            setActiveLevelId={session.training.setActiveLevelId}
-            handleLevelChange={session.handleLevelChange}
-          />
-        )}
+        {/* Status Text (Sing Along / Listen) */}
+        <div className="status-text-container">
+            {session.status}
+        </div>
 
         <Visualizer 
           viewMode={viewMode} activeMidi={session.activeMidi}
@@ -68,7 +66,7 @@ export default function App() {
           enabledDegrees={session.enabledDegrees}
           focusedDegrees={session.focusedDegrees} 
           toggleDegree={session.toggleDegree}
-          toggleFocus={session.toggleFocus} // NEW PROP
+          toggleFocus={session.toggleFocus} 
           scaleType={session.scaleType}
         />
 
@@ -89,6 +87,7 @@ export default function App() {
             volMetronome={session.volMetronome} setVolMetronome={session.setVolMetronome}
             volDrone={session.volDrone} setVolDrone={session.setVolDrone}
             volTraining={session.volTraining} setVolTraining={session.setVolTraining}
+            volReverb={session.volReverb} setVolReverb={session.setVolReverb}
             toggleMute={toggleMute}
         />
       </div>

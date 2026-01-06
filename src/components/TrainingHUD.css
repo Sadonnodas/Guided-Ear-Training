@@ -1,0 +1,100 @@
+.hud-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    
+    /* Darker, subtler background to recede visually */
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    
+    /* CONDENSED SPACING */
+    padding: 6px 12px; 
+    margin-bottom: 12px;
+    border-radius: 8px; /* Slightly tighter radius */
+    
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.8rem; /* Smaller base font */
+    color: var(--text-muted);
+    min-height: 36px; /* Enforce a slim height */
+}
+
+.hud-section {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Tighter gap */
+}
+
+.hud-section.left { flex: 0 1 auto; max-width: 35%; }
+.hud-section.center { flex: 1; justify-content: center; overflow: hidden; }
+.hud-section.right { flex: 0 1 auto; justify-content: flex-end; }
+
+/* Clean Select - Condensed */
+.hud-select {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    width: 100%;
+    
+    /* Truncate text if level name is too long */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hud-select:hover { opacity: 0.8; }
+.hud-select option { background: #161b22; }
+
+/* Stage Label */
+.hud-stage-label {
+    color: var(--btn-play);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 0.75rem; /* Smaller, punchier label */
+    white-space: nowrap;
+    
+    /* Subtle background pill for the label */
+    background: rgba(74, 222, 128, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* Time & Progress */
+.hud-time {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    white-space: nowrap;
+}
+
+.hud-progress-track {
+    width: 30px; /* Shorter track */
+    height: 3px; /* Slimmer line */
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.hud-progress-bar {
+    height: 100%;
+    background: var(--btn-play);
+    transition: width 0.5s linear;
+}
+
+@media (max-width: 500px) {
+    .hud-container {
+        padding: 6px 8px;
+        gap: 5px;
+    }
+    .hud-stage-label {
+        font-size: 0.7rem;
+        padding: 1px 5px;
+    }
+    .hud-time {
+        display: none; /* Hide numbers on very small screens, keep bar */
+    }
+}
