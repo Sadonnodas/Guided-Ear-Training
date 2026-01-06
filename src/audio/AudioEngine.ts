@@ -161,33 +161,25 @@ export class AudioEngine {
   }
 
   // NEW: Use this ONLY for the physical STOP button in the UI
+  // Use this for the physical STOP button in the UI
   public stopAndKillBridge() {
     if (!this.isInitialized) return;
-    this.shouldBePlaying = false; // MARK AS STOPPED
-
-    stopKeepAlive(); // This pauses the HTML5 audio, allowing iOS to suspend
+    this.shouldBePlaying = false;
+    stopKeepAlive(); // This allows the system to sleep
     this.scheduler.stop(); 
     this.drumMachine.unsync();
     this.dronePlayer.stop(); 
     Tone.Transport.cancel();
-    this.trainingSynth.triggerRelease();
   }
 
-  // NEW: Use this for internal changes (Key/Scale changes)
-  // This stops the music logic but keeps the background "bridge" open
+  // Use this for internal changes like Key or Scale changes
   public softReset() {
     if (!this.isInitialized) return;
-    // We do NOT set shouldBePlaying to false here
-    
     this.scheduler.stop(); 
     this.drumMachine.unsync();
     this.dronePlayer.stop(); 
-    
-    // CRITICAL: We do NOT call stopKeepAlive() here.
-    // This is what keeps the app alive in "Pocket Mode" during transitions.
-    
+    // DO NOT call stopKeepAlive() here; this keeps the pocket mode alive
     Tone.Transport.cancel();
-    this.trainingSynth.triggerRelease();
   }
 
   // Vol setters...

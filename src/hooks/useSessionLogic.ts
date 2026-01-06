@@ -91,11 +91,8 @@ export function useSessionLogic() {
 
   // Initialize the background bridge and link it to startSession
   useEffect(() => {
-    // We pass a wrapper function to ensure startSession is called correctly
-    initKeepAlive(() => {
-      startSession();
-    });
-  }, []);
+  initKeepAlive(() => startSession()); // Connect lock screen to your logic
+}, []);
 
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);

@@ -17,9 +17,8 @@ export function initKeepAlive(onTogglePlay?: () => void) {
   audioEl.src = SILENT_WAV;
   audioEl.loop = true;
   audioEl.preload = "auto";
-  audioEl.volume = 0.01; 
+  audioEl.volume = 0.01; // iOS requires non-zero volume to keep context alive
   
-  // Keep all your critical attributes
   audioEl.setAttribute("playsinline", "true");
   audioEl.setAttribute("webkit-playsinline", "true");
   audioEl.crossOrigin = "anonymous";
@@ -27,17 +26,16 @@ export function initKeepAlive(onTogglePlay?: () => void) {
   document.body.appendChild(audioEl);
 
   if ('mediaSession' in navigator) {
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title: "Ear Training",
-    artist: "Active Session",
-    album: "Guided Ear Training",
-    // Update this array with your icon path
-    artwork: [
-      { src: `${import.meta.env.BASE_URL}icon.png`, sizes: '512x512', type: 'image/png' }
-    ]
-  });
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: "Ear Training",
+      artist: "Active Session",
+      album: "Guided Ear Training",
+      artwork: [
+        { src: `${import.meta.env.BASE_URL}icon.png`, sizes: '512x512', type: 'image/png' }
+      ]
+    });
 
-   // UPDATED: Only call toggle if the handler was provided
+    // These handlers allow the lock screen play/pause buttons to work
     navigator.mediaSession.setActionHandler('play', () => {
         if (onTogglePlay) onTogglePlay();
     });
