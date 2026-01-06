@@ -3,8 +3,6 @@
  * and bypasses the iOS silent switch.
  */
 
-// FIX: Switched to a standard WAV header (Universally supported)
-// This is a 0.1s silent WAV file.
 const SILENT_WAV = "data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==";
 
 let audioEl: HTMLAudioElement | null = null;
@@ -12,13 +10,23 @@ let audioEl: HTMLAudioElement | null = null;
 export function initKeepAlive() {
   if (audioEl) return;
 
-  // Create an invisible audio element
-  audioEl = new Audio();
-  audioEl.src = SILENT_WAV; // Use WAV instead of MP3
+  audioEl = document.createElement("audio"); // Create properly
+  audioEl.src = SILENT_WAV;
   audioEl.loop = true;
-  audioEl.volume = 0.01; // Non-zero volume is required for iOS
+  audioEl.volume = 0.01;
   
-  // Set Media Session metadata (Shows on Lock Screen)
+  // CRITICAL FOR IOS BACKGROUND AUDIO:
+  audioEl.setAttribute("playsinline", "true");
+  audioEl.setAttribute("webkit-playsinline", "true");
+  
+  // CRITICAL: Add to DOM so the browser treats it as a "real" media player
+  // We hide it visually but keep it in the DOM structure
+  audioEl.style.position = 'absolute';
+  audioEl.style.top = '-9999px';
+  audioEl.style.left = '-9999px';
+  document.body.appendChild(audioEl);
+
+  // Metadata for Lock Screen
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: "Ear Training",
@@ -26,22 +34,15 @@ export function initKeepAlive() {
       album: "Guided Ear Training",
       artwork: []
     });
-
-    // Dummy handlers to prevent the OS from killing the audio
     navigator.mediaSession.setActionHandler('play', () => audioEl?.play());
     navigator.mediaSession.setActionHandler('pause', () => audioEl?.pause());
   }
 }
 
 export function startKeepAlive() {
-  // This must be called inside a user interaction (click/touch)
   if (audioEl && audioEl.paused) {
     audioEl.play().catch(e => {
-        // Ignore "AbortError" (happens if you click stop quickly)
-        // But log others
-        if (e.name !== 'AbortError') {
-            console.warn("KeepAlive play failed", e);
-        }
+        if (e.name !== 'AbortError') console.warn("KeepAlive play failed", e);
     });
   }
 }
@@ -49,6 +50,6 @@ export function startKeepAlive() {
 export function stopKeepAlive() {
   if (audioEl) {
     audioEl.pause();
-    audioEl.currentTime = 0; // Reset
+    audioEl.currentTime = 0;
   }
 }
