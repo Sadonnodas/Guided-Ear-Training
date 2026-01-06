@@ -13,7 +13,7 @@ const SAMPLE_GAINS: Record<string, number> = {
   hihat_open: -4,
   hihat_vinyl: -2,
   shaker: -3,
-  tambourine: -6,
+  tambourine: -8,
   crash: -4,
   ride: -3,
   
@@ -23,10 +23,10 @@ const SAMPLE_GAINS: Record<string, number> = {
   snare: 0,
   rimshot: -1,
   clap: -1,
-  snap: -1,
+  snap: -6,
   
   // Percussion
-  clave: -2,
+  clave: -4,
   woodblock: -2,
   triangle: -4,
   

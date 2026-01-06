@@ -5,7 +5,7 @@ import { DrumMachine } from "./DrumMachine";
 import { Scheduler } from "./Scheduler";
 import { TRAINING_WHEELS_CONFIG } from "../config/AudioConfig";
 
-// 1. IMPORT KEEP ALIVE
+// 1. IMPORT KEEP ALIVE HELPERS
 import { initKeepAlive, startKeepAlive, stopKeepAlive } from "./KeepAlive";
 
 export class AudioEngine {
@@ -34,11 +34,32 @@ export class AudioEngine {
   public async init(vols: { groove: number, voice: number, click: number, master: number, drone: number }) {
     if (this.isInitialized) return;
     
-    // 2. INIT KEEP ALIVE
+    // 2. INIT KEEP ALIVE (Create the hidden HTML Audio element)
     initKeepAlive();
     
     await Tone.start();
+
+    // 3. IOS WATCHDOG:
+    // If iOS suspends the context (e.g. switching apps), catch it and resume.
+    Tone.context.rawContext.onstatechange = () => {
+        const state = Tone.context.state;
+        if (state === 'suspended' || state === 'interrupted') {
+            console.log("AudioEngine: Context suspended/interrupted. Watchdog attempting resume...");
+            Tone.context.resume();
+        }
+    };
+
+    // 4. VISIBILITY WATCHDOG:
+    // Ensure audio wakes up if the user returns to the tab.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && Tone.context.state !== 'running') {
+            console.log("AudioEngine: Tab visible. Resuming context...");
+            Tone.context.resume();
+        }
+    });
     
+    // --- STANDARD SETUP BELOW ---
+
     this.compressor = new Tone.Compressor({ threshold: -24, ratio: 6 }).toDestination();
     this.masterGain = new Tone.Gain(vols.master).connect(this.compressor);
 
@@ -83,15 +104,16 @@ export class AudioEngine {
         this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, note.duration, time);
     } else {
         const degree = note.noteInfo.degree;
+        // Use the original ID for lookup (e.g. "1_60" or "#4_66")
         const id = `${degree}_${note.noteInfo.midi}`;
         const buffer = this.noteBuffers.get(id);
         
-        // FIX: Check if buffer exists to prevent "buffer not set" error
+        // Safety check to prevent crashes if a specific note isn't loaded
         if (buffer) {
             const source = new Tone.ToneBufferSource(buffer).connect(this.vocalGain);
             source.start(Math.max(0, time), 0, buffer.duration);
         } else {
-            // Optional: Log missing buffer locally
+            // Log warning once per missing note to avoid spamming, or just ignore
             // console.warn(`Buffer missing for ${id}`);
         }
     }
@@ -104,7 +126,6 @@ export class AudioEngine {
     if (!this.isInitialized) return;
     this.currentTonic = typeof key === 'string' ? key : (key as any).tonic;
     
-    // Path Logic preserved from your working file
     const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
     const tonicLower = this.currentTonic.toLowerCase();
     const droneUrl = `${baseUrl}loops/drones/${tonicLower}_drone.mp3`;
@@ -125,8 +146,13 @@ export class AudioEngine {
 
   public startPlayback() {
     if (!this.isInitialized) return;
+
+    // Force context resume (Belt and Suspenders approach)
+    if (Tone.context.state !== 'running') Tone.context.resume();
+
     if (Tone.Transport.state !== 'started') {
-        // 3. START KEEP ALIVE
+        // 5. START KEEP ALIVE (The Bridge)
+        // This plays the silent HTML audio, keeping the Tone context alive
         startKeepAlive();
 
         if (this.dronePlayer.loaded) this.dronePlayer.start(0);
@@ -138,7 +164,7 @@ export class AudioEngine {
   public reset() {
     if (!this.isInitialized) return;
     
-    // 4. STOP KEEP ALIVE
+    // 6. STOP KEEP ALIVE
     stopKeepAlive();
 
     this.scheduler.stop(); 
@@ -163,7 +189,8 @@ export class AudioEngine {
       
       const degree = id.split('_')[0]; 
       
-      // Sanitization: Convert # to s for file path, but KEEP original id for the map
+      // Sanitization: Convert # to s for file path (e.g. "#4" -> "s4")
+      // But we KEEP the original 'id' for the Map key so logic elsewhere doesn't break
       const safeDegree = degree.replace('#', 's');
       const safeId = id.replace('#', 's');
       
@@ -172,9 +199,9 @@ export class AudioEngine {
       try {
         const buffer = new Tone.ToneAudioBuffer();
         await buffer.load(url);
-        this.noteBuffers.set(id, buffer); // Map key uses original ID (e.g. #4_66)
+        this.noteBuffers.set(id, buffer); 
       } catch (e) { 
-          // Log warning but do not crash
+          // Warn but don't crash the app
           console.warn("Sample load failed:", url); 
       }
     });

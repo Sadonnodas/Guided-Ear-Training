@@ -124,10 +124,11 @@ export const DRUM_PATTERNS = {
   },
   "Percussion Only C": { 
     shaker: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75],
-    clave: [0, 1.5, 2, 3.5], 
+    clave: [0, 1.5, 2, 2.75, 3.5], 
     floortom: [0, 2],
     kick_soft: [1, 3],
-    racktom: [3.75]
+    racktom: [0, 0.5,3.75],
+    
   }
 };
 
