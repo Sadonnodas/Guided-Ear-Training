@@ -1,7 +1,6 @@
 import { getNoteForDegree } from "../audio/MusicTheory";
 import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints } from "../types";
 
-// --- EXISTING RANDOM GENERATOR ---
 interface GeneratorOptions {
   key: MusicalKey;
   scaleType: ScaleType;
@@ -10,69 +9,99 @@ interface GeneratorOptions {
 
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
   const { key, scaleType, constraints } = options;
-  const { allowedDegrees, startDegree, endDegree, length } = constraints;
+  const { allowedDegrees, focusedDegrees, startDegree, endDegree, length } = constraints;
   
-  const melody: NoteEvent[] = [];
+  // 1. Initialize empty slots
+  const degrees: (ScaleDegree | null)[] = new Array(length).fill(null);
   
-  // Safety: If allowedDegrees is empty (user unchecked everything), fallback to Root
-  const pool = allowedDegrees.length > 0 ? allowedDegrees : ["1"];
+  // 2. Set Constraints (Start/End)
+  // We only set them if they are actually in the allowed list (safety check)
+  if (startDegree && allowedDegrees.includes(startDegree)) {
+      degrees[0] = startDegree;
+  }
+  if (endDegree && allowedDegrees.includes(endDegree)) {
+      degrees[length - 1] = endDegree;
+  }
 
+  // 3. Handle Focused Degrees (NEW LOGIC)
+  // We need to forcibly insert these into the NULL slots.
+  if (focusedDegrees && focusedDegrees.length > 0) {
+      // Create a shuffled copy of focus requirements to randomize insertion order
+      const focusPool = [...focusedDegrees].sort(() => Math.random() - 0.5);
+      
+      // Get all currently empty indices
+      let emptyIndices = degrees
+          .map((val, idx) => val === null ? idx : -1)
+          .filter(idx => idx !== -1);
+      
+      // Shuffle the indices so the focused notes appear in random positions
+      emptyIndices.sort(() => Math.random() - 0.5);
+
+      // Place focused notes into the empty slots
+      while (focusPool.length > 0 && emptyIndices.length > 0) {
+          const note = focusPool.pop()!;
+          const idx = emptyIndices.pop()!;
+          degrees[idx] = note;
+      }
+  }
+
+  // 4. Fill remaining slots randomly from Allowed Degrees
+  // Safety: If allowed is empty, default to "1" to prevent crashes.
+  // FIX: Explicitly cast the default array to ScaleDegree[]
+  const pool: ScaleDegree[] = allowedDegrees.length > 0 ? allowedDegrees : ["1"];
+  
+  for (let i = 0; i < length; i++) {
+      // Only fill if the slot wasn't already taken by Start, End, or Focus
+      if (degrees[i] === null) {
+          let candidatePool = [...pool];
+
+          // Simple Repetition Guard: Avoid 3 identical notes in a row
+          // We only check this if we are generating a new note. 
+          // (If a Focused note creates a triplet, we allow it because Focus is higher priority).
+          if (i >= 2) {
+              const prev1 = degrees[i-1];
+              const prev2 = degrees[i-2];
+              if (prev1 && prev2 && prev1 === prev2) {
+                  candidatePool = candidatePool.filter(d => d !== prev1);
+                  // If we filtered everything out (impossible if pool > 1), reset
+                  if (candidatePool.length === 0) candidatePool = [...pool];
+              }
+          }
+          
+          degrees[i] = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+      }
+  }
+
+  // 5. Convert abstract degrees to playable NoteEvents
+  const melody: NoteEvent[] = [];
   let currentBeat = 0;
   let lastMidi: number | null = null;
+  const noteDur = 2; // Fixed duration (Half notes) for now
 
-  for (let i = 0; i < length; i++) {
-    const duration = 2; // Half Notes
-    let degree: ScaleDegree;
-
-    // --- REPETITION GUARD ---
-    // Prevent 3 consecutive identical notes
-    let candidatePool = [...pool];
-    
-    if (i >= 2) {
-        const prev1 = melody[i-1].noteInfo.degree;
-        const prev2 = melody[i-2].noteInfo.degree;
-        
-        // If the last two notes were the same, remove that degree from the options
-        if (prev1 === prev2) {
-            candidatePool = candidatePool.filter(d => d !== prev1);
-            // Safety: If the pool is empty (e.g., user only enabled "1"), we must allow repetition
-            if (candidatePool.length === 0) candidatePool = [...pool];
-        }
-    }
-
-    // 1. Determine Degree
-    // Priority 1: Start Constraint
-    if (i === 0 && startDegree && pool.includes(startDegree)) {
-      degree = startDegree;
-    } 
-    // Priority 2: End Constraint
-    else if (i === length - 1 && endDegree && pool.includes(endDegree)) {
-      degree = endDegree;
-    } 
-    // Priority 3: Random Selection (using the filtered pool)
-    else {
-      degree = candidatePool[Math.floor(Math.random() * candidatePool.length)] as ScaleDegree;
-    }
-
-    // 2. Create Event
-    const event = createEvent(degree, key, scaleType, currentBeat, duration, lastMidi);
-    melody.push(event);
-    
-    currentBeat += duration;
-    lastMidi = event.noteInfo.midi;
-  }
+  degrees.forEach(d => {
+      // d should effectively never be null here, but for TypeScript safety:
+      const safeDegree = d || "1"; 
+      
+      const event = createEvent(safeDegree, key, scaleType, currentBeat, noteDur, lastMidi);
+      melody.push(event);
+      
+      currentBeat += noteDur;
+      lastMidi = event.noteInfo.midi;
+  });
 
   return melody;
 }
 
-// --- NEW: FIXED PATTERN GENERATOR ---
+/**
+ * Generates a specific, pre-defined pattern (used for training levels/intros)
+ */
 export function generateFixedPattern(pattern: ScaleDegree[], key: MusicalKey, scaleType: ScaleType): NoteEvent[] {
     const melody: NoteEvent[] = [];
     let currentBeat = 0;
     let lastMidi: number | null = null;
     
     pattern.forEach(degree => {
-        const duration = 2; // Fixed Half Notes
+        const duration = 2; 
         const event = createEvent(degree, key, scaleType, currentBeat, duration, lastMidi);
         melody.push(event);
         currentBeat += duration;
@@ -82,7 +111,9 @@ export function generateFixedPattern(pattern: ScaleDegree[], key: MusicalKey, sc
     return melody;
 }
 
-// --- HELPER ---
+/**
+ * Helper to create the NoteEvent object with correct MIDI pitch
+ */
 function createEvent(
   degree: ScaleDegree, 
   key: MusicalKey, 

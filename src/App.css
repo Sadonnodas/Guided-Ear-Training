@@ -1,5 +1,4 @@
 :root {
-  /* --- THEME COLORS --- */
   --bg-app: #0d1117;       
   --bg-panel: #161b22;     
   --bg-tabs: #010409;      
@@ -8,46 +7,22 @@
   --text-main: #f0f6fc;
   --text-muted: #8b949e;
   
-  --btn-play: #4ade80;     /* Mint Green */
-  --btn-stop: #ff6b6b;     /* Red */
+  --btn-play: #4ade80;     
+  --btn-stop: #ff6b6b;     
 
-  /* --- 12-TONE SOFT PALETTE --- */
-  
-  /* 1: WARM SALMON/CORAL (Distinctly warm to separate from 7) */
+  /* 12-TONE PALETTE */
   --c-1: #ff8a65; 
-
-  /* b2: SOFT PEACH/TERRACOTTA */
   --c-b2: #ffab91; 
-
-  /* 2: SOFT ORANGE */
   --c-2: #ffb74d; 
-
-  /* b3: HONEY/AMBER (Darker/Warmer than 3) */
   --c-b3: #ffd54f; 
-
-  /* 3: PALE YELLOW (Bright and open) */
   --c-3: #fff176; 
-
-  /* 4: SOFT SAGE GREEN */
   --c-4: #a5d6a7; 
-
-  /* #4/b5: SOFT TEAL/SEAFOAM */
   --c-s4: #80cbc4; 
   --c-b5: #80cbc4;
-
-  /* 5: SOFT SKY BLUE */
   --c-5: #90caf9; 
-
-  /* b6: SOFT PERIWINKLE/INDIGO */
   --c-b6: #9fa8da; 
-
-  /* 6: SOFT LAVENDER (Major 6th) */
   --c-6: #b39ddb; 
-
-  /* b7: SOFT VIOLET (Minor 7th) */
   --c-b7: #ce93d8; 
-
-  /* 7: COOL ORCHID/MAGENTA (Distinctly cooler/purpler to separate from 1) */
   --c-7: #f06292; 
 }
 
@@ -58,7 +33,6 @@ body {
   overscroll-behavior: none; 
 }
 
-/* --- LAYOUT FIXES FOR MOBILE --- */
 #root {
   width: 100%;
   min-height: 100vh; 
@@ -74,22 +48,24 @@ body {
   align-items: center;
   width: 100%;
   max-width: 100%;
-  padding: 16px; 
+  padding: 0; /* REMOVED PADDING */
   box-sizing: border-box; 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* SLEEK UI UPDATE:
+   Removed background, border, and shadows to make it sit directly on the app background.
+*/
 .main-panel {
-  background: var(--bg-panel);
-  padding: 24px 20px; 
-  border-radius: 24px;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 20px 40px rgba(0,0,0,0.6);
+  background: transparent; 
+  padding: 20px 10px; 
+  border-radius: 0;
+  box-shadow: none;
   width: 100%;
-  max-width: 500px;
+  max-width: 550px; /* Slightly wider for better spacing */
   position: relative;
   box-sizing: border-box;
   margin: 0 auto; 
-  width: calc(100% - 10px); 
 }
 
 @media (min-width: 600px) {
@@ -97,14 +73,13 @@ body {
     padding: 20px;
   }
   .main-panel {
-    padding: 30px 40px;
-    width: 100%;
+    padding: 20px;
   }
 }
 
 .training-hud {
-    background: rgba(74, 222, 128, 0.1); 
-    border: 1px solid rgba(74, 222, 128, 0.3);
+    background: rgba(74, 222, 128, 0.05); 
+    border: 1px solid rgba(74, 222, 128, 0.2);
     padding: 15px;
     border-radius: 12px;
     margin-bottom: 20px;

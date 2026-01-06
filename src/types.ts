@@ -20,6 +20,7 @@ export interface NoteEvent {
 
 export interface MelodyConstraints {
   allowedDegrees: ScaleDegree[];
+  focusedDegrees?: ScaleDegree[];
   startDegree?: ScaleDegree;
   endDegree?: ScaleDegree;
   length: number;

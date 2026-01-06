@@ -29,7 +29,6 @@ export default function App() {
     }
   };
 
-  // Update visualizer steps
   useEffect(() => {
     if (session.activeMidi !== null) {
         const steps = getScaleStepsFromRoot(session.activeMidi, session.currentKey, session.scaleType);
@@ -65,9 +64,11 @@ export default function App() {
 
         <Visualizer 
           viewMode={viewMode} activeMidi={session.activeMidi}
-          lastValidStep={lastValidStep} enabledDegrees={session.enabledDegrees}
+          lastValidStep={lastValidStep} 
+          enabledDegrees={session.enabledDegrees}
+          focusedDegrees={session.focusedDegrees} 
           toggleDegree={session.toggleDegree}
-          // NEW: Pass the scaleType prop here
+          toggleFocus={session.toggleFocus} // NEW PROP
           scaleType={session.scaleType}
         />
 

@@ -3,19 +3,18 @@
   width: 100%;
   height: 90px;
   margin: 30px 0; 
-  /* FIX 1: Remove global overflow hidden. Tape view will re-add it. */
   background: transparent;
   touch-action: pan-y; 
+  user-select: none; /* Prevent text selection during long press */
+  -webkit-user-select: none;
 }
 
-/* Apply fade mask AND overflow hidden ONLY to Tape View */
 .visualizer-container.tape {
-  overflow: hidden; /* Tape needs this */
+  overflow: hidden; 
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
 }
 
-/* FIX 2: Ensure Static View allows children to "pop out" via scale/glow */
 .visualizer-container.static {
     overflow: visible;
 }
@@ -24,13 +23,11 @@
     display: flex; 
     gap: 0; 
     justify-content: center; 
-    /* FIX 3: Add padding so scaled circles (active state) don't get cut off at bottom/sides */
     padding: 10px 15px; 
-    
-    margin: 10px 0; /* Adjusted margin since we added padding */
+    margin: 10px 0; 
     width: 100%;
     flex-wrap: nowrap;
-    box-sizing: border-box; /* Ensures padding is contained in width */
+    box-sizing: border-box; 
 }
 
 .tape-strip {
@@ -56,6 +53,8 @@
   font-weight: 700;
   cursor: pointer;
   position: relative;
+  /* Disable browser touch actions to allow long press detection */
+  touch-action: none; 
 }
 
 .tape-cell span {
@@ -70,53 +69,65 @@
   box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   transition: all 0.2s;
   opacity: 0.8; 
+  border: 3px solid transparent; 
+  box-sizing: border-box;
 }
 
-/* Colors */
-.tape-cell.d-1 span { background: var(--c-1); }
+/* --- FOCUSED STATE --- */
+/* Gold Border + Pulse */
+.tape-cell.focused span {
+    border-color: #ffd700; /* Gold */
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+    opacity: 1;
+    transform: scale(1.05);
+    animation: pulse-focus 2s infinite;
+}
 
+@keyframes pulse-focus {
+    0% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.7); }
+    100% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+}
+
+/* --- COLORS --- */
+.tape-cell.d-1 span { background: var(--c-1); }
 .tape-cell.d-b2 span { background: var(--c-b2); }
 .tape-cell.d-2 span { background: var(--c-2); }
-
 .tape-cell.d-b3 span { background: var(--c-b3); }
 .tape-cell.d-3 span { background: var(--c-3); }
-
 .tape-cell.d-4 span { background: var(--c-4); }
 .tape-cell.d-s4 span, 
 .tape-cell.d-\#4 span,
-.tape-cell.d-b5 span { background: var(--c-s4); } /* Handles #4 and b5 */
-
+.tape-cell.d-b5 span { background: var(--c-s4); } 
 .tape-cell.d-5 span { background: var(--c-5); }
-
 .tape-cell.d-b6 span { background: var(--c-b6); }
 .tape-cell.d-6 span { background: var(--c-6); }
-
 .tape-cell.d-b7 span { background: var(--c-b7); }
 .tape-cell.d-7 span { background: var(--c-7); }
 
+/* --- ACTIVE STATE (Playing) --- */
+/* White border overrides Gold, but we keep the glow */
 .tape-cell.active span {
   transform: scale(1.15);
-  box-shadow: 0 0 15px currentColor;
+  box-shadow: 0 0 20px white;
   opacity: 1;
-  border: 2px solid white;
+  border-color: white;
   z-index: 10;
+  animation: none; /* Stop pulse when active to avoid conflict */
 }
 
 .tape-cell.disabled span {
   opacity: 0.2;
   filter: grayscale(0.8);
   box-shadow: none;
+  transform: scale(0.9);
 }
 
-/* --- MOBILE RESPONSIVE --- */
 @media (max-width: 600px) {
     .visualizer-container { height: 70px; }
-    
     .tape-cell { font-size: 0.9rem; }
-    
     .tape-cell span { 
         width: 40px; 
         height: 40px; 
-        max-width: 100%;
     }
 }

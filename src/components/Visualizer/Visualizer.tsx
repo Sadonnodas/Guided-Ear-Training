@@ -1,4 +1,5 @@
 import { getDegreeLabelFromStep, getAvailableDegrees } from '../../audio/MusicTheory';
+import { useLongPress } from '../../hooks/useLongPress'; // Import Hook
 import type { ScaleDegree, ScaleType } from '../../types';
 import './Visualizer.css';
 
@@ -10,13 +11,39 @@ interface VisualizerProps {
   activeMidi: number | null;
   lastValidStep: number;
   enabledDegrees: ScaleDegree[];
+  focusedDegrees: ScaleDegree[]; 
   toggleDegree: (d: ScaleDegree) => void;
-  // NEW: Need scaleType to know which degrees to show
+  toggleFocus: (d: ScaleDegree) => void; // Add this prop
   scaleType: ScaleType; 
 }
 
+// Sub-component for individual notes to handle hooks cleanly
+const NoteCell = ({ label, isActive, isEnabled, isFocused, onToggle, onFocus }: any) => {
+    
+    // Wire up the hook
+    const handlers = useLongPress({
+        onClick: () => onToggle(label),
+        onLongPress: () => onFocus(label),
+        ms: 400 // 400ms hold time
+    });
+
+    let classes = `tape-cell d-${label}`;
+    if (isActive) classes += ' active';
+    if (isFocused) classes += ' focused';
+    if (!isEnabled && !isFocused) classes += ' disabled';
+
+    return (
+        <div 
+            className={classes}
+            {...handlers} // Apply mouse/touch handlers
+        >
+            <span>{label}</span>
+        </div>
+    );
+};
+
 export default function Visualizer({ 
-  viewMode, activeMidi, lastValidStep, enabledDegrees, toggleDegree, scaleType
+  viewMode, activeMidi, lastValidStep, enabledDegrees, focusedDegrees, toggleDegree, toggleFocus, scaleType
 }: VisualizerProps) {
 
   // --- Tape Logic ---
@@ -29,19 +56,21 @@ export default function Visualizer({
     return (
         <div className="tape-strip" style={{ transform: `translateX(${totalTranslate}px)` }}>
             {staticCells.map((stepIndex) => {
-                // Pass scaleType so the tape knows if step 2 is a '3' (Major) or 'b3' (Minor)
-                const label = getDegreeLabelFromStep(stepIndex, scaleType);
+                const label = getDegreeLabelFromStep(stepIndex, scaleType) as ScaleDegree;
                 const isActive = stepIndex === lastValidStep && activeMidi !== null;
-                const isEnabled = enabledDegrees.includes(label as ScaleDegree);
+                const isEnabled = enabledDegrees.includes(label);
+                const isFocused = focusedDegrees.includes(label);
                 
                 return (
-                    <div 
-                        key={stepIndex} 
-                        className={`tape-cell d-${label} ${isActive ? 'active' : ''} ${isEnabled ? '' : 'disabled'}`}
-                        onClick={() => toggleDegree(label as ScaleDegree)}
-                    >
-                        <span>{label}</span>
-                    </div>
+                    <NoteCell 
+                        key={stepIndex}
+                        label={label}
+                        isActive={isActive}
+                        isEnabled={isEnabled}
+                        isFocused={isFocused}
+                        onToggle={toggleDegree}
+                        onFocus={toggleFocus}
+                    />
                 );
             })}
         </div>
@@ -50,26 +79,25 @@ export default function Visualizer({
 
   // --- Static Logic ---
   const renderStatic = () => {
-    // FIX: Get degrees dynamically based on the selected Scale Type (Major vs Minor)
-    // This ensures we see "1, 2, b3..." instead of always "1, 2, 3..."
     const degrees = getAvailableDegrees(scaleType);
 
     return (
         <div className="static-container">
             {degrees.map(d => {
-                const isEnabled = enabledDegrees.includes(d);
-                // Compare labels using the current scale context
                 const isActive = activeMidi !== null && getDegreeLabelFromStep(lastValidStep, scaleType) === d;
-                
+                const isEnabled = enabledDegrees.includes(d);
+                const isFocused = focusedDegrees.includes(d);
+
                 return (
-                    <div 
+                    <NoteCell 
                         key={d}
-                        // The class d-{label} triggers the specific color defined in CSS
-                        className={`tape-cell d-${d} ${isActive ? 'active' : ''} ${isEnabled ? '' : 'disabled'}`}
-                        onClick={() => toggleDegree(d)}
-                    >
-                        <span>{d}</span>
-                    </div>
+                        label={d}
+                        isActive={isActive}
+                        isEnabled={isEnabled}
+                        isFocused={isFocused}
+                        onToggle={toggleDegree}
+                        onFocus={toggleFocus}
+                    />
                 )
             })}
         </div>
