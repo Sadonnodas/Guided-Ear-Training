@@ -198,8 +198,14 @@ export function useSessionLogic() {
         
         if (!isPlayingRef.current) return; 
         
+        // 1. Initialize metadata immediately (don't await)
+        initKeepAlive(() => {
+          if (isPlayingRef.current) stopSession(); else startSession();
+        });
+
         setVisualizerKey(currentKey); 
 
+        // 2. Load the actual music assets
         await audioEngine.loadBackingTracks(currentKey, ""); 
         audioEngine.setBpm(bpm);
         audioEngine.setDrumPattern(currentPattern);
@@ -207,9 +213,10 @@ export function useSessionLogic() {
 
         if (activeTab === 'training') training.startTrainingTimer();
         
-        // Update lock screen icon to "Pause"
+        // 3. Update the Lock Screen UI State
         updateMediaSessionState(true);
 
+        // 4. Start the Music (The runCycle calls startPlayback internally)
         runCycle(currentKey, true);
 
       } catch (e) { 

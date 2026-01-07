@@ -150,7 +150,7 @@ export class AudioEngine {
 
     if (Tone.context.state !== 'running') Tone.context.resume();
 
-    // Ensure the background bridge is active
+    // Fire and forget the bridge so it doesn't block the music
     startKeepAlive();
 
     if (Tone.Transport.state !== 'started') {

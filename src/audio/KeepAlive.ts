@@ -55,32 +55,27 @@ export function updateMediaSessionState(isPlaying: boolean) {
 export async function startKeepAlive() {
   if (!audioEl) initKeepAlive();
   
-  // 3. Connect HTML Audio -> Tone Context
+  // NUCLEAR STEP: Connect without blocking the main thread
   if (audioEl && !mediaSource) {
       try {
-          if (Tone.context.state !== 'running') await Tone.context.resume();
+          if (Tone.context.state !== 'running') Tone.context.resume();
           
-          // Create the native bridge
           mediaSource = Tone.context.createMediaElementSource(audioEl);
+          const silentNode = new Tone.Gain(0).toDestination();
           
-          // FIX: Create a Tone.Gain, but access its raw input node for connection
-          const zeroGain = new Tone.Gain(0).toDestination();
-          
-          // Connect native node -> Tone node using the Tone helper
-          Tone.connect(mediaSource, zeroGain); 
+          // Connect native node -> Tone node
+          mediaSource.connect(silentNode.input); 
+          console.log("KeepAlive: Nuclear bridge backgrounded.");
       } catch (e) {
-          console.warn("KeepAlive: Failed to connect to Tone context", e);
+          console.warn("KeepAlive: Bridge connection issue", e);
       }
   }
 
-  // 4. Play
+  // Play the silent track immediately
   if (audioEl && audioEl.paused) {
-    try {
-        await audioEl.play();
-    } catch (e) {
-        console.warn("KeepAlive play failed", e);
-    }
+    audioEl.play().catch(e => console.warn("KeepAlive play failed", e));
   }
+
 }
 
 export function stopKeepAlive() {
