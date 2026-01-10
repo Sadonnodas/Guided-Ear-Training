@@ -136,30 +136,30 @@ export class AudioEngine {
     if (this.shouldBePlaying) this.drumMachine.sync(); 
   }
 
-  public scheduleRoutine(notes: NoteEvent[], silent: boolean, wheels: boolean, isFirst: boolean, onComplete: (nextStartTime: number) => void, startTime?: number) {
-    if (!this.isInitialized) return;
-    const beatSec = 60 / Tone.Transport.bpm.value;
-    const melodyDur = notes.reduce((sum, n) => sum + n.duration, 0) * beatSec; 
-    
-    let safeStartTime = startTime;
-    const now = Tone.Transport.seconds;
-    
-    // FIX: Quantize to next Measure (1 bar wait max)
-    if (isFirst || safeStartTime === undefined || safeStartTime < now) {
-         if (isFirst && now < 0.1) {
-             safeStartTime = 0; 
-         } else {
-             // Calculate time of next measure
-             const beatLen = 60 / Tone.Transport.bpm.value;
-             const measureLen = beatLen * 4;
-             
-             // Snap to next measure, not arbitrarily far in future
-             safeStartTime = Math.ceil(now / measureLen) * measureLen;
-         }
-    }
+  public scheduleRoutine(notes: NoteEvent[], silent: boolean, wheels: boolean, isFirst: boolean, onComplete: (nextStartTime: number) => void, startTime?: number, skipPrepare?: boolean) {
+      if (!this.isInitialized) return;
+      const beatSec = 60 / Tone.Transport.bpm.value;
+      const melodyDur = notes.reduce((sum, n) => sum + n.duration, 0) * beatSec; 
+      
+      let safeStartTime = startTime;
+      const now = Tone.Transport.seconds;
+      
+      // FIX: Quantize to next Measure (1 bar wait max)
+      if (isFirst || safeStartTime === undefined || safeStartTime < now) {
+          if (isFirst && now < 0.1) {
+              safeStartTime = 0; 
+          } else {
+              // Calculate time of next measure
+              const beatLen = 60 / Tone.Transport.bpm.value;
+              const measureLen = beatLen * 4;
+              
+              // Snap to next measure, not arbitrarily far in future
+              safeStartTime = Math.ceil(now / measureLen) * measureLen;
+          }
+      }
 
-    this.scheduler.scheduleRoutine(notes, silent, wheels, isFirst, onComplete, melodyDur, safeStartTime);
-  }
+      this.scheduler.scheduleRoutine(notes, silent, wheels, isFirst, onComplete, melodyDur, safeStartTime, skipPrepare);
+    }
 
   public startPlayback() {
     if (!this.isInitialized) return;

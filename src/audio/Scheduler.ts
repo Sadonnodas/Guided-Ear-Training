@@ -54,7 +54,8 @@ export class Scheduler {
       _isFirst: boolean,
       onComplete: (nextStartTime: number) => void, 
       calculatedMelodyDur: number,
-      atTime?: number 
+      atTime?: number,
+      skipPrepare: boolean = false // NEW: Flag to skip "Prepare..." message (default false)
   ) {
     this.clearMelody();
     this.ensureSystemEvents();
@@ -121,13 +122,14 @@ export class Scheduler {
 
     // --- FIX: Schedule "Prepare" visual & Logic separately ---
 
-    // 1. Visual Status Update: "Prepare..."
-    // Scheduled slightly before the end so it appears right as the user finishes singing.
-    schedule((time) => {
-        Tone.Draw.schedule(() => {
-            this.callbacks.onStatusChange("Prepare...");
-        }, time);
-    }, cursor - 0.1);
+    // 1. Visual Status Update: "Prepare..." (Skip if modulation is next)
+    if (!skipPrepare) {
+        schedule((time) => {
+            Tone.Draw.schedule(() => {
+                this.callbacks.onStatusChange("Prepare...");
+            }, time);
+        }, cursor - 0.1);
+    }
 
     // 2. Logic: Next Cycle Trigger
     // CRITICAL: NOT wrapped in Tone.Draw. This ensures the game continues even if the tab is hidden.

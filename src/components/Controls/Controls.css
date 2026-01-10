@@ -13,7 +13,7 @@
 /* NEW: Mini Stop Button */
 .stop-mini-btn {
     position: absolute;
-    top: -45px; /* Floats above the main button */
+    bottom: -45px; /* Floats below the main button */
     background: rgba(255, 107, 107, 0.15);
     border: 1px solid var(--btn-stop);
     color: var(--btn-stop);
@@ -27,7 +27,7 @@
     font-weight: 700;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(10px);
+    transform: translateY(-10px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 0;
 }

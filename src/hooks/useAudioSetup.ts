@@ -27,7 +27,7 @@ export function useAudioSetup(props: AudioSetupProps) {
         window.clearTimeout(props.visualTimeoutRef.current);
         props.visualTimeoutRef.current = window.setTimeout(() => {
           props.setActiveMidi(null);
-        }, 600);
+        }, 1200);
       }
     };
   }, []);

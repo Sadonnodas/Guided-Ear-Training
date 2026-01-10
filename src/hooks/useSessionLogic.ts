@@ -269,7 +269,7 @@ export function useSessionLogic() {
     }
   };
 
-  const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: number) => {
+const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: number) => {
     if (!isPlayingRef.current) return;
     
     setVisualizerKey(keyToUse);
@@ -279,11 +279,13 @@ export function useSessionLogic() {
     
     let currentCycleKey = keyToUse;
     let forceOneThreeFive = false;
+    let skipPrepareMessage = false; // NEW: Flag to skip "Prepare..." before modulation
 
     // --- MODULATION LOGIC ---
     if (currentKeyRef.current !== keyToUse) {
         currentCycleKey = currentKeyRef.current;
         setStatus(`Key Change: ${KEY_DISPLAY_MAP[currentCycleKey]}`);
+        skipPrepareMessage = true; // Don't show "Prepare..." before modulation message
         
         if (!isPlayingRef.current) return;
         await audioEngine.loadBackingTracks(currentCycleKey, "");
@@ -302,6 +304,7 @@ export function useSessionLogic() {
 
         setCurrentKey(newKey);
         setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
+        skipPrepareMessage = true; // Don't show "Prepare..." before modulation message
         
         await audioEngine.loadBackingTracks(newKey, "");
         if (!isPlayingRef.current) return;

@@ -5,8 +5,9 @@
   margin: 30px 0; 
   background: transparent;
   touch-action: pan-y; 
-  user-select: none; /* Prevent text selection during long press */
+  user-select: none;
   -webkit-user-select: none;
+  overflow: visible; /* Changed from conditional to always visible for glows */
 }
 
 .visualizer-container.tape {
