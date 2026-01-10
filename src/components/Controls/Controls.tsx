@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { DRUM_PATTERNS } from '../../config/AudioConfig';
-import type { MelodyDifficulty } from '../../types'; // Add this line
+import type { MelodyDifficulty } from '../../types'; 
 import './Controls.css';
 
 // --- ICONS ---
 const PlayIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
-const StopIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>; 
+const PauseIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>;
+const StopIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>; 
 const ChevronIcon = ({open}: {open: boolean}) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}><path d="M6 9l6 6 6-6"/></svg>;
 const MinusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14"/></svg>;
 const PlusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14"/></svg>;
@@ -16,6 +17,7 @@ const TEMPOS = [60, 80, 100, 120, 150];
 interface ControlsProps {
   isPlaying: boolean;
   onPlayToggle: () => void;
+  onStop: () => void; // NEW PROP
   bpm: number; setBpm: (b: number) => void;
   triggerPulse: boolean; 
   startRoot: boolean; setStartRoot: (v: boolean) => void;
@@ -33,8 +35,6 @@ interface ControlsProps {
   volGroove: number; setVolGroove: (v: number) => void;
   volMetronome: number; setVolMetronome: (v: number) => void;
   volTraining: number; setVolTraining: (v: number) => void;
-  
-  // FIX: Added Reverb Props here
   volReverb: number; setVolReverb: (v: number) => void;
   
   toggleMute: (type: string, val: number, setter: (v: number) => void) => void;
@@ -62,11 +62,18 @@ export default function Controls(props: ControlsProps) {
   return (
     <>
       <div className="play-btn-container">
+          {/* NEW: Stop/Reset Button (Appears above play button when active) */}
+          <div className={`stop-mini-btn ${props.isPlaying ? 'visible' : ''}`} onClick={props.onStop}>
+             <StopIcon />
+             <span className="mini-label">RESTART</span>
+          </div>
+
           <button 
             className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
             onClick={props.onPlayToggle}
           >
-            {props.isPlaying ? <StopIcon /> : <PlayIcon />}
+            {/* Toggle Icon based on Play State */}
+            {props.isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
       </div>
 

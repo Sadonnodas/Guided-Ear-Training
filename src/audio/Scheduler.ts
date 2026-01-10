@@ -38,6 +38,15 @@ export class Scheduler {
     Tone.Transport.cancel(); 
   }
 
+  public pause() {
+    Tone.Transport.pause();
+  }
+
+  public resume() {
+    if (Tone.context.state !== 'running') Tone.context.resume();
+    Tone.Transport.start();
+  }
+
   public scheduleRoutine(
       notes: NoteEvent[], 
       silentPractice: boolean, 

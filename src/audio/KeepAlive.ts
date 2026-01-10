@@ -2,7 +2,7 @@ import * as Tone from "tone";
 
 /**
  * Keeps the audio context alive in background (Pocket Mode) 
- * by bridging an HTML5 Audio Element into the Web Audio Context.
+ * and handles Lock Screen / Bluetooth controls.
  */
 
 const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==";
@@ -10,42 +10,48 @@ const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAE
 let audioEl: HTMLAudioElement | null = null;
 let mediaSource: MediaElementAudioSourceNode | null = null;
 
-export function initKeepAlive(onTogglePlay?: () => void) {
+type PlaybackHandlers = {
+  onPlay: () => void;
+  onPause: () => void;
+  onNext?: () => void;
+};
+
+let activeHandlers: PlaybackHandlers | null = null;
+
+export function initKeepAlive(handlers: PlaybackHandlers) {
+  activeHandlers = handlers;
+  
   if (audioEl) return;
 
   audioEl = document.createElement("audio");
   audioEl.src = SILENT_WAV;
   audioEl.loop = true;
   audioEl.preload = "auto";
-  audioEl.volume = 0.01; // iOS requires non-zero volume to keep context alive
+  audioEl.volume = 1.0; // iOS sometimes needs non-zero volume to prevent muting
   
+  // CRITICAL for iOS Background Audio
   audioEl.setAttribute("playsinline", "true");
-  audioEl.setAttribute("webkit-playsinline", "true");
-  audioEl.crossOrigin = "anonymous";
+  audioEl.setAttribute("x-webkit-airplay", "allow");
+  
   audioEl.style.display = "none";
   document.body.appendChild(audioEl);
 
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: "Ear Training",
+      title: "Guided Ear Training",
       artist: "Active Session",
-      album: "Guided Ear Training",
+      album: "Ear Training App",
       artwork: [
         { src: `${import.meta.env.BASE_URL}icon.png`, sizes: '512x512', type: 'image/png' }
       ]
     });
 
-    // These handlers allow the lock screen play/pause buttons to work
-    navigator.mediaSession.setActionHandler('play', () => {
-        if (onTogglePlay) onTogglePlay();
-    });
-    navigator.mediaSession.setActionHandler('pause', () => {
-        if (onTogglePlay) onTogglePlay();
-    });
+    navigator.mediaSession.setActionHandler('play', () => { if (activeHandlers) activeHandlers.onPlay(); });
+    navigator.mediaSession.setActionHandler('pause', () => { if (activeHandlers) activeHandlers.onPause(); });
+    navigator.mediaSession.setActionHandler('nexttrack', () => { if (activeHandlers?.onNext) activeHandlers.onNext(); });
   }
 }
 
-// Add this helper to update the lock screen icon (Play vs Pause)
 export function updateMediaSessionState(isPlaying: boolean) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
@@ -53,34 +59,33 @@ export function updateMediaSessionState(isPlaying: boolean) {
 }
 
 export async function startKeepAlive() {
-  if (!audioEl) initKeepAlive();
-  
-  // NUCLEAR STEP: Connect without blocking the main thread
-  if (audioEl && !mediaSource) {
+  if (Tone.context.state !== 'running') await Tone.context.resume();
+  if (!audioEl) return;
+
+  // RE-ESTABLISH THE BRIDGE
+  if (!mediaSource) {
       try {
-          if (Tone.context.state !== 'running') Tone.context.resume();
+          const ctx = Tone.context.rawContext as AudioContext;
+          mediaSource = ctx.createMediaElementSource(audioEl);
           
-          mediaSource = Tone.context.createMediaElementSource(audioEl);
-          const silentNode = new Tone.Gain(0).toDestination();
+          // Connect to a Gain that is NOT zero, but very low, to fool iOS
+          const bridgeGain = ctx.createGain();
+          bridgeGain.gain.value = 0.001; 
           
-          // Connect native node -> Tone node
-          mediaSource.connect(silentNode.input); 
-          console.log("KeepAlive: Nuclear bridge backgrounded.");
+          mediaSource.connect(bridgeGain);
+          bridgeGain.connect(ctx.destination);
+          
+          console.log("KeepAlive: Bridge active.");
       } catch (e) {
           console.warn("KeepAlive: Bridge connection issue", e);
       }
   }
 
-  // Play the silent track immediately
-  if (audioEl && audioEl.paused) {
-    audioEl.play().catch(e => console.warn("KeepAlive play failed", e));
+  if (audioEl.paused) {
+      audioEl.play().catch(e => console.warn("KeepAlive play failed", e));
   }
-
 }
 
 export function stopKeepAlive() {
-  if (audioEl) {
-    audioEl.pause();
-    // Don't disconnect mediaSource, keep it for next time
-  }
+  if (audioEl) audioEl.pause();
 }

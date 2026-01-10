@@ -3,10 +3,48 @@
   position: relative;
   width: 80px;
   height: 80px;
-  margin: 10px auto;
+  margin: 10px auto 20px; /* Added bottom margin for spacing */
   display: flex;
+  flex-direction: column; /* Stack them */
   align-items: center;
   justify-content: center;
+}
+
+/* NEW: Mini Stop Button */
+.stop-mini-btn {
+    position: absolute;
+    top: -45px; /* Floats above the main button */
+    background: rgba(255, 107, 107, 0.15);
+    border: 1px solid var(--btn-stop);
+    color: var(--btn-stop);
+    border-radius: 20px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 700;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+}
+
+.stop-mini-btn.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.stop-mini-btn:hover {
+    background: var(--btn-stop);
+    color: #0d1117;
+}
+
+.mini-label {
+    letter-spacing: 0.5px;
 }
 
 .play-btn {

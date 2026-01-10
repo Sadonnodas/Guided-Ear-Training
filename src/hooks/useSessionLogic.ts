@@ -1,6 +1,7 @@
+import * as Tone from "tone";
 import { useState, useRef, useEffect } from "react";
 import { audioEngine } from "../audio/AudioEngine";
-import { initKeepAlive, updateMediaSessionState } from "../audio/KeepAlive"; // New
+import { initKeepAlive, updateMediaSessionState, startKeepAlive } from "../audio/KeepAlive";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
 import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
@@ -15,6 +16,7 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 
 export function useSessionLogic() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false); // New State
   const [currentKey, setCurrentKey] = useState<MusicalKey>("C");
   const [visualizerKey, setVisualizerKey] = useState<MusicalKey>("C");
 
@@ -91,8 +93,15 @@ export function useSessionLogic() {
 
   // Initialize the background bridge and link it to startSession
   useEffect(() => {
-  initKeepAlive(() => startSession()); // Connect lock screen to your logic
-}, []);
+    initKeepAlive({
+      onPlay: () => startSession(), 
+      onPause: () => pauseSession(),
+      onNext: () => {
+        // Optional: Skip to next melody
+        if (isPlayingRef.current) runCycle(currentKeyRef.current, false); 
+      }
+    }); 
+  }, []);
 
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
@@ -171,6 +180,7 @@ export function useSessionLogic() {
 
   const stopSession = () => {
     setIsPlaying(false);
+    setIsPaused(false); // Reset pause state
     isPlayingRef.current = false; 
     
     // Stop the music AND the background process
@@ -180,52 +190,82 @@ export function useSessionLogic() {
     updateMediaSessionState(false);
 
     training.pauseTrainingTimer(); 
-    setStatus("Paused");
+    setStatus("Stopped"); // Changed from "Paused" to "Stopped" for clarity
     setActiveMidi(null);
   };
 
+  const pauseSession = () => {
+        setIsPlaying(false);
+        setIsPaused(true);
+        isPlayingRef.current = false;
+        
+        audioEngine.pausePlayback();
+        
+        setStatus("Paused");
+        updateMediaSessionState(false);
+    };
+
   const startSession = async () => {
-    if (!isPlaying) {
-      try {
-        setStatus("Initializing...");
+    // 1. RESUME FROM PAUSE
+    if (isPaused) {
         setIsPlaying(true);
+        setIsPaused(false);
         isPlayingRef.current = true;
-
-        await audioEngine.init({ 
-          groove: volGroove, voice: volVoice, click: volMetronome, 
-          master: volMaster, drone: volDrone 
-        });
+        setStatus("Resuming...");
         
-        if (!isPlayingRef.current) return; 
-        
-        // 1. Initialize metadata immediately (don't await)
-        initKeepAlive(() => {
-          if (isPlayingRef.current) stopSession(); else startSession();
-        });
-
-        setVisualizerKey(currentKey); 
-
-        // 2. Load the actual music assets
-        await audioEngine.loadBackingTracks(currentKey, ""); 
-        audioEngine.setBpm(bpm);
-        audioEngine.setDrumPattern(currentPattern);
-        audioEngine.setReverbAmt(volReverb); 
-
-        if (activeTab === 'training') training.startTrainingTimer();
-        
-        // 3. Update the Lock Screen UI State
+        await initKeepAlive({ 
+            onPlay: () => startSession(), 
+            onPause: () => pauseSession() 
+        }); // Ensure handlers are fresh
         updateMediaSessionState(true);
 
-        // 4. Start the Music (The runCycle calls startPlayback internally)
-        runCycle(currentKey, true);
+        audioEngine.resumePlayback();
+        return;
+    }
 
-      } catch (e) { 
-          console.error(e); 
-          setStatus("Error"); 
-          stopSession(); 
-      }
-    } else {
-      stopSession();
+    // 2. PAUSE IF ALREADY PLAYING (Toggle behavior)
+    if (isPlaying) {
+      pauseSession();
+      return;
+    }
+
+    // 3. FRESH START
+    try {
+      setStatus("Initializing...");
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+
+      // Start the silence IMMEDIATELY on click to unlock audio context
+      await startKeepAlive();
+
+      // FIX: Reset Transport so "Now" aligns with Beat 1
+      Tone.Transport.stop();
+      Tone.Transport.position = 0;
+
+      await audioEngine.init({ 
+        groove: volGroove, voice: volVoice, click: volMetronome, 
+        master: volMaster, drone: volDrone 
+      });
+      
+      if (!isPlayingRef.current) return; 
+      
+      setVisualizerKey(currentKey); 
+      await audioEngine.loadBackingTracks(currentKey, ""); 
+      audioEngine.setBpm(bpm);
+      audioEngine.setDrumPattern(currentPattern);
+      audioEngine.setReverbAmt(volReverb); 
+
+      if (activeTab === 'training') training.startTrainingTimer();
+      
+      updateMediaSessionState(true);
+
+      // Start logic
+      runCycle(currentKey, true);
+
+    } catch (e) { 
+        console.error(e); 
+        setStatus("Error"); 
+        stopSession(); 
     }
   };
 
@@ -377,9 +417,10 @@ export function useSessionLogic() {
     volMetronome, setVolMetronome,
     volTraining, setVolTraining,
     volReverb, setVolReverb,
-    difficulty,     // Add this
+    difficulty,     
     setDifficulty, 
     startSession,
+    stopSession, // <--- ADD THIS LINE
     setKeyManually,
     training,
     handleLevelChange,

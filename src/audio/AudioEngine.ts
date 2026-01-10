@@ -136,12 +136,29 @@ export class AudioEngine {
     if (this.shouldBePlaying) this.drumMachine.sync(); 
   }
 
-  // ... (keep scheduleRoutine same) ...
   public scheduleRoutine(notes: NoteEvent[], silent: boolean, wheels: boolean, isFirst: boolean, onComplete: (nextStartTime: number) => void, startTime?: number) {
     if (!this.isInitialized) return;
     const beatSec = 60 / Tone.Transport.bpm.value;
     const melodyDur = notes.reduce((sum, n) => sum + n.duration, 0) * beatSec; 
-    this.scheduler.scheduleRoutine(notes, silent, wheels, isFirst, onComplete, melodyDur, startTime);
+    
+    let safeStartTime = startTime;
+    const now = Tone.Transport.seconds;
+    
+    // FIX: Quantize to next Measure (1 bar wait max)
+    if (isFirst || safeStartTime === undefined || safeStartTime < now) {
+         if (isFirst && now < 0.1) {
+             safeStartTime = 0; 
+         } else {
+             // Calculate time of next measure
+             const beatLen = 60 / Tone.Transport.bpm.value;
+             const measureLen = beatLen * 4;
+             
+             // Snap to next measure, not arbitrarily far in future
+             safeStartTime = Math.ceil(now / measureLen) * measureLen;
+         }
+    }
+
+    this.scheduler.scheduleRoutine(notes, silent, wheels, isFirst, onComplete, melodyDur, safeStartTime);
   }
 
   public startPlayback() {
@@ -170,6 +187,23 @@ export class AudioEngine {
     this.drumMachine.unsync();
     this.dronePlayer.stop(); 
     Tone.Transport.cancel();
+  }
+
+  public pausePlayback() {
+    if (!this.isInitialized) return;
+    this.shouldBePlaying = false;
+    this.scheduler.pause();
+    this.drumMachine.unsync(); // Stop drums, but keep melody events
+    this.dronePlayer.stop();
+  }
+
+  public resumePlayback() {
+    if (!this.isInitialized) return;
+    this.shouldBePlaying = true;
+    startKeepAlive(); // Re-engage background audio
+    this.dronePlayer.start(0);
+    this.drumMachine.sync();
+    this.scheduler.resume();
   }
 
   // Use this for internal changes like Key or Scale changes

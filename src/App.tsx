@@ -70,8 +70,10 @@ export default function App() {
         />
 
         <Controls 
-            isPlaying={session.isPlaying} onPlayToggle={session.startSession}
-            bpm={session.bpm} setBpm={session.setBpm} 
+            isPlaying={session.isPlaying} 
+            onPlayToggle={session.startSession}
+            onStop={session.stopSession} // Pass the stop logic here
+            bpm={session.bpm} setBpm={session.setBpm}
             difficulty={session.difficulty}
             setDifficulty={session.setDifficulty}
             triggerPulse={session.triggerPulse} 
