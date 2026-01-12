@@ -103,7 +103,7 @@ export function useSessionLogic() {
     }); 
   }, []);
 
-  const handleScaleChange = (type: ScaleType) => {
+const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
     const defaults = getAvailableDegrees(type);
     setEnabledDegrees(defaults);
@@ -124,9 +124,11 @@ export function useSessionLogic() {
         if (enabledDegrees.length > 1) {
             setEnabledDegrees(prev => prev.filter(x => x !== d));
             setFocusedDegrees(prev => prev.filter(x => x !== d));
+            setStatus(`${d} Disabled`);
         }
     } else {
-        setEnabledDegrees(prev => [...prev, d]); 
+        setEnabledDegrees(prev => [...prev, d]);
+        setStatus(`${d} Enabled`);
     }
   };
 
@@ -135,17 +137,21 @@ export function useSessionLogic() {
 
     if (focusedDegrees.includes(d)) {
         setFocusedDegrees(prev => prev.filter(x => x !== d));
+        setStatus(`Removed focus: ${d}`);
     } else {
         if (!enabledDegrees.includes(d)) {
             setEnabledDegrees(prev => [...prev, d]);
         }
         setFocusedDegrees(prev => {
             const next = [...prev, d];
-            if (next.length > 2) next.shift(); 
+            if (next.length > 2) next.shift();
+            setStatus(`Focus on ${next.join(" & ")}`);
             return next;
         });
     }
   };
+
+
 
   const setPattern = (name: string) => {
     setCurrentPattern(name);

@@ -25,9 +25,13 @@ export function useAudioSetup(props: AudioSetupProps) {
       if (note) {
         props.setActiveMidi(note.noteInfo.midi);
         window.clearTimeout(props.visualTimeoutRef.current);
+        
+        // Calculate 1.5 beats in milliseconds: (60 / BPM) * 1.5 * 1000
+        const displayDuration = (60 / props.bpm) * 1.5 * 1000;
+        
         props.visualTimeoutRef.current = window.setTimeout(() => {
           props.setActiveMidi(null);
-        }, 1200);
+        }, displayDuration);
       }
     };
   }, []);

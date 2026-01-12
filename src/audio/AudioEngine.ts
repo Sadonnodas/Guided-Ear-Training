@@ -145,7 +145,8 @@ export class AudioEngine {
       const now = Tone.Transport.seconds;
       
       // FIX: Quantize to next Measure (1 bar wait max)
-      if (isFirst || safeStartTime === undefined || safeStartTime < now) {
+      // Added 100ms look-ahead to prevent skipping the first note on new cycles
+      if (isFirst || safeStartTime === undefined || safeStartTime < now + 0.1) {
           if (isFirst && now < 0.1) {
               safeStartTime = 0; 
           } else {

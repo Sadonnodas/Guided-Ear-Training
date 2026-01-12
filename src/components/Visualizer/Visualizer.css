@@ -11,7 +11,8 @@
 }
 
 .visualizer-container.tape {
-  overflow: hidden; 
+  /* overflow: hidden removed to prevent glow clipping */
+  padding: 20px 0; /* Space for the glow to expand top and bottom */
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
 }
