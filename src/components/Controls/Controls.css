@@ -159,11 +159,19 @@
     opacity: 0.7;
 }
 
-/* --- NEW SLEEK TOGGLES --- */
 .toggle-grid-sleek {
   display: flex;
+  flex-wrap: wrap; /* Essential for mobile responsiveness */
   gap: 10px;
   align-items: center;
+  width: 100%;
+}
+
+@media (max-width: 400px) {
+  .toggle-pill-btn {
+    flex: 1 1 40%; /* Makes buttons take up half width on very small screens */
+    min-width: 80px;
+  }
 }
 
 .toggle-pill-btn {
@@ -258,9 +266,17 @@
 }
 
 /* --- TEMPO --- */
-.tempo-row { display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; }
+.tempo-row { 
+    display: flex; 
+    justify-content: center; 
+    gap: 5px; 
+    flex-wrap: wrap; 
+    width: 100%;
+}
+
 .tempo-btn {
-  flex: 1;
+  flex: 1 1 auto; /* Allow buttons to grow and shrink */
+  min-width: 45px; /* Minimum width to keep numbers readable */
   text-align: center;
   border: 1px solid rgba(255,255,255,0.1);
   background: transparent;
@@ -270,8 +286,8 @@
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  min-width: 40px;
 }
+
 .tempo-btn.active {
   background: var(--text-main);
   color: var(--bg-panel);
