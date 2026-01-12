@@ -56,7 +56,7 @@ export class Scheduler {
       calculatedMelodyDur: number,
       atTime?: number,
       skipPrepare: boolean = false,
-      quizMode: boolean = false // New parameter
+      inverseMode: boolean = false // Rename parameter
   ) {
     this.clearMelody();
     this.ensureSystemEvents();
@@ -107,8 +107,8 @@ export class Scheduler {
 
     let cursor = melodyStart;
 
-    if (quizMode) {
-        // QUIZ MODE: Melody (Synth) -> Melody (Synth) -> Confirmation (Vocal)
+    if (inverseMode) {
+        // INVERSE MODE: Synth -> Synth (Repeat) -> Vocal Answer -> Synth Affirmation
         schedulePass(cursor, true, true, "Listen");  
         cursor += calculatedMelodyDur;
 
@@ -117,7 +117,12 @@ export class Scheduler {
 
         schedulePass(cursor, true, false, "Answer");  
         cursor += calculatedMelodyDur;
-    } else {
+
+        // Final pass: Synth again so the player can sing along with the correct pitch
+        schedulePass(cursor, true, true, "Affirm");  
+        cursor += calculatedMelodyDur;
+    }
+    else {
         // NORMAL MODE: Listen -> Sing Along -> Your Turn (if enabled)
         schedulePass(cursor, true, false, "Listen");  
         cursor += calculatedMelodyDur;

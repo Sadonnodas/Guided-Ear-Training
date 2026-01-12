@@ -33,7 +33,7 @@ export function useSessionLogic() {
   const [endRoot, setEndRoot] = useState(false);
   const [silentPractice, setSilentPractice] = useState(true);
   const [trainingWheels, setTrainingWheels] = useState(false);
-  const [quizMode, setQuizMode] = useState(false); // New state
+  const [inverseMode, setInverseMode] = useState(false); // Changed from quizMode
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
   
   const [difficulty, setDifficulty] = useState<MelodyDifficulty>("normal"); //
@@ -43,7 +43,7 @@ export function useSessionLogic() {
   const [volDrone, setVolDrone] = useState(0.4);
   const [volGroove, setVolGroove] = useState(0.6); 
   const [volMetronome, setVolMetronome] = useState(0.8);
-  const [volTraining, setVolTraining] = useState(0.8); 
+  const [volTraining, setVolTraining] = useState(0.4); 
   const [volReverb, setVolReverb] = useState(0.3); 
 
   const [activeMidi, setActiveMidi] = useState<number | null>(null);
@@ -427,7 +427,7 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
             },
             startTime,
             skipPrepareMessage,
-            quizMode // Add this as the 8th argument
+            inverseMode // Use the new name here
         );
         
         if (isFirst) audioEngine.startPlayback();
@@ -458,10 +458,10 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
         setTrainingWheels(v); 
         setStatus(`Pitch Guide: ${v ? 'ON' : 'OFF'}`); 
     },
-    quizMode, setQuizMode: (v: boolean) => { 
-        setQuizMode(v); 
-        setStatus(`Quiz Mode: ${v ? 'ON' : 'OFF'}`); 
-    },
+    inverseMode, setInverseMode: (v: boolean) => { 
+    setInverseMode(v); 
+    setStatus(`Inverse Mode: ${v ? 'ON' : 'OFF'}`); // Updated label
+},
     questionsPerKey, setQuestionsPerKey,
     volMaster, setVolMaster,
     volVoice, setVolVoice,

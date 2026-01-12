@@ -84,7 +84,7 @@ export default function App() {
             endRoot={session.endRoot} setEndRoot={session.setEndRoot}
             silentPractice={session.silentPractice} setSilentPractice={session.setSilentPractice}
             trainingWheels={session.trainingWheels} setTrainingWheels={session.setTrainingWheels}
-            quizMode={session.quizMode} setQuizMode={session.setQuizMode} // Add this
+            inverseMode={session.inverseMode} setInverseMode={session.setInverseMode} // Updated to inverseMode
             questionsPerKey={session.questionsPerKey} setQuestionsPerKey={session.setQuestionsPerKey}
             volMaster={session.volMaster} setVolMaster={session.setVolMaster}
             volVoice={session.volVoice} setVolVoice={session.setVolVoice}

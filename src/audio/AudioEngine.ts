@@ -3,7 +3,6 @@ import type { NoteEvent, MusicalKey } from "../types";
 import { Metronome } from "./Metronome";
 import { DrumMachine } from "./DrumMachine";
 import { Scheduler } from "./Scheduler";
-import { TRAINING_WHEELS_CONFIG } from "../config/AudioConfig";
 import { startKeepAlive, stopKeepAlive } from "./KeepAlive";
 
 export class AudioEngine {
@@ -13,7 +12,7 @@ export class AudioEngine {
   private vocalGain!: Tone.Gain;
   private droneGain!: Tone.Gain;
   private dronePlayer!: Tone.Player;
-  private trainingSynth!: Tone.Synth;
+  private trainingSynth!: Tone.FMSynth; // Changed to FMSynth for Rhodes sound
   private trainingGain!: Tone.Gain;
   private trainingVol: number = 0.3;
   private transitionSynth!: Tone.MetalSynth;
@@ -53,14 +52,29 @@ export class AudioEngine {
     this.droneGain = new Tone.Gain(vols.drone).connect(this.masterGain);
     this.dronePlayer = new Tone.Player({ loop: true, fadeIn: 2, fadeOut: 2 }).connect(this.droneGain);
 
-    this.trainingSynth = new Tone.Synth({
-        oscillator: {
-            type: "sine",
-            // Add a subtle warmth
+   // FMSynth creates the "tine" and "bell" quality of a Rhodes
+   this.trainingSynth = new Tone.FMSynth({
+        harmonicity: 2, // Creates a more musical, bell-like harmonic structure
+        modulationIndex: 15, // Higher index adds "bark" to cut through the drone
+        oscillator: { type: "sine" }, 
+        modulation: { type: "sawtooth" }, // Sawtooth adds the grit needed for low-note visibility
+        envelope: {
+            attack: 0.005, // Snappier attack for better definition
+            decay: 0.5,
+            sustain: 0.3, // SIGNIFICANTLY increased sustain so notes ring out
+            release: 0.5
         },
-        envelope: TRAINING_WHEELS_CONFIG.envelope
-    }).connect(new Tone.Vibrato(5, 0.1).toDestination()); // Subtle pitch movement helps with ear matching
-    this.trainingGain = new Tone.Gain(0).connect(this.masterGain);
+        modulationEnvelope: {
+            attack: 0.01,
+            decay: 0.5,
+            sustain: 0.6,
+            release: 1.0
+        }
+    // The first number (3) is speed in Hz, the second (0.05) is the pitch depth.
+    }).connect(new Tone.Vibrato(3, 0.05).toDestination());
+
+    // Start with the volume passed in from the UI/vols
+    this.trainingGain = new Tone.Gain(this.trainingVol).connect(this.masterGain); 
     this.trainingSynth.connect(this.trainingGain);
 
     this.transitionSynth = new Tone.MetalSynth({
@@ -90,8 +104,9 @@ export class AudioEngine {
   // ... (keep playMelodyNote same) ...
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
     if (useSynth) {
-        this.trainingGain.gain.setValueAtTime(this.trainingVol, time);
-        this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, note.duration, time);
+        // Multiply duration by 0.4 to make the note play for only 40% of its length
+        const shortDuration = note.duration * 0.8; 
+        this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
     } else {
         const degree = note.noteInfo.degree;
         const id = `${degree}_${note.noteInfo.midi}`;
@@ -242,7 +257,14 @@ export class AudioEngine {
   public setMasterVol(v: number) { this.masterGain?.gain.rampTo(v, 0.1); }
   public setClickVol(v: number) { this.metronome?.setClickVol(v); }
   public setDebugClick(active: boolean) { this.metronome?.setDebugActive(active); }
-  public setTrainingVol(v: number) { this.trainingVol = v; }
+  // This will make the slider's 0-1 range feel like 0-0.5
+  public setTrainingVol(v: number) { 
+    this.trainingVol = v; 
+    // This physically updates the Gain node in real-time
+    if (this.isInitialized && this.trainingGain) {
+        this.trainingGain.gain.rampTo(v, 0.1); 
+    }
+  }
   
   // ... (keep preloadNotes and transitionSound same) ...
   public async preloadNotes(notes: NoteEvent[]) {
