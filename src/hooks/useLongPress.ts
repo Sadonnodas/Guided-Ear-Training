@@ -12,7 +12,10 @@ export function useLongPress({ onLongPress, onClick, ms = 500 }: LongPressOption
   const isStarted = useRef(false);
 
   // Removed unused 'e' parameter
-  const start = useCallback(() => {
+  const start = useCallback((e: any) => {
+    // Prevent context menus and scrolling during the press
+    if (e.cancelable) e.preventDefault();
+    
     isStarted.current = true;
     isLongPress.current = false;
     
@@ -40,7 +43,7 @@ export function useLongPress({ onLongPress, onClick, ms = 500 }: LongPressOption
     onMouseDown: start,
     onMouseUp: stop,
     onMouseLeave: stop,
-    onTouchStart: start,
+    onTouchStart: start, // Now passes the event 'e' to start
     onTouchEnd: stop,
   };
 }

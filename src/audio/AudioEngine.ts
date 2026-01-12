@@ -54,9 +54,12 @@ export class AudioEngine {
     this.dronePlayer = new Tone.Player({ loop: true, fadeIn: 2, fadeOut: 2 }).connect(this.droneGain);
 
     this.trainingSynth = new Tone.Synth({
-        oscillator: TRAINING_WHEELS_CONFIG.oscillator as any,
+        oscillator: {
+            type: "sine",
+            // Add a subtle warmth
+        },
         envelope: TRAINING_WHEELS_CONFIG.envelope
-    });
+    }).connect(new Tone.Vibrato(5, 0.1).toDestination()); // Subtle pitch movement helps with ear matching
     this.trainingGain = new Tone.Gain(0).connect(this.masterGain);
     this.trainingSynth.connect(this.trainingGain);
 
@@ -136,7 +139,16 @@ export class AudioEngine {
     if (this.shouldBePlaying) this.drumMachine.sync(); 
   }
 
-  public scheduleRoutine(notes: NoteEvent[], silent: boolean, wheels: boolean, isFirst: boolean, onComplete: (nextStartTime: number) => void, startTime?: number, skipPrepare?: boolean) {
+  public scheduleRoutine(
+    notes: NoteEvent[], 
+    silent: boolean, 
+    wheels: boolean, 
+    isFirst: boolean, 
+    onComplete: (nextStartTime: number) => void, 
+    startTime?: number, 
+    skipPrepare?: boolean,
+    quizMode: boolean = false // Added 8th parameter
+  ) {
       if (!this.isInitialized) return;
       const beatSec = 60 / Tone.Transport.bpm.value;
       const melodyDur = notes.reduce((sum, n) => sum + n.duration, 0) * beatSec; 
@@ -144,22 +156,28 @@ export class AudioEngine {
       let safeStartTime = startTime;
       const now = Tone.Transport.seconds;
       
-      // FIX: Quantize to next Measure (1 bar wait max)
-      // Added 100ms look-ahead to prevent skipping the first note on new cycles
       if (isFirst || safeStartTime === undefined || safeStartTime < now + 0.1) {
           if (isFirst && now < 0.1) {
               safeStartTime = 0; 
           } else {
-              // Calculate time of next measure
               const beatLen = 60 / Tone.Transport.bpm.value;
               const measureLen = beatLen * 4;
-              
-              // Snap to next measure, not arbitrarily far in future
               safeStartTime = Math.ceil(now / measureLen) * measureLen;
           }
       }
 
-      this.scheduler.scheduleRoutine(notes, silent, wheels, isFirst, onComplete, melodyDur, safeStartTime, skipPrepare);
+      // Pass the 8th argument (quizMode) to the scheduler
+      this.scheduler.scheduleRoutine(
+        notes, 
+        silent, 
+        wheels, 
+        isFirst, 
+        onComplete, 
+        melodyDur, 
+        safeStartTime, 
+        skipPrepare,
+        quizMode
+      );
     }
 
   public startPlayback() {

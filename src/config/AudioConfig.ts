@@ -134,13 +134,13 @@ export const DRUM_PATTERNS = {
 
 export const TRAINING_WHEELS_CONFIG = {
   oscillator: { 
-    type: "triangle" as Tone.ToneOscillatorType 
+    type: "sine" as Tone.ToneOscillatorType // Smoother, pure tone
   },
   envelope: { 
-    attack:  0.020, 
-    decay:   0.100, 
-    sustain: 0.300, 
-    release: 1.000 
+    attack:  0.050, // Softer onset
+    decay:   0.200, 
+    sustain: 0.400, 
+    release: 1.200 // Longer tail for a "dreamy" feel
   },
-  volume: -5 
+  volume: -8 // Slightly lower default volume
 };

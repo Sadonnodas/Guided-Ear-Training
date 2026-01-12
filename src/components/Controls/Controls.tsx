@@ -25,6 +25,7 @@ interface ControlsProps {
   endRoot: boolean; setEndRoot: (v: boolean) => void;
   silentPractice: boolean; setSilentPractice: (v: boolean) => void;
   trainingWheels: boolean; setTrainingWheels: (v: boolean) => void;
+  quizMode: boolean; setQuizMode: (v: boolean) => void;
   questionsPerKey: number; setQuestionsPerKey: (n: number) => void;
   difficulty: MelodyDifficulty; 
   setDifficulty: (d: MelodyDifficulty) => void;
@@ -137,6 +138,15 @@ export default function Controls(props: ControlsProps) {
            title="Pitch Guide"
          >
             <TrainingWheelsIcon />
+         </div>
+
+         <div 
+           className={`icon-toggle-btn ${props.quizMode ? 'active' : ''}`} 
+           onClick={() => props.setQuizMode(!props.quizMode)} 
+           title="Quiz Mode (Inverse)"
+           style={{ marginLeft: '8px' }}
+         >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
          </div>
       </div>
     </div>

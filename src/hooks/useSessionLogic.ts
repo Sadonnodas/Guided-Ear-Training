@@ -33,7 +33,9 @@ export function useSessionLogic() {
   const [endRoot, setEndRoot] = useState(false);
   const [silentPractice, setSilentPractice] = useState(true);
   const [trainingWheels, setTrainingWheels] = useState(false);
+  const [quizMode, setQuizMode] = useState(false); // New state
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
+  
   const [difficulty, setDifficulty] = useState<MelodyDifficulty>("normal"); //
   
   const [volMaster, setVolMaster] = useState(1.0);
@@ -151,7 +153,15 @@ const handleScaleChange = (type: ScaleType) => {
     }
   };
 
+const handleDifficultyChange = (d: MelodyDifficulty) => {
+    setDifficulty(d);
+    setStatus(`Difficulty: ${d.toUpperCase()}`);
+  };
 
+  const handleBpmChange = (newBpm: number) => {
+    setBpm(newBpm);
+    setStatus(`Tempo: ${newBpm} BPM`);
+  };
 
   const setPattern = (name: string) => {
     setCurrentPattern(name);
@@ -241,17 +251,17 @@ const handleScaleChange = (type: ScaleType) => {
       setIsPlaying(true);
       isPlayingRef.current = true;
 
-      // Start the silence IMMEDIATELY on click to unlock audio context
+      // CRITICAL: Consolidate KeepAlive and Engine Init for Mobile/PWA
       await startKeepAlive();
-
-      // FIX: Reset Transport so "Now" aligns with Beat 1
-      Tone.Transport.stop();
-      Tone.Transport.position = 0;
-
       await audioEngine.init({ 
         groove: volGroove, voice: volVoice, click: volMetronome, 
         master: volMaster, drone: volDrone 
       });
+
+      // FIX: Ensure Transport is fresh for the first play
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      Tone.Transport.position = 0;
       
       if (!isPlayingRef.current) return; 
       
@@ -330,6 +340,27 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
         constraints = config.constraints;
         const stageIndex = config.stageIndex;
 
+        // NEW: Apply questionsPerKey from training stage if defined (for modulation challenges)
+        const effectiveQuestionsPerKey = config.questionsPerKey || Infinity;
+
+        // If we hit the limit in this training stage, modulate
+        if (questionCount.current > effectiveQuestionsPerKey) {
+            questionCount.current = 1;
+            const otherKeys = KEYS.filter(k => k !== keyToUse);
+            const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+            setCurrentKey(newKey);
+            setStatus(`Level Modulation: ${KEY_DISPLAY_MAP[newKey]}`);
+            await audioEngine.loadBackingTracks(newKey, "");
+            currentCycleKey = newKey;
+        }
+
+        // NEW: Auto-Focus New Degrees for the first 4 questions of a level
+        if (questionCount.current <= 4 && constraints.allowedDegrees.length > 0) {
+            const newestDegree = constraints.allowedDegrees[constraints.allowedDegrees.length - 1];
+            constraints.focusedDegrees = [newestDegree];
+            setStatus(`Learning: ${newestDegree}`);
+        }
+
         if (config.forceTrainingWheels !== undefined) {
              useTrainingWheels = config.forceTrainingWheels;
              setTrainingWheels(config.forceTrainingWheels); 
@@ -395,7 +426,8 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
                 }
             },
             startTime,
-            skipPrepareMessage // Add this as the 7th argument
+            skipPrepareMessage,
+            quizMode // Add this as the 8th argument
         );
         
         if (isFirst) audioEngine.startPlayback();
@@ -409,17 +441,27 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
     currentKey,
     visualizerKey,
     status,
-    bpm, setBpm,
+    bpm, setBpm: handleBpmChange,
     enabledDegrees, toggleDegree,
     focusedDegrees, toggleFocus, 
     activeMidi,
     triggerPulse,
     debugClick, setDebugClick,
     currentPattern, setPattern,
-    startRoot, setStartRoot,
-    endRoot, setEndRoot,
-    silentPractice, setSilentPractice,
-    trainingWheels, setTrainingWheels,
+    startRoot, setStartRoot: (v: boolean) => { setStartRoot(v); setStatus(`Start on 1: ${v ? 'ON' : 'OFF'}`); },
+    endRoot, setEndRoot: (v: boolean) => { setEndRoot(v); setStatus(`End on 1: ${v ? 'ON' : 'OFF'}`); },
+    silentPractice, setSilentPractice: (v: boolean) => { 
+        setSilentPractice(v); 
+        setStatus(`Silent Phase: ${v ? 'ENABLED' : 'DISABLED'}`); 
+    },
+    trainingWheels, setTrainingWheels: (v: boolean) => { 
+        setTrainingWheels(v); 
+        setStatus(`Pitch Guide: ${v ? 'ON' : 'OFF'}`); 
+    },
+    quizMode, setQuizMode: (v: boolean) => { 
+        setQuizMode(v); 
+        setStatus(`Quiz Mode: ${v ? 'ON' : 'OFF'}`); 
+    },
     questionsPerKey, setQuestionsPerKey,
     volMaster, setVolMaster,
     volVoice, setVolVoice,
@@ -429,7 +471,7 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
     volTraining, setVolTraining,
     volReverb, setVolReverb,
     difficulty,     
-    setDifficulty, 
+    setDifficulty: handleDifficultyChange, 
     startSession,
     stopSession, // <--- ADD THIS LINE
     setKeyManually,

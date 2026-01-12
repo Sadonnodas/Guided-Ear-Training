@@ -24,6 +24,12 @@ const createLevel = (id: number, name: string, degrees: string[], intro?: string
         duration: 90, 
         label: "Free Melody", 
         constraints: { allowedDegrees: degrees, length: 4 }
+      },
+      {
+        duration: 120,
+        label: "Modulation Challenge",
+        questionsPerKey: 10, // Triggers key change every 10 melodies
+        constraints: { allowedDegrees: degrees, length: 4, difficulty: "normal" }
       }
     ]
   } as TrainingLevel;

@@ -55,7 +55,8 @@ export class Scheduler {
       onComplete: (nextStartTime: number) => void, 
       calculatedMelodyDur: number,
       atTime?: number,
-      skipPrepare: boolean = false // NEW: Flag to skip "Prepare..." message (default false)
+      skipPrepare: boolean = false,
+      quizMode: boolean = false // New parameter
   ) {
     this.clearMelody();
     this.ensureSystemEvents();
@@ -106,18 +107,28 @@ export class Scheduler {
 
     let cursor = melodyStart;
 
-    // Pass 1: Listen
-    schedulePass(cursor, true, false, "Listen");  
-    cursor += calculatedMelodyDur;
-    
-    // Pass 2: Sing Along
-    schedulePass(cursor, true, false, "Sing Along");  
-    cursor += calculatedMelodyDur;
-    
-    // Pass 3: Silent (Your Turn)
-    if (silentPractice) {
-        schedulePass(cursor, trainingWheels, true, "Your Turn"); 
+    if (quizMode) {
+        // QUIZ MODE: Melody (Synth) -> Melody (Synth) -> Confirmation (Vocal)
+        schedulePass(cursor, true, true, "Listen");  
         cursor += calculatedMelodyDur;
+
+        schedulePass(cursor, true, true, "Listen (Again)");  
+        cursor += calculatedMelodyDur;
+
+        schedulePass(cursor, true, false, "Answer");  
+        cursor += calculatedMelodyDur;
+    } else {
+        // NORMAL MODE: Listen -> Sing Along -> Your Turn (if enabled)
+        schedulePass(cursor, true, false, "Listen");  
+        cursor += calculatedMelodyDur;
+        
+        schedulePass(cursor, true, false, "Sing Along");  
+        cursor += calculatedMelodyDur;
+        
+        if (silentPractice) {
+            schedulePass(cursor, trainingWheels, true, "Your Turn"); 
+            cursor += calculatedMelodyDur;
+        }
     }
 
     // --- FIX: Schedule "Prepare" visual & Logic separately ---

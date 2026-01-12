@@ -45,7 +45,7 @@
 /* Shared Cell Styles */
 .tape-cell {
   width: 60px; 
-  height: 60px;
+  height: 80px;
   flex-shrink: 1;
   min-width: 0;
   display: flex;
