@@ -16,8 +16,9 @@ const TEMPOS = [60, 80, 100, 120, 150];
 
 interface ControlsProps {
   isPlaying: boolean;
+  isPaused: boolean; // Add this line
   onPlayToggle: () => void;
-  onStop: () => void; // NEW PROP
+  onStop: () => void; 
   bpm: number; setBpm: (b: number) => void;
   triggerPulse: boolean; 
   startRoot: boolean; setStartRoot: (v: boolean) => void;
@@ -46,6 +47,10 @@ export default function Controls(props: ControlsProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [animate, setAnimate] = useState(false);
 
+// Calculate duration of one beat: 60 / BPM
+  // We use a slightly shorter duration (90% of a beat) to make it feel snappier
+  const beatDuration = ((60 / props.bpm) * 0.9).toFixed(3);
+
   useEffect(() => {
     if (props.isPlaying) {
         setAnimate(true);
@@ -62,20 +67,20 @@ export default function Controls(props: ControlsProps) {
   return (
     <>
       <div className="play-btn-container">
-          {/* NEW: Stop/Reset Button (Appears above play button when active) */}
-          <div className={`stop-mini-btn ${props.isPlaying ? 'visible' : ''}`} onClick={props.onStop}>
-             <StopIcon />
-             <span className="mini-label">RESTART</span>
-          </div>
+    <button 
+     className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
+      onClick={props.onPlayToggle}
+     style={{ "--beat-dur": `${beatDuration}s` } as React.CSSProperties}
+    >
+      {props.isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </button>
 
-          <button 
-            className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
-            onClick={props.onPlayToggle}
-          >
-            {/* Toggle Icon based on Play State */}
-            {props.isPlaying ? <PauseIcon /> : <PlayIcon />}
-          </button>
-      </div>
+    {/* Moved below the play button and updated condition to include isPaused */}
+    <div className={`stop-mini-btn ${props.isPlaying || props.isPaused ? 'visible' : ''}`} onClick={props.onStop}>
+       <StopIcon />
+       <span className="mini-label">RESTART</span>
+    </div>
+</div>
 
       <div className="settings-trigger" onClick={() => setSettingsOpen(!settingsOpen)}>
         <span>Controls</span>

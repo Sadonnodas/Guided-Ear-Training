@@ -388,7 +388,8 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
                     runCycle(currentCycleKey, false, nextStartTime);
                 }
             },
-            startTime
+            startTime,
+            skipPrepareMessage // Add this as the 7th argument
         );
         
         if (isFirst) audioEngine.startPlayback();
@@ -398,7 +399,8 @@ const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: numbe
   return {
     activeTab, setActiveTab,
     isPlaying,
-    currentKey, 
+    isPaused, // Add this line
+    currentKey,
     visualizerKey,
     status,
     bpm, setBpm,

@@ -1,19 +1,16 @@
-/* --- PLAY BUTTON --- */
 .play-btn-container {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  margin: 10px auto 20px; /* Added bottom margin for spacing */
+  width: 100%;
+  margin: 20px auto 10px;
   display: flex;
-  flex-direction: column; /* Stack them */
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 15px; 
+  min-height: 140px;
+  overflow: visible; /* Allows the pulse to be seen outside the container */
 }
 
-/* NEW: Mini Stop Button */
 .stop-mini-btn {
-    position: absolute;
-    bottom: -45px; /* Floats below the main button */
+    position: relative; /* Changed from absolute */
     background: rgba(255, 107, 107, 0.15);
     border: 1px solid var(--btn-stop);
     color: var(--btn-stop);
@@ -26,15 +23,14 @@
     font-size: 0.7rem;
     font-weight: 700;
     opacity: 0;
-    pointer-events: none;
+    visibility: hidden; /* Ensures it doesn't block clicks when not visible */
     transform: translateY(-10px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 0;
 }
 
 .stop-mini-btn.visible {
     opacity: 1;
-    pointer-events: auto;
+    visibility: visible;
     transform: translateY(0);
 }
 
@@ -48,8 +44,10 @@
 }
 
 .play-btn {
-  width: 100%;
-  height: 100%;
+  position: relative; /* Add this to anchor the pulse */
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--btn-play);
   color: #0d1117; 
@@ -74,26 +72,39 @@
 }
 .play-btn.playing:hover { background: rgba(255, 107, 107, 0.1); }
 
-/* BEAT PULSE */
 .play-btn.playing::before {
   content: '';
   position: absolute;
-  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   border-radius: 50%;
-  border: 1px solid var(--btn-stop);
+  border: 2px solid var(--btn-stop); /* Doubled thickness for impact */
   opacity: 0;
-  z-index: 1;
+  z-index: 5;
+  pointer-events: none;
   transform: scale(1);
-  transition: none; 
+  box-sizing: border-box;
 }
 
 .play-btn.pulse-beat::before {
-  animation: pulse-one-shot 0.15s ease-out forwards;
+  /* Use the synced duration, or fallback to 0.5s if not defined */
+  animation: pulse-one-shot var(--beat-dur, 0.5s) ease-out forwards;
 }
 
 @keyframes pulse-one-shot {
-  0% { transform: scale(1); opacity: 0.4; }
-  100% { transform: scale(1.15); opacity: 0; }
+  0% { 
+    transform: scale(1); 
+    opacity: 0.7; /* Softer start */
+  }
+  10% {
+    opacity: 0.7; /* Shorter hold */
+  }
+  100% { 
+    transform: scale(2.0); /* Slightly smaller max expansion */
+    opacity: 0; 
+  }
 }
 
 /* --- ACCORDION CONTAINER --- */
@@ -106,7 +117,7 @@
   color: var(--text-muted);
   font-size: 0.9rem;
   padding: 15px;
-  margin-top: 20px;
+  margin-top: 5px; /* Reduced from 20px */
 }
 .settings-trigger:hover { color: var(--text-main); }
 
