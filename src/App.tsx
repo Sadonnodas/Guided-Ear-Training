@@ -71,6 +71,7 @@ export default function App() {
     selectedShape={session.selectedShape}
     activeMidi={session.activeMidi}
     hideVisuals={session.hideFretboardVisuals}
+    status={session.status}
   />
 ) : (
         <Visualizer 
@@ -111,6 +112,7 @@ export default function App() {
             toggleMute={toggleMute}
             hideFretboardVisuals={session.hideFretboardVisuals}
             setHideFretboardVisuals={session.setHideFretboardVisuals}
+            activeTab={session.activeTab}
         />
       </div>
     </div>

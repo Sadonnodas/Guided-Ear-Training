@@ -9,6 +9,7 @@ import { useMixerLogic } from "./useMixerLogic"; // <--- NEW
 import { useSessionSettings } from "./useSessionSettings"; // <--- NEW
 import { getAvailableDegrees } from "../audio/MusicTheory"; 
 import type { MusicalKey, ScaleDegree, MelodyConstraints, ScaleType } from "../types";
+import { getFretboardConfig } from "../config/FretboardData";
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
@@ -87,12 +88,14 @@ export function useSessionLogic() {
 
   // --- 4. HANDLERS ---
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    // If switching to Fretboard, we often want Inverse Mode on by default
-    if (tab === 'fretboard') {
-        settings.setInverseMode(true);
-    }
-  };
+  setActiveTab(tab);
+  if (tab === 'fretboard') {
+    settings.setInverseMode(true);
+    // FIX: Force scale to Pentatonic and update enabled degrees immediately
+    const pentatonicType = scaleType === 'Minor' ? 'PentatonicMinor' : 'PentatonicMajor';
+    handleScaleChange(pentatonicType); 
+  }
+};
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
     const defaults = getAvailableDegrees(type);
@@ -291,6 +294,14 @@ export function useSessionLogic() {
     let playSilent = settings.refs.silentPractice.current; // Use Ref!
     let useTrainingWheels = settings.refs.trainingWheels.current; // Use Ref!
 
+    // Calculate fretboard range if in fretboard mode (used by both training and random)
+    let fretboardRange: { min: number; max: number } | undefined;
+    if (activeTabRef.current === 'fretboard') {
+        const fretConfig = getFretboardConfig(currentCycleKey, scaleType, settings.refs.selectedShape.current);
+        const midis = fretConfig.notes.map(n => n.midi);
+        fretboardRange = { min: Math.min(...midis), max: Math.max(...midis) };
+    }
+
     if (activeTabRef.current === 'training') {
         const config = training.getCurrentConfig();
         constraints = config.constraints;
@@ -340,7 +351,65 @@ export function useSessionLogic() {
              noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleType, constraints });
              playSilent = settings.refs.silentPractice.current; 
         }
+    } else {
 
+    if (activeTabRef.current === 'training') {
+        const config = training.getCurrentConfig();
+        constraints = config.constraints;
+        const stageIndex = config.stageIndex;
+
+        // Training Modulation Check
+        const effectiveQuestionsPerKey = config.questionsPerKey || Infinity;
+        if (questionCount.current > effectiveQuestionsPerKey) {
+            questionCount.current = 1;
+            const otherKeys = KEYS.filter(k => k !== keyToUse);
+            const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+            setCurrentKey(newKey);
+            setStatus(`Level Modulation: ${KEY_DISPLAY_MAP[newKey]}`);
+            await audioEngine.loadBackingTracks(newKey, "");
+            currentCycleKey = newKey;
+        }
+
+        // Auto-Focus for first 4 questions
+        if (questionCount.current <= 4 && constraints.allowedDegrees.length > 0) {
+            const newestDegree = constraints.allowedDegrees[constraints.allowedDegrees.length - 1];
+            constraints.focusedDegrees = [newestDegree];
+            setStatus(`Learning: ${newestDegree}`);
+        }
+
+        if (config.forceTrainingWheels !== undefined) {
+             useTrainingWheels = config.forceTrainingWheels;
+        }
+
+        setEnabledDegrees(constraints.allowedDegrees);
+
+        if (stageIndex !== lastPlayedStageIndex.current) {
+            lastPlayedStageIndex.current = stageIndex;
+            hasPlayedScalePreview.current = false;
+            hasPlayedIntroSequence.current = false;
+        }
+
+        if (config.scalePreview && !hasPlayedScalePreview.current) {
+            noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, "Major"); 
+            hasPlayedScalePreview.current = true; 
+        } 
+        else if (config.introSequence && !hasPlayedIntroSequence.current) {
+            noteEvents = generateFixedPattern(config.introSequence, currentCycleKey, "Major");
+            hasPlayedIntroSequence.current = true; 
+        }
+        else {
+             // FIX: Pass the limits to the training melodies too
+             noteEvents = generateMelody({ 
+                 key: currentCycleKey, 
+                 scaleType: scaleType, 
+                 constraints: {
+                    ...constraints,
+                    minMidi: fretboardRange?.min,
+                    maxMidi: fretboardRange?.max
+                 } 
+             });
+             playSilent = settings.refs.silentPractice.current; 
+        }
     } else {
         // Random Mode Logic
         if (forceOneThreeFive) {
@@ -355,15 +424,19 @@ export function useSessionLogic() {
             constraints = {
                 allowedDegrees: enabledDegreesRef.current,
                 focusedDegrees: focusedDegreesRef.current, 
-                startDegree: settings.refs.startRoot.current ? "1" : undefined, // Use Ref!
-                endDegree: settings.refs.endRoot.current ? "1" : undefined,     // Use Ref!
+                startDegree: settings.refs.startRoot.current ? "1" : undefined,
+                endDegree: settings.refs.endRoot.current ? "1" : undefined,     
                 length: 4,
-                difficulty: settings.refs.difficulty.current // Use Ref!
+                difficulty: settings.refs.difficulty.current,
+                minMidi: fretboardRange?.min, 
+                maxMidi: fretboardRange?.max  
             };
             playSilent = settings.refs.silentPractice.current;
             noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleType, constraints });
         }
     }
+    }
+
 
     // C. Schedule & Play
     if (noteEvents && isPlayingRef.current) {

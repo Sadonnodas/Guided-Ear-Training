@@ -86,16 +86,7 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
       const safeDegree = d || "1"; 
       
       // Pass the difficulty and current leap status
-      const event = createEvent(
-          safeDegree, 
-          key, 
-          scaleType, 
-          currentBeat, 
-          noteDur, 
-          lastMidi, 
-          constraints.difficulty || "normal", 
-          hasLeaped
-      );
+      const event = createEvent(safeDegree, key, scaleType, currentBeat, noteDur, lastMidi, constraints.difficulty || "normal", hasLeaped, constraints);
 
       // If this specific note created a leap > 7 semitones, trip the flag
       if (lastMidi !== null && Math.abs(event.noteInfo.midi - lastMidi) > 7) {
@@ -139,11 +130,22 @@ function createEvent(
   startTime: number, 
   duration: number,
   prevMidi: number | null,
-  difficulty: MelodyDifficulty = "normal", // Add
-  hasLeaped: boolean = false                // Add
+  difficulty: MelodyDifficulty = "normal", 
+  hasLeaped: boolean = false,
+  constraints?: MelodyConstraints // Add this parameter
 ): NoteEvent {
-  // Pass the new difficulty and hasLeaped flags
-  const info = getNoteForDegree(key, degree, scale, prevMidi, difficulty, hasLeaped);
+  // Pass the range limits into getNoteForDegree
+  const info = getNoteForDegree(
+    key, 
+    degree, 
+    scale, 
+    prevMidi, 
+    difficulty, 
+    hasLeaped,
+    constraints?.minMidi, // Pass from constraints
+    constraints?.maxMidi  // Pass from constraints
+  );
+  
   return {
     noteInfo: info,
     startTime: startTime,

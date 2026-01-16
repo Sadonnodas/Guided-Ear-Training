@@ -34,51 +34,66 @@ const SCALES: Record<ScaleType, { degrees: ScaleDegree[], intervals: number[] }>
   }
 };
 
-const MIN_MIDI = 43; // G2
-const MAX_MIDI = 67; // G4 (Increased slightly to allow 1->5 up from C)
+const DEFAULT_MIN_MIDI = 43; // G2
+const DEFAULT_MAX_MIDI = 67; // G4
 
 export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
   _scaleType: ScaleType, 
   previousMidi: number | null = null,
-  difficulty: MelodyDifficulty = "normal", // New
-  hasLeaped: boolean = false                // New
+  difficulty: MelodyDifficulty = "normal",
+  hasLeaped: boolean = false,
+  minLimit?: number, // Dynamic lower bound
+  maxLimit?: number  // Dynamic upper bound
 ): NoteInfo {
   const rootMidi = ROOT_MIDI[key];
   const interval = DEGREE_TO_SEMITONE[degree]; 
   
+  // Use provided limits (fretboard range) or fall back to global vocal range
+  const minMidi = minLimit ?? DEFAULT_MIN_MIDI;
+  const maxMidi = maxLimit ?? DEFAULT_MAX_MIDI;
+
   let targetMidi = rootMidi + interval;
 
   if (previousMidi !== null) {
     const candidates = [targetMidi - 12, targetMidi, targetMidi + 12];
     
-    // 1. Determine the jump limit based on difficulty settings
     let jumpLimit = 12; 
     if (difficulty === "easy") {
-        jumpLimit = 7; // Strictly restrict to a 5th
+        jumpLimit = 7; 
     } else if (difficulty === "normal" && hasLeaped) {
-        jumpLimit = 7; // Restrict after the first big leap
+        jumpLimit = 7; 
     }
 
-    // 2. Filter candidates by both vocal range AND the jump limit
     let valid = candidates.filter(m => {
-        const withinRange = m >= MIN_MIDI && m <= MAX_MIDI;
+        const withinRange = m >= minMidi && m <= maxMidi;
         const jumpDist = Math.abs(m - previousMidi);
         return withinRange && jumpDist <= jumpLimit;
     });
 
     if (valid.length > 0) {
-      // Pick randomly from all valid options to avoid prioritizing big jumps
       targetMidi = valid[Math.floor(Math.random() * valid.length)];
+    } else {
+        // Fallback: if range is too tight for the jump limit, ignore jump limit but keep range
+        const validInRange = candidates.filter(m => m >= minMidi && m <= maxMidi);
+        if (validInRange.length > 0) {
+            targetMidi = validInRange[Math.floor(Math.random() * validInRange.length)];
+        }
     }
   } else {
-    if (targetMidi < 48) targetMidi += 12;
-    if (targetMidi > 60) targetMidi -= 12;
+    // Starting note logic
+    const startCandidates = [targetMidi - 12, targetMidi, targetMidi + 12];
+    const validStart = startCandidates.filter(m => m >= minMidi && m <= maxMidi);
+    
+    if (validStart.length > 0) {
+        targetMidi = validStart[Math.floor(Math.random() * validStart.length)];
+    }
   }
 
-  if (targetMidi < MIN_MIDI) targetMidi += 12;
-  if (targetMidi > MAX_MIDI) targetMidi -= 12;
+  // Final safety clamp
+  while (targetMidi < minMidi) targetMidi += 12;
+  while (targetMidi > maxMidi) targetMidi -= 12;
 
   return {
     degree,

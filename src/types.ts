@@ -23,7 +23,9 @@ export interface MelodyConstraints {
   startDegree?: ScaleDegree;
   endDegree?: ScaleDegree;
   length: number;
-  difficulty?: MelodyDifficulty; // Add this line
+  difficulty?: MelodyDifficulty;
+  minMidi?: number; // Add these
+  maxMidi?: number; // Add these
 }
 
 export interface TrainingStage {

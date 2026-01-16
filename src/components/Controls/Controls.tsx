@@ -44,6 +44,7 @@ interface ControlsProps {
   setPattern: (name: string) => void;
   hideFretboardVisuals: boolean;
   setHideFretboardVisuals: (v: boolean) => void;
+  activeTab: string;
 }
 
 export default function Controls(props: ControlsProps) {
@@ -127,7 +128,6 @@ export default function Controls(props: ControlsProps) {
           onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
           title="Blind Mode"
         >
-
         Blind Mode
         </div>
          <div 
@@ -142,22 +142,28 @@ export default function Controls(props: ControlsProps) {
          >
            End on 1
          </div>
-         <div 
-           className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
-           onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
-           title="Pitch Guide"
-         >
-            <TrainingWheelsIcon />
-         </div>
 
-         <div 
-           className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
-           onClick={() => props.setInverseMode(!props.inverseMode)} 
-           title="Inverse Mode"
-           style={{ marginLeft: '8px' }}
-         >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-         </div>
+         {/* HIDE Pitch Guide and Inverse buttons in Fretboard mode */}
+         {props.activeTab !== 'fretboard' && (
+           <>
+             <div 
+               className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
+               onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
+               title="Pitch Guide"
+             >
+                <TrainingWheelsIcon />
+             </div>
+
+             <div 
+               className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
+               onClick={() => props.setInverseMode(!props.inverseMode)} 
+               title="Inverse Mode"
+               style={{ marginLeft: '8px' }}
+             >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+             </div>
+           </>
+         )}
       </div>
     </div>
 

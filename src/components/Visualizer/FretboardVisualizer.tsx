@@ -9,24 +9,34 @@ interface FretboardVisualizerProps {
   selectedShape: CagedShape;
   activeMidi: number | null;
   hideVisuals: boolean;
+  status: string;
 }
 
 export default function FretboardVisualizer({
-  currentKey, scaleType, selectedShape, activeMidi, hideVisuals
+  currentKey, scaleType, selectedShape, activeMidi, hideVisuals, status
 }: FretboardVisualizerProps) {
 
+  const isRevealStage = status === "Answer" || status === "Affirm";
+  const effectiveHide = hideVisuals && !isRevealStage;
   const config = getFretboardConfig(currentKey, scaleType, selectedShape);
   
-  // Dimensions
-  const fretCount = config.endFret - config.startFret + 1;
-  const viewWidth = 900;  
-  const viewHeight = 480; // Vertically larger for a clearer view
-  const paddingX = 40;    // Padding on sides
-  const fretWidth = (viewWidth - (paddingX * 2)) / fretCount;
+  // Calculate actual fret range from notes (min to max fret used)
+  const noteFrets = config.notes.map(n => n.fret);
+  const minNoteFret = Math.min(...noteFrets);
+  const maxNoteFret = Math.max(...noteFrets);
   
-  // String Spacing (centered vertically)
-  const neckTopY = 80; // Pushed down slightly for larger circles
-  const neckBottomY = viewHeight - 120; // Pulled up slightly
+  // Add 1 fret padding on each side
+  const displayStartFret = minNoteFret - 1;
+  const displayEndFret = maxNoteFret + 1;
+  const fretCount = displayEndFret - displayStartFret + 1;
+  
+  const paddingX = 40;    
+  const fretWidth = 180;  
+  const viewWidth = (fretCount * fretWidth) + (paddingX * 2);
+  const viewHeight = 700; 
+  
+  const neckTopY = 60;  // More space at top for fret numbers
+  const neckBottomY = viewHeight - 80; // More space at bottom for fret numbers
   const neckHeight = neckBottomY - neckTopY;
   const stringSpacing = neckHeight / 5; // 5 spaces for 6 strings
 
@@ -34,8 +44,8 @@ export default function FretboardVisualizer({
 
   // X = Center of the space between frets
   const getNoteX = (fret: number) => {
-      const localFret = fret - config.startFret;
-      return paddingX + (localFret * fretWidth) - (fretWidth / 2);
+      const localFret = fret - displayStartFret;
+      return paddingX + (localFret * fretWidth) + (fretWidth / 2);
   };
 
   // X = Position of the Fret Wire itself
@@ -60,30 +70,30 @@ export default function FretboardVisualizer({
   const renderInlays = () => {
       const inlays = [3, 5, 7, 9, 12, 15, 17, 19, 21];
       return inlays.map(f => {
-          if (f < config.startFret || f > config.endFret) return null;
+          if (f < displayStartFret || f > displayEndFret) return null;
           const x = getNoteX(f);
           
           if (f % 12 === 0 && f !== 0) {
              return (
                  <g key={f}>
-                     <circle cx={x} cy={neckTopY - 15} r={6} fill="rgba(255,255,255,0.15)" />
-                     <circle cx={x} cy={neckBottomY + 15} r={6} fill="rgba(255,255,255,0.15)" />
+                     <circle cx={x} cy={neckTopY + stringSpacing * 1} r={7} fill="rgba(255,255,255,0.15)" />
+                     <circle cx={x} cy={neckTopY + stringSpacing * 4} r={7} fill="rgba(255,255,255,0.15)" />
                  </g>
              );
           }
-          return <circle key={f} cx={x} cy={(neckTopY + neckBottomY) / 2} r={8} fill="rgba(255,255,255,0.1)" />;
+          return <circle key={f} cx={x} cy={(neckTopY + neckBottomY) / 2} r={9} fill="rgba(255,255,255,0.1)" />;
       });
   };
 
   return (
     <div className="visualizer-container" style={{
-        height: '320px', 
+        height: '380px', 
         overflow: 'hidden', 
         display:'flex', 
         justifyContent:'center',
         background: 'transparent'
     }}>
-        <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} style={{width:'100%', maxWidth:'800px'}}>
+        <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} style={{width:'100%', height:'auto'}}>
             
             {/* Inlays */}
             {renderInlays()}
@@ -95,14 +105,14 @@ export default function FretboardVisualizer({
                     x1={getWireX(i)} y1={neckTopY} 
                     x2={getWireX(i)} y2={neckBottomY} 
                     stroke="#555" 
-                    strokeWidth={3} 
+                    strokeWidth={4} 
                 />
             ))}
 
             {/* Strings */}
             {Array.from({length: 6}).map((_, i) => {
                 const stringNum = i + 1;
-                const thickness = 1 + (stringNum * 0.6); 
+                const thickness = 1.5 + (stringNum * 0.7); 
                 const y = getStringY(stringNum);
                 return (
                     <line 
@@ -115,51 +125,52 @@ export default function FretboardVisualizer({
                 );
             })}
 
-            {/* Fret Numbers */}
+            {/* Fret Numbers - BOTTOM (only standard positions) */}
             {Array.from({length: fretCount}).map((_, i) => {
-                const f = config.startFret + i;
-                if ([3,5,7,9,12,15,17].includes(f)) 
-                    return (
-                        <text 
-                            key={`num-${i}`} 
-                            x={getNoteX(f)} 
-                            y={neckBottomY + 35} 
-                            fill="#666" 
-                            fontSize="14" 
-                            textAnchor="middle" 
-                            fontWeight="bold"
-                        >
-                            {f}
-                        </text>
-                    );
-                return null;
+                const f = displayStartFret + i;
+                // Only show fret numbers for positions 3, 5, 7, 9, 12
+                if (![3, 5, 7, 9, 12, 15, 17].includes(f)) return null;
+                
+                return (
+                    <text 
+                        key={`num-bottom-${i}`} 
+                        x={getNoteX(f)} 
+                        y={neckBottomY + 45} 
+                        fill="#aaa" 
+                        fontSize="24" 
+                        textAnchor="middle" 
+                        fontWeight="bold"
+                    >
+                        {f}
+                    </text>
+                );
             })}
 
-            {/* Notes */}
+            {/* Notes - EXTRA LARGE CIRCLES */}
             {config.notes.map((note, idx) => {
                 const isActive = activeMidi === note.midi;
-                const displayActive = isActive && !hideVisuals;
+                const displayActive = isActive && !effectiveHide;
                 const noteColor = getDegreeColor(note.degree);
                 
                 const cx = getNoteX(note.fret);
                 const cy = getStringY(note.string);
-                const r = 24; // Matches standard visualizer circle size
+                const r = 50; // Slightly reduced for better spacing
 
                 return (
                     <g key={`note-${idx}`}>
                         <circle 
                             cx={cx} cy={cy} r={r}
                             fill={displayActive ? noteColor : "transparent"}
-                            stroke={displayActive ? "white" : "rgba(255,255,255,0.15)"}
-                            strokeWidth={displayActive ? 4 : 2} // Slightly thicker stroke for better legibility
+                            stroke={displayActive ? "white" : "rgba(255,255,255,0.2)"}
+                            strokeWidth={displayActive ? 7 : 3.5}
                             style={{transition: 'all 0.15s ease-out'}}
                         />
                         <text 
-                            x={cx} y={cy} dy="6" // Adjusted dy for larger font
+                            x={cx} y={cy} dy="11" 
                             textAnchor="middle" 
                             fill="#161b22"
-                            fontWeight="800" 
-                            fontSize="18" // Larger font for better readability
+                            fontWeight="900" 
+                            fontSize="36" 
                             opacity={displayActive ? 1 : 0}
                             style={{pointerEvents:'none'}}
                         >
