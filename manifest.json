@@ -1,29 +1,18 @@
 {
   "name": "Guided Ear Training",
   "short_name": "Ear Training",
-  "description": "Interactive ear training application with guided melodies",
-  "start_url": "/",
+  "start_url": "/Guided-Ear-Training/",
+  "scope": "/Guided-Ear-Training/",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "icon.png", 
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "categories": ["music", "education"],
-  "shortcuts": [
-    {
-      "name": "Start Training",
-      "short_name": "Train",
-      "description": "Start a guided ear training session",
-      "url": "/?mode=training",
-      "icons": [{ "src": "/icon.png", "sizes": "512x512" }]
-    }
-  ],
-  "prefer_related_applications": false
+  ]
 }
