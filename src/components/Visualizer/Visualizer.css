@@ -7,16 +7,14 @@
   touch-action: pan-y; 
   user-select: none;
   -webkit-user-select: none;
-  overflow: visible; /* Changed from conditional to always visible for glows */
+  overflow: visible;
 }
 
 .visualizer-container.tape {
   overflow-x: hidden; 
-  /* Use clip to prevent the scrollbar while allowing the glow effect */
   overflow-y: clip; 
   width: 100%;
   max-width: 100vw;
-  /* Increase height slightly to ensure no vertical clipping occurs */
   height: 120px; 
   padding: 10px 0;
   display: flex;
@@ -26,18 +24,18 @@
 }
 
 .visualizer-container.static {
-    overflow: visible;
+  overflow: visible;
 }
 
 .static-container {
-    display: flex; 
-    gap: 0; 
-    justify-content: center; 
-    padding: 10px 15px; 
-    margin: 10px 0; 
-    width: 100%;
-    flex-wrap: nowrap;
-    box-sizing: border-box; 
+  display: flex; 
+  gap: 0; 
+  justify-content: center; 
+  padding: 10px 15px; 
+  margin: 10px 0; 
+  width: 100%;
+  flex-wrap: nowrap;
+  box-sizing: border-box; 
 }
 
 .tape-strip {
@@ -63,8 +61,10 @@
   font-weight: 700;
   cursor: pointer;
   position: relative;
-  /* Disable browser touch actions to allow long press detection */
-  touch-action: none; 
+  /* Critical for mobile long-press */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tape-cell span {
@@ -77,26 +77,73 @@
   background: #21262d; 
   color: #000; 
   box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-  transition: all 0.2s;
+  transition: all 0.15s ease-out;
   opacity: 0.8; 
   border: 3px solid transparent; 
   box-sizing: border-box;
 }
 
+/* --- PRESSING STATE (Long-press in progress) --- */
+.tape-cell.pressing span {
+  transform: scale(0.92);
+  opacity: 1;
+  box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.3);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+/* Add a ring animation to show progress */
+.tape-cell.pressing::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  margin-left: -28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: #ffd700;
+  animation: long-press-ring 0.35s linear forwards;
+  pointer-events: none;
+}
+
+@keyframes long-press-ring {
+  0% { 
+    transform: rotate(0deg);
+    border-top-color: #ffd700;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+  }
+  25% { 
+    border-right-color: #ffd700;
+  }
+  50% { 
+    border-bottom-color: #ffd700;
+  }
+  75% { 
+    border-left-color: #ffd700;
+  }
+  100% { 
+    transform: rotate(360deg);
+    border-color: #ffd700;
+  }
+}
+
 /* --- FOCUSED STATE --- */
-/* Gold Border + Pulse */
 .tape-cell.focused span {
-    border-color: #ffd700; /* Gold */
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
-    opacity: 1;
-    transform: scale(1.05);
-    animation: pulse-focus 2s infinite;
+  border-color: #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+  opacity: 1;
+  transform: scale(1.05);
+  animation: pulse-focus 2s infinite;
 }
 
 @keyframes pulse-focus {
-    0% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
-    50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.7); }
-    100% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+  0% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+  50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.7); }
+  100% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
 }
 
 /* --- COLORS --- */
@@ -116,14 +163,18 @@
 .tape-cell.d-7 span { background: var(--c-7); }
 
 /* --- ACTIVE STATE (Playing) --- */
-/* White border overrides Gold, but we keep the glow */
 .tape-cell.active span {
   transform: scale(1.15);
   box-shadow: 0 0 20px white;
   opacity: 1;
   border-color: white;
   z-index: 10;
-  animation: none; /* Stop pulse when active to avoid conflict */
+  animation: none;
+}
+
+/* Active overrides pressing */
+.tape-cell.active.pressing span {
+  transform: scale(1.15);
 }
 
 .tape-cell.disabled span {
@@ -133,39 +184,52 @@
   transform: scale(0.9);
 }
 
-@media (max-width: 600px) {
-    .visualizer-container { height: 70px; }
-    .tape-cell { font-size: 0.9rem; }
-    .tape-cell span { 
-        width: 40px; 
-        height: 40px; 
-    }
+/* Disabled cells don't show pressing animation */
+.tape-cell.disabled.pressing span {
+  transform: scale(0.85);
+  box-shadow: none;
 }
+
+@media (max-width: 600px) {
+  .visualizer-container { height: 70px; }
+  .tape-cell { font-size: 0.9rem; }
+  .tape-cell span { 
+    width: 40px; 
+    height: 40px; 
+  }
+  .tape-cell.pressing::after {
+    width: 48px;
+    height: 48px;
+    margin-top: -24px;
+    margin-left: -24px;
+  }
+}
+
 /* PIANO GRID */
 .chromatic-grid {
-    flex-direction: column;
-    gap: 5px;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .piano-row {
-    display: flex;
-    justify-content: center;
-    width: 100%;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .piano-row.top {
-    margin-bottom: -10px; /* Overlap slightly or just tight packing */
-    z-index: 2; /* Black keys sit on top */
-    pointer-events: none; /* Let clicks pass through spacers */
-}
-.piano-row.top .tape-cell {
-    pointer-events: auto; /* Re-enable pointer on actual keys */
+  margin-bottom: -10px;
+  z-index: 2;
+  pointer-events: none;
 }
 
-/* Adjust cell size for chromatic view to fit 12 keys */
+.piano-row.top .tape-cell {
+  pointer-events: auto;
+}
+
 .visualizer-container.chromatic .tape-cell {
-    width: 45px; /* Smaller cells */
-    font-size: 0.9rem;
+  width: 45px;
+  font-size: 0.9rem;
 }
 
 .spacer { pointer-events: none; }
@@ -175,7 +239,6 @@
 .fretboard-viewport {
   width: 100%;
   overflow: hidden;
-  /* Mask creates the fuzzy edges you requested */
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   display: flex;
@@ -183,12 +246,10 @@
   padding: 20px 0;
 }
 
-/* Styling to ensure the Fretboard looks like a guitar neck */
 .visualizer-container svg {
-    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
 }
 
-/* Ensure ghost notes are subtle but visible */
 circle[stroke="rgba(255,255,255,0.15)"] {
-    stroke-dasharray: none;
+  stroke-dasharray: none;
 }

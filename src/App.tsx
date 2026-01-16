@@ -7,7 +7,6 @@ import "./App.css";
 // Components
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
-// Ensure this path matches your file structure
 import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer"; 
 import Controls from "./components/Controls/Controls";
 
@@ -32,11 +31,18 @@ export default function App() {
 
   useEffect(() => {
     if (session.activeMidi !== null) {
-        // FIX: Use session.visualizerKey here to prevent visual mismatch during key changes
         const steps = getScaleStepsFromRoot(session.activeMidi, session.visualizerKey, session.scaleType);
         setLastValidStep(steps);
     }
   }, [session.activeMidi, session.visualizerKey, session.scaleType]);
+
+  // Determine if we should hide visuals in the Visualizer (for Blind Mode in Random tab)
+  // In Random tab with inverse mode + blind mode: hide during Listen phases, show during Answer/Affirm
+  const shouldHideVisualizerNotes = session.activeTab === 'random' 
+    && session.inverseMode 
+    && session.hideFretboardVisuals
+    && session.status !== 'Answer' 
+    && session.status !== 'Affirm';
 
   return (
     <div className="app-container">
@@ -47,7 +53,6 @@ export default function App() {
           currentKey={session.currentKey} setKeyManually={session.setKeyManually}
           pickRandomKey={() => session.setKeyManually(KEYS[Math.floor(Math.random() * KEYS.length)])} 
           viewMode={viewMode} setViewMode={setViewMode}
-          debugClick={session.debugClick} setDebugClick={session.setDebugClick}
           scaleType={session.scaleType}
           setScaleType={session.handleScaleChange}
           
@@ -57,6 +62,7 @@ export default function App() {
           // Fretboard Props
           selectedShape={session.selectedShape}
           setSelectedShape={session.setSelectedShape}
+          
         />
 
         {/* Status Text (Sing Along / Listen) */}
@@ -65,29 +71,30 @@ export default function App() {
         </div>
 
         {session.activeTab === 'fretboard' ? (
-  <FretboardVisualizer 
-    currentKey={session.currentKey}
-    scaleType={session.scaleType}
-    selectedShape={session.selectedShape}
-    activeMidi={session.activeMidi}
-    hideVisuals={session.hideFretboardVisuals}
-    status={session.status}
-  />
-) : (
-        <Visualizer 
-          viewMode={viewMode} activeMidi={session.activeMidi}
-          lastValidStep={lastValidStep} 
-          enabledDegrees={session.enabledDegrees}
-          focusedDegrees={session.focusedDegrees} 
-          toggleDegree={session.toggleDegree}
-          toggleFocus={session.toggleFocus} 
-          scaleType={session.scaleType}
-        />
-)}
+          <FretboardVisualizer 
+            currentKey={session.currentKey}
+            scaleType={session.scaleType}
+            selectedShape={session.selectedShape}
+            activeMidi={session.activeMidi}
+            hideVisuals={session.hideFretboardVisuals}
+            status={session.status}
+          />
+        ) : (
+          <Visualizer 
+            viewMode={viewMode} 
+            activeMidi={shouldHideVisualizerNotes ? null : session.activeMidi}
+            lastValidStep={lastValidStep} 
+            enabledDegrees={session.enabledDegrees}
+            focusedDegrees={session.focusedDegrees} 
+            toggleDegree={session.toggleDegree}
+            toggleFocus={session.toggleFocus} 
+            scaleType={session.scaleType}
+          />
+        )}
 
         <Controls 
             isPlaying={session.isPlaying} 
-            isPaused={session.isPaused} // Add this line
+            isPaused={session.isPaused}
             onPlayToggle={session.startSession}
             onStop={session.stopSession} 
             bpm={session.bpm} setBpm={session.setBpm}
@@ -100,8 +107,9 @@ export default function App() {
             endRoot={session.endRoot} setEndRoot={session.setEndRoot}
             silentPractice={session.silentPractice} setSilentPractice={session.setSilentPractice}
             trainingWheels={session.trainingWheels} setTrainingWheels={session.setTrainingWheels}
-            inverseMode={session.inverseMode} setInverseMode={session.setInverseMode} // Updated to inverseMode
+            inverseMode={session.inverseMode} setInverseMode={session.setInverseMode}
             questionsPerKey={session.questionsPerKey} setQuestionsPerKey={session.setQuestionsPerKey}
+            debugClick={session.debugClick} setDebugClick={session.setDebugClick}
             volMaster={session.volMaster} setVolMaster={session.setVolMaster}
             volVoice={session.volVoice} setVolVoice={session.setVolVoice}
             volGroove={session.volGroove} setVolGroove={session.setVolGroove}

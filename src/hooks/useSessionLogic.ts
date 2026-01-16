@@ -1,12 +1,12 @@
 import * as Tone from "tone";
-import { useState, useRef, useEffect } from "react";
-import { audioEngine } from "../audio/AudioEngine";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { audioEngine, MIN_VOCAL_MIDI, MAX_VOCAL_MIDI } from "../audio/AudioEngine";
 import { initKeepAlive, updateMediaSessionState, startKeepAlive } from "../audio/KeepAlive";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
 import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
-import { useMixerLogic } from "./useMixerLogic"; // <--- NEW
-import { useSessionSettings } from "./useSessionSettings"; // <--- NEW
+import { useMixerLogic } from "./useMixerLogic";
+import { useSessionSettings } from "./useSessionSettings";
 import { getAvailableDegrees } from "../audio/MusicTheory"; 
 import type { MusicalKey, ScaleDegree, MelodyConstraints, ScaleType } from "../types";
 import { getFretboardConfig } from "../config/FretboardData";
@@ -17,8 +17,31 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
   "Fs": "F♯", "G": "G", "Gs": "A♭", "A": "A", "As": "B♭", "B": "B"
 };
 
+// Default settings per tab (used for reset on tab switch)
+const TAB_DEFAULTS: Record<string, {
+  inverseMode: boolean;
+  trainingWheels: boolean;
+  hideFretboardVisuals: boolean;
+}> = {
+  random: {
+    inverseMode: false,
+    trainingWheels: false,
+    hideFretboardVisuals: false
+  },
+  training: {
+    inverseMode: false,
+    trainingWheels: false,
+    hideFretboardVisuals: false
+  },
+  fretboard: {
+    inverseMode: true,
+    trainingWheels: false,
+    hideFretboardVisuals: false
+  }
+};
+
 export function useSessionLogic() {
-  // --- 1. NEW HOOKS ---
+  // --- 1. HOOKS ---
   const mixer = useMixerLogic();
   const settings = useSessionSettings();
 
@@ -27,6 +50,16 @@ export function useSessionLogic() {
   const [isPaused, setIsPaused] = useState(false);
   const [status, setStatus] = useState("Start Session");
   const [activeTab, setActiveTab] = useState("random");
+  
+  // Track if audio has ever been initialized (for first-play fix)
+  const hasInitializedAudio = useRef(false);
+  
+  // Store per-tab user settings (so switching back restores their choices)
+  const tabSettingsCache = useRef<Record<string, typeof TAB_DEFAULTS.random>>({
+    random: { ...TAB_DEFAULTS.random },
+    training: { ...TAB_DEFAULTS.training },
+    fretboard: { ...TAB_DEFAULTS.fretboard }
+  });
   
   // Music Theory State
   const [currentKey, setCurrentKey] = useState<MusicalKey>("C");
@@ -48,6 +81,7 @@ export function useSessionLogic() {
   const enabledDegreesRef = useRef(enabledDegrees);
   const focusedDegreesRef = useRef(focusedDegrees);
   const currentKeyRef = useRef(currentKey);
+  const scaleTypeRef = useRef(scaleType);
 
   // Training Logic
   const training = useTrainingMode(scaleType);
@@ -60,6 +94,7 @@ export function useSessionLogic() {
   useEffect(() => { enabledDegreesRef.current = enabledDegrees; }, [enabledDegrees]);
   useEffect(() => { focusedDegreesRef.current = focusedDegrees; }, [focusedDegrees]);
   useEffect(() => { currentKeyRef.current = currentKey; }, [currentKey]);
+  useEffect(() => { scaleTypeRef.current = scaleType; }, [scaleType]);
 
   useEffect(() => {
     audioEngine.onStatusChange = (text) => setStatus(text);
@@ -77,38 +112,108 @@ export function useSessionLogic() {
     debugClick, setTriggerPulse, setActiveMidi, visualTimeoutRef
   });
 
-  // Background Audio Bridge
+  // Helper for MediaSession resume (needs stable reference)
+  const resumeFromMediaSession = useCallback(() => {
+    if (isPaused) {
+      setIsPlaying(true);
+      setIsPaused(false);
+      isPlayingRef.current = true;
+      audioEngine.resumePlayback();
+      updateMediaSessionState(true);
+    }
+  }, [isPaused]);
+
+  // Background Audio Bridge - Initialize once on mount
   useEffect(() => {
     initKeepAlive({
-      onPlay: () => startSession(), 
+      onPlay: () => resumeFromMediaSession(), 
       onPause: () => pauseSession(),
       onNext: () => { if (isPlayingRef.current) runCycle(currentKeyRef.current, false); }
     }); 
-  }, []);
+  }, [resumeFromMediaSession]);
 
-  // --- 4. HANDLERS ---
-  const handleTabChange = (tab: string) => {
-  setActiveTab(tab);
-  if (tab === 'fretboard') {
-    settings.setInverseMode(true);
-    // FIX: Force scale to Pentatonic and update enabled degrees immediately
-    const pentatonicType = scaleType === 'Minor' ? 'PentatonicMinor' : 'PentatonicMajor';
-    handleScaleChange(pentatonicType); 
-  }
-};
+  // --- 4. TAB SWITCHING WITH AUTO-STOP AND FADE ---
+  const stopWithFade = async (): Promise<void> => {
+    return new Promise((resolve) => {
+      // Quick fade out (200ms)
+      audioEngine.setMasterVol(0);
+      
+      setTimeout(() => {
+        setIsPlaying(false);
+        setIsPaused(false);
+        isPlayingRef.current = false;
+        audioEngine.stopAndKillBridge();
+        updateMediaSessionState(false);
+        training.pauseTrainingTimer();
+        
+        // Restore master volume for next play
+        audioEngine.setMasterVol(mixer.volMaster);
+        resolve();
+      }, 200);
+    });
+  };
+
+  const handleTabChange = async (newTab: string) => {
+    if (newTab === activeTab) return;
+    
+    // Save current tab's settings before switching
+    tabSettingsCache.current[activeTab] = {
+      inverseMode: settings.inverseMode,
+      trainingWheels: settings.trainingWheels,
+      hideFretboardVisuals: settings.hideFretboardVisuals
+    };
+    
+    // If playing, stop with fade-out
+    if (isPlaying || isPaused) {
+      await stopWithFade();
+    }
+    
+    // Switch tab
+    setActiveTab(newTab);
+    
+    // Restore cached settings for the new tab (or use defaults if never visited)
+    const cachedSettings = tabSettingsCache.current[newTab] || TAB_DEFAULTS[newTab];
+    
+    // Apply tab-specific settings
+    if (newTab === 'fretboard') {
+      // Fretboard always uses inverse mode and pentatonic
+      settings.setInverseMode(true);
+      const pentatonicType = scaleType === 'Minor' || scaleType === 'PentatonicMinor' 
+        ? 'PentatonicMinor' 
+        : 'PentatonicMajor';
+      handleScaleChange(pentatonicType);
+    } else {
+      // Apply cached/default settings for random/training
+      settings.setInverseMode(cachedSettings.inverseMode);
+      settings.setTrainingWheels(cachedSettings.trainingWheels);
+      settings.setHideFretboardVisuals(cachedSettings.hideFretboardVisuals);
+    }
+    
+    // Reset training state when entering training tab
+    if (newTab === 'training') {
+      training.resetTraining();
+      lastPlayedStageIndex.current = -1;
+      hasPlayedScalePreview.current = false;
+      hasPlayedIntroSequence.current = false;
+    }
+    
+    setStatus("Start Session");
+    setActiveMidi(null);
+  };
+
+  // --- 5. SCALE & DEGREE HANDLERS ---
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
     const defaults = getAvailableDegrees(type);
     setEnabledDegrees(defaults);
-    // Force the ref to update immediately for the melody generator
     enabledDegreesRef.current = defaults; 
     setFocusedDegrees([]);
-    setFocusedDegrees([]); 
+    focusedDegreesRef.current = [];
     training.resetTraining();
     
     if (isPlaying) {
-        audioEngine.softReset();
-        runCycle(currentKey, true); 
+      audioEngine.softReset();
+      runCycle(currentKey, true); 
     }
   };
 
@@ -116,14 +221,14 @@ export function useSessionLogic() {
     if (activeTab !== 'random') return;
 
     if (enabledDegrees.includes(d)) {
-        if (enabledDegrees.length > 1) {
-            setEnabledDegrees(prev => prev.filter(x => x !== d));
-            setFocusedDegrees(prev => prev.filter(x => x !== d));
-            setStatus(`${d} Disabled`);
-        }
+      if (enabledDegrees.length > 1) {
+        setEnabledDegrees(prev => prev.filter(x => x !== d));
+        setFocusedDegrees(prev => prev.filter(x => x !== d));
+        setStatus(`${d} Disabled`);
+      }
     } else {
-        setEnabledDegrees(prev => [...prev, d]);
-        setStatus(`${d} Enabled`);
+      setEnabledDegrees(prev => [...prev, d]);
+      setStatus(`${d} Enabled`);
     }
   };
 
@@ -131,16 +236,16 @@ export function useSessionLogic() {
     if (activeTab !== 'random') return;
 
     if (focusedDegrees.includes(d)) {
-        setFocusedDegrees(prev => prev.filter(x => x !== d));
-        setStatus(`Removed focus: ${d}`);
+      setFocusedDegrees(prev => prev.filter(x => x !== d));
+      setStatus(`Removed focus: ${d}`);
     } else {
-        if (!enabledDegrees.includes(d)) setEnabledDegrees(prev => [...prev, d]);
-        setFocusedDegrees(prev => {
-            const next = [...prev, d];
-            if (next.length > 2) next.shift();
-            setStatus(`Focus on ${next.join(" & ")}`);
-            return next;
-        });
+      if (!enabledDegrees.includes(d)) setEnabledDegrees(prev => [...prev, d]);
+      setFocusedDegrees(prev => {
+        const next = [...prev, d];
+        if (next.length > 2) next.shift();
+        setStatus(`Focus on ${next.join(" & ")}`);
+        return next;
+      });
     }
   };
 
@@ -151,26 +256,27 @@ export function useSessionLogic() {
     } else {
       setVisualizerKey(k);
       setStatus(`Key: ${KEY_DISPLAY_MAP[k]}`);
-      await audioEngine.loadBackingTracks(k, "");
+      if (hasInitializedAudio.current) {
+        await audioEngine.loadBackingTracks(k, "");
+      }
     }
   };
 
   const handleLevelChange = (newLevelId: number) => {
-      training.setActiveLevelId(newLevelId);
-      lastPlayedStageIndex.current = -1; 
-      hasPlayedScalePreview.current = false;
-      hasPlayedIntroSequence.current = false;
-      
-      if (isPlaying) {
-          audioEngine.softReset(); 
-          training.resetTraining(); 
-          training.startTrainingTimer();
-          runCycle(currentKey, true); 
-      }
+    training.setActiveLevelId(newLevelId);
+    lastPlayedStageIndex.current = -1; 
+    hasPlayedScalePreview.current = false;
+    hasPlayedIntroSequence.current = false;
+    
+    if (isPlaying) {
+      audioEngine.softReset(); 
+      training.resetTraining(); 
+      training.startTrainingTimer();
+      runCycle(currentKey, true); 
+    }
   };
 
-  // --- 5. SESSION CONTROLS ---
-
+  // --- 6. SESSION CONTROLS ---
   const stopSession = () => {
     setIsPlaying(false);
     setIsPaused(false);
@@ -183,26 +289,27 @@ export function useSessionLogic() {
   };
 
   const pauseSession = () => {
-        setIsPlaying(false);
-        setIsPaused(true);
-        isPlayingRef.current = false;
-        audioEngine.pausePlayback();
-        setStatus("Paused");
-        updateMediaSessionState(false);
-    };
+    setIsPlaying(false);
+    setIsPaused(true);
+    isPlayingRef.current = false;
+    audioEngine.pausePlayback();
+    setStatus("Paused");
+    updateMediaSessionState(false);
+  };
 
   const startSession = async () => {
+    // Handle resume from pause
     if (isPaused) {
-        setIsPlaying(true);
-        setIsPaused(false);
-        isPlayingRef.current = true;
-        setStatus("Resuming...");
-        await initKeepAlive({ onPlay: () => startSession(), onPause: () => pauseSession() }); 
-        updateMediaSessionState(true);
-        audioEngine.resumePlayback();
-        return;
+      setIsPlaying(true);
+      setIsPaused(false);
+      isPlayingRef.current = true;
+      setStatus("Resuming...");
+      updateMediaSessionState(true);
+      audioEngine.resumePlayback();
+      return;
     }
 
+    // Handle pause if already playing
     if (isPlaying) {
       pauseSession();
       return;
@@ -213,18 +320,32 @@ export function useSessionLogic() {
       setIsPlaying(true);
       isPlayingRef.current = true;
 
+      // CRITICAL: Start Tone.js AudioContext from user gesture FIRST
+      await Tone.start();
+      
+      // Now start the keep-alive bridge (also needs user gesture context)
       await startKeepAlive();
-      await audioEngine.init({ 
-        groove: mixer.volGroove, voice: mixer.volVoice, click: mixer.volMetronome, 
-        master: mixer.volMaster, drone: mixer.volDrone 
-      });
+      
+      // Initialize audio engine if not already done
+      if (!hasInitializedAudio.current) {
+        await audioEngine.init({ 
+          groove: mixer.volGroove, 
+          voice: mixer.volVoice, 
+          click: mixer.volMetronome, 
+          master: mixer.volMaster, 
+          drone: mixer.volDrone 
+        });
+        hasInitializedAudio.current = true;
+      }
 
+      // Reset transport
       Tone.Transport.stop();
       Tone.Transport.cancel();
       Tone.Transport.position = 0;
       
       if (!isPlayingRef.current) return; 
       
+      // Load backing tracks and configure
       setVisualizerKey(currentKey); 
       await audioEngine.loadBackingTracks(currentKey, ""); 
       audioEngine.setBpm(settings.bpm);
@@ -237,13 +358,13 @@ export function useSessionLogic() {
       runCycle(currentKey, true);
 
     } catch (e) { 
-        console.error(e); 
-        setStatus("Error"); 
-        stopSession(); 
+      console.error("startSession error:", e); 
+      setStatus("Error - Tap to retry"); 
+      stopSession(); 
     }
   };
 
-  // --- 6. GAME LOOP ---
+  // --- 7. GAME LOOP ---
   const runCycle = async (keyToUse: MusicalKey, isFirst = false, startTime?: number) => {
     if (!isPlayingRef.current) return;
     
@@ -255,226 +376,196 @@ export function useSessionLogic() {
     let forceOneThreeFive = false;
     let skipPrepareMessage = false;
 
-    // A. Key Changes & Modulation
+    // A. Handle Key Changes & Modulation
     if (currentKeyRef.current !== keyToUse) {
-        currentCycleKey = currentKeyRef.current;
-        setStatus(`Key Change: ${KEY_DISPLAY_MAP[currentCycleKey]}`);
-        skipPrepareMessage = true;
-        
-        if (!isPlayingRef.current) return;
-        await audioEngine.loadBackingTracks(currentCycleKey, "");
-        if (!isPlayingRef.current) return;
-        
-        setVisualizerKey(currentCycleKey);
-        forceOneThreeFive = true;
-        questionCount.current = 1; 
+      currentCycleKey = currentKeyRef.current;
+      setStatus(`Key Change: ${KEY_DISPLAY_MAP[currentCycleKey]}`);
+      skipPrepareMessage = true;
+      
+      if (!isPlayingRef.current) return;
+      await audioEngine.loadBackingTracks(currentCycleKey, "");
+      if (!isPlayingRef.current) return;
+      
+      setVisualizerKey(currentCycleKey);
+      forceOneThreeFive = true;
+      questionCount.current = 1; 
     } 
-    // Random Mode Modulation
+    // Random Mode Auto-Modulation
     else if (activeTabRef.current === 'random' && questionCount.current > settings.refs.questionsPerKey.current) {
-        questionCount.current = 1; 
-        const otherKeys = KEYS.filter(k => k !== keyToUse); 
-        const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
-        
-        if (!isPlayingRef.current) return;
-        setCurrentKey(newKey);
-        setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
-        skipPrepareMessage = true;
-        
-        await audioEngine.loadBackingTracks(newKey, "");
-        if (!isPlayingRef.current) return;
+      questionCount.current = 1; 
+      const otherKeys = KEYS.filter(k => k !== keyToUse); 
+      const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+      
+      if (!isPlayingRef.current) return;
+      setCurrentKey(newKey);
+      setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
+      skipPrepareMessage = true;
+      
+      await audioEngine.loadBackingTracks(newKey, "");
+      if (!isPlayingRef.current) return;
 
-        currentCycleKey = newKey;
-        setVisualizerKey(newKey);
-        forceOneThreeFive = true;
+      currentCycleKey = newKey;
+      setVisualizerKey(newKey);
+      forceOneThreeFive = true;
     }
 
-    // B. Determine Constraints
-    let constraints: MelodyConstraints;
-    let noteEvents; 
-    let playSilent = settings.refs.silentPractice.current; // Use Ref!
-    let useTrainingWheels = settings.refs.trainingWheels.current; // Use Ref!
-
-    // Calculate fretboard range if in fretboard mode (used by both training and random)
+    // B. Calculate fretboard range if needed
+    // For fretboard mode, we need to find the intersection of fretboard notes and vocal sample range
     let fretboardRange: { min: number; max: number } | undefined;
     if (activeTabRef.current === 'fretboard') {
-        const fretConfig = getFretboardConfig(currentCycleKey, scaleType, settings.refs.selectedShape.current);
-        const midis = fretConfig.notes.map(n => n.midi);
-        fretboardRange = { min: Math.min(...midis), max: Math.max(...midis) };
+      const fretConfig = getFretboardConfig(currentCycleKey, scaleTypeRef.current, settings.refs.selectedShape.current);
+      const midis = fretConfig.notes.map(n => n.midi);
+      const fretMin = Math.min(...midis);
+      const fretMax = Math.max(...midis);
+      
+      // Find the intersection of fretboard range and vocal sample range
+      // This ensures all generated notes have vocal samples available
+      const effectiveMin = Math.max(fretMin, MIN_VOCAL_MIDI);
+      const effectiveMax = Math.min(fretMax, MAX_VOCAL_MIDI);
+      
+      // Only use range if there's a valid intersection
+      if (effectiveMin <= effectiveMax) {
+        fretboardRange = { min: effectiveMin, max: effectiveMax };
+      } else {
+        // No overlap - fall back to vocal range entirely
+        // The melody will still be musically correct, just not visually matching the fretboard position
+        fretboardRange = { min: MIN_VOCAL_MIDI, max: MAX_VOCAL_MIDI };
+        console.warn('Fretboard range has no overlap with vocal samples, using vocal range');
+      }
     }
+
+    // C. Determine Constraints & Generate Melody
+    let constraints: MelodyConstraints;
+    let noteEvents; 
+    let playSilent = settings.refs.silentPractice.current;
+    let useTrainingWheels = settings.refs.trainingWheels.current;
 
     if (activeTabRef.current === 'training') {
-        const config = training.getCurrentConfig();
-        constraints = config.constraints;
-        const stageIndex = config.stageIndex;
+      const config = training.getCurrentConfig();
+      constraints = config.constraints;
+      const stageIndex = config.stageIndex;
 
-        // Training Modulation Check
-        const effectiveQuestionsPerKey = config.questionsPerKey || Infinity;
-        if (questionCount.current > effectiveQuestionsPerKey) {
-            questionCount.current = 1;
-            const otherKeys = KEYS.filter(k => k !== keyToUse);
-            const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
-            setCurrentKey(newKey);
-            setStatus(`Level Modulation: ${KEY_DISPLAY_MAP[newKey]}`);
-            await audioEngine.loadBackingTracks(newKey, "");
-            currentCycleKey = newKey;
-        }
+      // Training Modulation Check
+      const effectiveQuestionsPerKey = config.questionsPerKey || Infinity;
+      if (questionCount.current > effectiveQuestionsPerKey) {
+        questionCount.current = 1;
+        const otherKeys = KEYS.filter(k => k !== keyToUse);
+        const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+        setCurrentKey(newKey);
+        setStatus(`Level Modulation: ${KEY_DISPLAY_MAP[newKey]}`);
+        await audioEngine.loadBackingTracks(newKey, "");
+        currentCycleKey = newKey;
+      }
 
-        // Auto-Focus for first 4 questions
-        if (questionCount.current <= 4 && constraints.allowedDegrees.length > 0) {
-            const newestDegree = constraints.allowedDegrees[constraints.allowedDegrees.length - 1];
-            constraints.focusedDegrees = [newestDegree];
-            setStatus(`Learning: ${newestDegree}`);
-        }
+      // Auto-Focus for first 4 questions
+      if (questionCount.current <= 4 && constraints.allowedDegrees.length > 0) {
+        const newestDegree = constraints.allowedDegrees[constraints.allowedDegrees.length - 1];
+        constraints.focusedDegrees = [newestDegree];
+        setStatus(`Learning: ${newestDegree}`);
+      }
 
-        if (config.forceTrainingWheels !== undefined) {
-             useTrainingWheels = config.forceTrainingWheels;
-             // Update UI to reflect forced state (optional, might need a setter if you want UI to update)
-        }
+      if (config.forceTrainingWheels !== undefined) {
+        useTrainingWheels = config.forceTrainingWheels;
+      }
 
-        setEnabledDegrees(constraints.allowedDegrees);
+      setEnabledDegrees(constraints.allowedDegrees);
 
-        if (stageIndex !== lastPlayedStageIndex.current) {
-            lastPlayedStageIndex.current = stageIndex;
-            hasPlayedScalePreview.current = false;
-            hasPlayedIntroSequence.current = false;
-        }
+      // Track stage changes for intro sequences
+      if (stageIndex !== lastPlayedStageIndex.current) {
+        lastPlayedStageIndex.current = stageIndex;
+        hasPlayedScalePreview.current = false;
+        hasPlayedIntroSequence.current = false;
+      }
 
-        if (config.scalePreview && !hasPlayedScalePreview.current) {
-            noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, "Major"); 
-            hasPlayedScalePreview.current = true; 
-        } 
-        else if (config.introSequence && !hasPlayedIntroSequence.current) {
-            noteEvents = generateFixedPattern(config.introSequence, currentCycleKey, "Major");
-            hasPlayedIntroSequence.current = true; 
-        }
-        else {
-             noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleType, constraints });
-             playSilent = settings.refs.silentPractice.current; 
-        }
-    } else {
-
-    if (activeTabRef.current === 'training') {
-        const config = training.getCurrentConfig();
-        constraints = config.constraints;
-        const stageIndex = config.stageIndex;
-
-        // Training Modulation Check
-        const effectiveQuestionsPerKey = config.questionsPerKey || Infinity;
-        if (questionCount.current > effectiveQuestionsPerKey) {
-            questionCount.current = 1;
-            const otherKeys = KEYS.filter(k => k !== keyToUse);
-            const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
-            setCurrentKey(newKey);
-            setStatus(`Level Modulation: ${KEY_DISPLAY_MAP[newKey]}`);
-            await audioEngine.loadBackingTracks(newKey, "");
-            currentCycleKey = newKey;
-        }
-
-        // Auto-Focus for first 4 questions
-        if (questionCount.current <= 4 && constraints.allowedDegrees.length > 0) {
-            const newestDegree = constraints.allowedDegrees[constraints.allowedDegrees.length - 1];
-            constraints.focusedDegrees = [newestDegree];
-            setStatus(`Learning: ${newestDegree}`);
-        }
-
-        if (config.forceTrainingWheels !== undefined) {
-             useTrainingWheels = config.forceTrainingWheels;
-        }
-
-        setEnabledDegrees(constraints.allowedDegrees);
-
-        if (stageIndex !== lastPlayedStageIndex.current) {
-            lastPlayedStageIndex.current = stageIndex;
-            hasPlayedScalePreview.current = false;
-            hasPlayedIntroSequence.current = false;
-        }
-
-        if (config.scalePreview && !hasPlayedScalePreview.current) {
-            noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, "Major"); 
-            hasPlayedScalePreview.current = true; 
-        } 
-        else if (config.introSequence && !hasPlayedIntroSequence.current) {
-            noteEvents = generateFixedPattern(config.introSequence, currentCycleKey, "Major");
-            hasPlayedIntroSequence.current = true; 
-        }
-        else {
-             // FIX: Pass the limits to the training melodies too
-             noteEvents = generateMelody({ 
-                 key: currentCycleKey, 
-                 scaleType: scaleType, 
-                 constraints: {
-                    ...constraints,
-                    minMidi: fretboardRange?.min,
-                    maxMidi: fretboardRange?.max
-                 } 
-             });
-             playSilent = settings.refs.silentPractice.current; 
-        }
-    } else {
-        // Random Mode Logic
-        if (forceOneThreeFive) {
-            const pattern: ScaleDegree[] = scaleType === 'Minor' 
-                ? ["1", "b3", "5", "1"] 
-                : ["1", "3", "5", "1"];
-
-            noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleType);
-            setStatus("New Key: Settling In");
-            playSilent = settings.refs.silentPractice.current;
-        } else {
-            constraints = {
-                allowedDegrees: enabledDegreesRef.current,
-                focusedDegrees: focusedDegreesRef.current, 
-                startDegree: settings.refs.startRoot.current ? "1" : undefined,
-                endDegree: settings.refs.endRoot.current ? "1" : undefined,     
-                length: 4,
-                difficulty: settings.refs.difficulty.current,
-                minMidi: fretboardRange?.min, 
-                maxMidi: fretboardRange?.max  
-            };
-            playSilent = settings.refs.silentPractice.current;
-            noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleType, constraints });
-        }
-    }
-    }
-
-
-    // C. Schedule & Play
-    if (noteEvents && isPlayingRef.current) {
-        // Map melody notes to valid vocal sample range (43-67)
-        const playableNotes = noteEvents.map(event => {
-            let wrappedMidi = event.noteInfo.midi;
-            while (wrappedMidi < 43) wrappedMidi += 12;
-            while (wrappedMidi > 67) wrappedMidi -= 12;
-            
-            return {
-                ...event,
-                noteInfo: {
-                    ...event.noteInfo,
-                    midi: wrappedMidi // Ensure vocal samples exist for this pitch
-                }
-            };
+      // Generate appropriate melody
+      if (config.scalePreview && !hasPlayedScalePreview.current) {
+        noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, scaleTypeRef.current); 
+        hasPlayedScalePreview.current = true; 
+      } 
+      else if (config.introSequence && !hasPlayedIntroSequence.current) {
+        noteEvents = generateFixedPattern(config.introSequence, currentCycleKey, scaleTypeRef.current);
+        hasPlayedIntroSequence.current = true; 
+      }
+      else {
+        noteEvents = generateMelody({ 
+          key: currentCycleKey, 
+          scaleType: scaleTypeRef.current, 
+          constraints: {
+            ...constraints,
+            minMidi: fretboardRange?.min,
+            maxMidi: fretboardRange?.max
+          } 
         });
+        playSilent = settings.refs.silentPractice.current; 
+      }
+    } 
+    else if (activeTabRef.current === 'fretboard') {
+      // Fretboard Mode
+      if (forceOneThreeFive) {
+        const pattern: ScaleDegree[] = scaleTypeRef.current === 'PentatonicMinor' 
+          ? ["1", "b3", "5", "1"] 
+          : ["1", "3", "5", "1"];
+        noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleTypeRef.current);
+        setStatus("New Key: Settling In");
+      } else {
+        constraints = {
+          allowedDegrees: enabledDegreesRef.current,
+          focusedDegrees: focusedDegreesRef.current, 
+          startDegree: settings.refs.startRoot.current ? "1" : undefined,
+          endDegree: settings.refs.endRoot.current ? "1" : undefined,     
+          length: 4,
+          difficulty: settings.refs.difficulty.current,
+          minMidi: fretboardRange?.min, 
+          maxMidi: fretboardRange?.max  
+        };
+        noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleTypeRef.current, constraints });
+      }
+      playSilent = settings.refs.silentPractice.current;
+    }
+    else {
+      // Random Mode
+      if (forceOneThreeFive) {
+        const pattern: ScaleDegree[] = scaleTypeRef.current === 'Minor' || scaleTypeRef.current === 'PentatonicMinor'
+          ? ["1", "b3", "5", "1"] 
+          : ["1", "3", "5", "1"];
+        noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleTypeRef.current);
+        setStatus("New Key: Settling In");
+      } else {
+        constraints = {
+          allowedDegrees: enabledDegreesRef.current,
+          focusedDegrees: focusedDegreesRef.current, 
+          startDegree: settings.refs.startRoot.current ? "1" : undefined,
+          endDegree: settings.refs.endRoot.current ? "1" : undefined,     
+          length: 4,
+          difficulty: settings.refs.difficulty.current
+        };
+        noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleTypeRef.current, constraints });
+      }
+      playSilent = settings.refs.silentPractice.current;
+    }
 
-        await audioEngine.preloadNotes(playableNotes);
-        
-        if (!isPlayingRef.current) return;
+    // D. Schedule & Play
+    if (noteEvents && isPlayingRef.current) {
+      await audioEngine.preloadNotes(noteEvents);
+      
+      if (!isPlayingRef.current) return;
 
-        audioEngine.scheduleRoutine(
-            noteEvents, 
-            playSilent, 
-            useTrainingWheels, 
-            isFirst, 
-            (nextStartTime) => {
-                if (isPlayingRef.current) {
-                    runCycle(currentCycleKey, false, nextStartTime);
-                }
-            },
-            startTime,
-            skipPrepareMessage,
-            settings.refs.inverseMode.current // Use Ref!
-        );
-        
-        if (isFirst) audioEngine.startPlayback();
+      audioEngine.scheduleRoutine(
+        noteEvents,
+        playSilent, 
+        useTrainingWheels, 
+        isFirst, 
+        (nextStartTime) => {
+          if (isPlayingRef.current) {
+            runCycle(currentCycleKey, false, nextStartTime);
+          }
+        },
+        startTime,
+        skipPrepareMessage,
+        settings.refs.inverseMode.current
+      );
+      
+      if (isFirst) audioEngine.startPlayback();
     }
   };
 
@@ -489,7 +580,7 @@ export function useSessionLogic() {
     triggerPulse,
     debugClick, setDebugClick,
     
-    // Spread the new hooks to maintain API compatibility with App.tsx
+    // Spread the hooks to maintain API compatibility
     ...mixer,
     ...settings,
     

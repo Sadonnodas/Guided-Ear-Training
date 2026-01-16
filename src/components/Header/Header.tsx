@@ -5,7 +5,7 @@ import './Header.css';
 const ShuffleIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>;
 const TapeIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12h20M2 8h20M2 16h20" /></svg>;
 const StaticIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>;
-const MetronomeIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L4 20h16L12 2z" /><path d="M12 6v8" /></svg>;
+
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
@@ -21,8 +21,7 @@ interface HeaderProps {
   pickRandomKey: () => void;
   viewMode: 'tape' | 'static';
   setViewMode: (mode: 'tape' | 'static') => void;
-  debugClick: boolean; 
-  setDebugClick: (v: boolean) => void;
+  
   scaleType: ScaleType;
   setScaleType: (s: ScaleType) => void;
   
@@ -37,7 +36,7 @@ interface HeaderProps {
 
 export default function Header({ 
   activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, 
-  viewMode, setViewMode, debugClick, setDebugClick, scaleType, setScaleType,
+  viewMode, setViewMode, scaleType, setScaleType,
   activeLevelId, setActiveLevelId, levels,
   selectedShape, setSelectedShape // Added these two
 }: HeaderProps) {
@@ -62,26 +61,33 @@ export default function Header({
         <div className="key-container">
           
           {/* SCALE TYPE */}
-          <select 
-            className="key-select" 
-            value={scaleType} 
-            onChange={(e) => setScaleType(e.target.value as ScaleType)}
-            style={{ marginRight: '5px' }}
-          >
-            {activeTab === 'fretboard' ? (
-              <>
-                <option value="PentatonicMajor">Major Pentatonic</option>
-                <option value="PentatonicMinor">Minor Pentatonic</option>
-              </>
-            ) : (
-              <>
-                <option value="Major">Major</option>
-                <option value="Minor">Minor</option>
-                <option value="PentatonicMajor">Major Pentatonic</option>
-                <option value="PentatonicMinor">Minor Pentatonic</option>
-              </>
-            )}
-          </select>
+<select 
+  className="key-select" 
+  value={scaleType} 
+  onChange={(e) => setScaleType(e.target.value as ScaleType)}
+  style={{ marginRight: '5px' }}
+>
+  {activeTab === 'fretboard' ? (
+    <>
+      <option value="PentatonicMajor">Major Pentatonic</option>
+      <option value="PentatonicMinor">Minor Pentatonic</option>
+    </>
+  ) : activeTab === 'training' ? (
+    /* Only show Major and Minor when in the Training tab */
+    <>
+      <option value="Major">Major</option>
+      <option value="Minor">Minor</option>
+    </>
+  ) : (
+    /* Show all options for the Random tab */
+    <>
+      <option value="Major">Major</option>
+      <option value="Minor">Minor</option>
+      <option value="PentatonicMajor">Major Pentatonic</option>
+      <option value="PentatonicMinor">Minor Pentatonic</option>
+    </>
+  )}
+</select>
 
           <div className="separator"></div>
 
@@ -94,7 +100,6 @@ export default function Header({
             <ShuffleIcon />
           </button>
           
-          <div className="separator"></div>
 
           {/* LEVEL SELECTOR (TRAINING ONLY) */}
           {activeTab === 'training' && levels && setActiveLevelId && (
@@ -108,10 +113,12 @@ export default function Header({
                         <option key={l.id} value={l.id}>{l.name}</option>
                     ))}
                 </select>
-                <div className="separator"></div>
+                
             </>
           )}
           
+          <div className="separator"></div>
+
           {/* DYNAMIC TOGGLE: View Mode or Shape Selector */}
           {activeTab === 'fretboard' && setSelectedShape ? (
             <select 
@@ -137,17 +144,7 @@ export default function Header({
             </div>
           )}
 
-          <div className="separator"></div>
-
-          {/* METRONOME */}
-          <button 
-            className={`icon-btn ${debugClick ? 'active-pulse' : ''}`} 
-            onClick={() => setDebugClick(!debugClick)} 
-            title="Toggle Metronome"
-            style={{color: debugClick ? 'var(--btn-play)' : 'inherit'}}
-          >
-            <MetronomeIcon />
-          </button>
+          
         </div>
       </div>
     </>
