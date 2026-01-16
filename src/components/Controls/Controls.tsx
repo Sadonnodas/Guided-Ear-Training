@@ -42,6 +42,8 @@ interface ControlsProps {
   toggleMute: (type: string, val: number, setter: (v: number) => void) => void;
   currentPattern: string;
   setPattern: (name: string) => void;
+  hideFretboardVisuals: boolean;
+  setHideFretboardVisuals: (v: boolean) => void;
 }
 
 export default function Controls(props: ControlsProps) {
@@ -120,6 +122,14 @@ export default function Controls(props: ControlsProps) {
     <div className="control-section">
       <h3 className="section-title">Melody Flow</h3>
       <div className="toggle-grid-sleek">
+        <div 
+          className={`toggle-pill-btn ${props.hideFretboardVisuals ? 'active' : ''}`} 
+          onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
+          title="Blind Mode"
+        >
+
+        Blind Mode
+        </div>
          <div 
            className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} 
            onClick={() => props.setStartRoot(!props.startRoot)}

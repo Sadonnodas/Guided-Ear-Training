@@ -171,3 +171,24 @@
 .spacer { pointer-events: none; }
 .spacer.half { width: 22px; }
 .spacer.full { width: 45px; }
+
+.fretboard-viewport {
+  width: 100%;
+  overflow: hidden;
+  /* Mask creates the fuzzy edges you requested */
+  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+/* Styling to ensure the Fretboard looks like a guitar neck */
+.visualizer-container svg {
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+}
+
+/* Ensure ghost notes are subtle but visible */
+circle[stroke="rgba(255,255,255,0.15)"] {
+    stroke-dasharray: none;
+}

@@ -7,6 +7,8 @@ import "./App.css";
 // Components
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
+// Ensure this path matches your file structure
+import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer"; 
 import Controls from "./components/Controls/Controls";
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
@@ -52,6 +54,9 @@ export default function App() {
           activeLevelId={session.training.activeLevelId}
           setActiveLevelId={session.training.setActiveLevelId}
           levels={session.training.levels}
+          // Fretboard Props
+          selectedShape={session.selectedShape}
+          setSelectedShape={session.setSelectedShape}
         />
 
         {/* Status Text (Sing Along / Listen) */}
@@ -59,6 +64,15 @@ export default function App() {
             {session.status}
         </div>
 
+        {session.activeTab === 'fretboard' ? (
+  <FretboardVisualizer 
+    currentKey={session.currentKey}
+    scaleType={session.scaleType}
+    selectedShape={session.selectedShape}
+    activeMidi={session.activeMidi}
+    hideVisuals={session.hideFretboardVisuals}
+  />
+) : (
         <Visualizer 
           viewMode={viewMode} activeMidi={session.activeMidi}
           lastValidStep={lastValidStep} 
@@ -68,6 +82,7 @@ export default function App() {
           toggleFocus={session.toggleFocus} 
           scaleType={session.scaleType}
         />
+)}
 
         <Controls 
             isPlaying={session.isPlaying} 
@@ -94,6 +109,8 @@ export default function App() {
             volTraining={session.volTraining} setVolTraining={session.setVolTraining}
             volReverb={session.volReverb} setVolReverb={session.setVolReverb}
             toggleMute={toggleMute}
+            hideFretboardVisuals={session.hideFretboardVisuals}
+            setHideFretboardVisuals={session.setHideFretboardVisuals}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { audioEngine } from "../audio/AudioEngine";
-import type { MelodyDifficulty } from "../types";
+import type { MelodyDifficulty, CagedShape} from "../types";
 
 export function useSessionSettings() {
   // --- STATE ---
@@ -14,6 +14,8 @@ export function useSessionSettings() {
   const [inverseMode, setInverseMode] = useState(false);
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
   const [difficulty, setDifficulty] = useState<MelodyDifficulty>("normal");
+  const [selectedShape, setSelectedShape] = useState<CagedShape>("E"); // New state for Fretboard Tab
+  const [hideFretboardVisuals, setHideFretboardVisuals] = useState(false); // "Blind Mode" toggle
 
   // --- REFS (For access inside the async Game Loop) ---
   const refs = {
@@ -25,6 +27,8 @@ export function useSessionSettings() {
     inverseMode: useRef(inverseMode),
     questionsPerKey: useRef(questionsPerKey),
     difficulty: useRef(difficulty),
+    selectedShape: useRef(selectedShape), //
+    hideFretboardVisuals: useRef(hideFretboardVisuals) //
   };
 
   // --- SYNC REFS & ENGINE ---
@@ -36,6 +40,8 @@ export function useSessionSettings() {
   useEffect(() => { refs.inverseMode.current = inverseMode; }, [inverseMode]);
   useEffect(() => { refs.questionsPerKey.current = questionsPerKey; }, [questionsPerKey]);
   useEffect(() => { refs.difficulty.current = difficulty; }, [difficulty]);
+  useEffect(() => { refs.selectedShape.current = selectedShape; }, [selectedShape]); //
+  useEffect(() => { refs.hideFretboardVisuals.current = hideFretboardVisuals; }, [hideFretboardVisuals]); //
 
   const setPattern = (name: string) => {
     setCurrentPattern(name);
@@ -52,6 +58,8 @@ export function useSessionSettings() {
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
     
     // Refs (Expose these to the game loop)
+    selectedShape, setSelectedShape,
+    hideFretboardVisuals, setHideFretboardVisuals,
     refs
   };
 }

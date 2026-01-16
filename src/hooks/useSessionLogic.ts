@@ -86,11 +86,20 @@ export function useSessionLogic() {
   }, []);
 
   // --- 4. HANDLERS ---
-
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    // If switching to Fretboard, we often want Inverse Mode on by default
+    if (tab === 'fretboard') {
+        settings.setInverseMode(true);
+    }
+  };
   const handleScaleChange = (type: ScaleType) => {
     setScaleType(type);
     const defaults = getAvailableDegrees(type);
     setEnabledDegrees(defaults);
+    // Force the ref to update immediately for the melody generator
+    enabledDegreesRef.current = defaults; 
+    setFocusedDegrees([]);
     setFocusedDegrees([]); 
     training.resetTraining();
     
@@ -358,7 +367,22 @@ export function useSessionLogic() {
 
     // C. Schedule & Play
     if (noteEvents && isPlayingRef.current) {
-        await audioEngine.preloadNotes(noteEvents);
+        // Map melody notes to valid vocal sample range (43-67)
+        const playableNotes = noteEvents.map(event => {
+            let wrappedMidi = event.noteInfo.midi;
+            while (wrappedMidi < 43) wrappedMidi += 12;
+            while (wrappedMidi > 67) wrappedMidi -= 12;
+            
+            return {
+                ...event,
+                noteInfo: {
+                    ...event.noteInfo,
+                    midi: wrappedMidi // Ensure vocal samples exist for this pitch
+                }
+            };
+        });
+
+        await audioEngine.preloadNotes(playableNotes);
         
         if (!isPlayingRef.current) return;
 
@@ -382,7 +406,7 @@ export function useSessionLogic() {
   };
 
   return {
-    activeTab, setActiveTab,
+    activeTab, setActiveTab: handleTabChange,
     isPlaying, isPaused,
     currentKey, visualizerKey,
     status,

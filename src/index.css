@@ -30,3 +30,15 @@ body {
   align-items: center;
   justify-content: center;
 }
+:root {
+  --degree-color-1: #ff4d4d;
+  --degree-color-2: #4d94ff;
+  --degree-color-b3: #4d94ff;
+  --degree-color-3: #4d94ff;
+  --degree-color-4: #4d94ff;
+  --degree-color-5: #4d94ff;
+  --degree-color-6: #4d94ff;
+  --degree-color-b7: #4d94ff;
+  --degree-color-7: #4d94ff;
+}
+/* You can refine these colors to match your exact Red/Blue preferences */

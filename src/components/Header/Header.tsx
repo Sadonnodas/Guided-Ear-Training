@@ -1,4 +1,4 @@
-import type { MusicalKey, ScaleType, TrainingLevel } from '../../types';
+import type { MusicalKey, ScaleType, TrainingLevel, CagedShape} from '../../types';
 import './Header.css';
 
 // --- ICONS ---
@@ -30,12 +30,16 @@ interface HeaderProps {
   activeLevelId?: number;
   setActiveLevelId?: (id: number) => void;
   levels?: TrainingLevel[];
+  // Add Fretboard Props
+  selectedShape?: CagedShape;
+  setSelectedShape?: (s: CagedShape) => void;
 }
 
 export default function Header({ 
   activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, 
   viewMode, setViewMode, debugClick, setDebugClick, scaleType, setScaleType,
-  activeLevelId, setActiveLevelId, levels
+  activeLevelId, setActiveLevelId, levels,
+  selectedShape, setSelectedShape // Added these two
 }: HeaderProps) {
 
   const handleTabChange = (tab: string) => {
@@ -48,9 +52,11 @@ export default function Header({
   return (
     <>
       <div className="tabs">
-        <button className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} onClick={() => handleTabChange("random")}>Random</button>
-        <button className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} onClick={() => handleTabChange("training")}>Training</button>
-      </div>
+  <button className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} onClick={() => handleTabChange("random")}>Random</button>
+  <button className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} onClick={() => handleTabChange("training")}>Training</button>
+  {/* Added Fretboard Tab Button */}
+  <button className={`tab-btn ${activeTab === 'fretboard' ? 'active' : ''}`} onClick={() => handleTabChange("fretboard")}>Fretboard</button>
+</div>
 
       <div className="info-display">
         <div className="key-container">
@@ -62,10 +68,19 @@ export default function Header({
             onChange={(e) => setScaleType(e.target.value as ScaleType)}
             style={{ marginRight: '5px' }}
           >
-            <option value="Major">Major</option>
-            <option value="Minor">Minor</option>
-            {/* Hide Chromatic in Training */}
-            {/*{activeTab !== 'training' && <option value="Chromatic">Chromatic</option>}*/}
+            {activeTab === 'fretboard' ? (
+              <>
+                <option value="PentatonicMajor">Major Pentatonic</option>
+                <option value="PentatonicMinor">Minor Pentatonic</option>
+              </>
+            ) : (
+              <>
+                <option value="Major">Major</option>
+                <option value="Minor">Minor</option>
+                <option value="PentatonicMajor">Major Pentatonic</option>
+                <option value="PentatonicMinor">Minor Pentatonic</option>
+              </>
+            )}
           </select>
 
           <div className="separator"></div>
@@ -97,16 +112,30 @@ export default function Header({
             </>
           )}
           
-          {/* VIEW TOGGLE */}
-          <div className="view-toggle">
-            <div className={`toggle-option ${viewMode === 'tape' ? 'active' : ''}`} onClick={() => setViewMode('tape')} title="Tape View">
-              <TapeIcon />
+          {/* DYNAMIC TOGGLE: View Mode or Shape Selector */}
+          {activeTab === 'fretboard' && setSelectedShape ? (
+            <select 
+              className="key-select" 
+              value={selectedShape} 
+              onChange={(e) => setSelectedShape(e.target.value as CagedShape)}
+            >
+              <option value="C">C-Shape</option>
+              <option value="A">A-Shape</option>
+              <option value="G">G-Shape</option>
+              <option value="E">E-Shape</option>
+              <option value="D">D-Shape</option>
+            </select>
+          ) : (
+            <div className="view-toggle">
+              <div className={`toggle-option ${viewMode === 'tape' ? 'active' : ''}`} onClick={() => setViewMode('tape')} title="Tape View">
+                <TapeIcon />
+              </div>
+              <div className={`toggle-option ${viewMode === 'static' ? 'active' : ''}`} onClick={() => setViewMode('static')} title="Static View">
+                <StaticIcon />
+              </div>
+              <div className={`toggle-pill ${viewMode}`} />
             </div>
-            <div className={`toggle-option ${viewMode === 'static' ? 'active' : ''}`} onClick={() => setViewMode('static')} title="Static View">
-              <StaticIcon />
-            </div>
-            <div className={`toggle-pill ${viewMode}`} />
-          </div>
+          )}
 
           <div className="separator"></div>
 

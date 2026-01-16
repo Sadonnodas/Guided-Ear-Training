@@ -38,8 +38,11 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
       emptyIndices.sort(() => Math.random() - 0.5);
 
       // Place focused notes into the empty slots
-      while (focusPool.length > 0 && emptyIndices.length > 0) {
-          const note = focusPool.pop()!;
+      // SAFEGUARD: Ensure focused note is actually allowed in the current scale
+      const validFocusPool = focusPool.filter(d => allowedDegrees.includes(d));
+      
+      while (validFocusPool.length > 0 && emptyIndices.length > 0) {
+          const note = validFocusPool.pop()!;
           const idx = emptyIndices.pop()!;
           degrees[idx] = note;
       }
