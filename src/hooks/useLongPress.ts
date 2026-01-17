@@ -4,7 +4,7 @@ interface LongPressOptions {
   onLongPress: () => void;
   onClick: () => void;
   ms?: number;
-  debug?: boolean; // Add debug flag
+  debug?: boolean;
 }
 
 interface LongPressResult {
@@ -19,6 +19,9 @@ interface LongPressResult {
   isLongPressing: boolean;
 }
 
+/**
+ * SIMPLIFIED v4: Clear separation between touch and mouse with explicit state
+ */
 export function useLongPress({ 
   onLongPress, 
   onClick, 
@@ -27,11 +30,9 @@ export function useLongPress({
 }: LongPressOptions): LongPressResult {
   
   const timerRef = useRef<number>(0);
-  const isLongPressRef = useRef(false);
-  const isStartedRef = useRef(false);
+  const isActiveRef = useRef(false);
+  const longPressTriggeredRef = useRef(false); // Did the long press callback fire?
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
-  const longPressJustFiredRef = useRef(false);
-  const stopAlreadyCalledRef = useRef(false); // NEW: Prevent double-stop
   
   const [isLongPressing, setIsLongPressing] = useState(false);
 
@@ -39,21 +40,21 @@ export function useLongPress({
     if (debug) console.log('[LongPress]', ...args);
   }, [debug]);
 
+  // ===== SHARED START =====
   const start = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    log('START', { isStarted: isStartedRef.current });
+    log('START');
     
-    // Prevent starting if already started
-    if (isStartedRef.current) {
-      log('START: Already started, ignoring');
+    if (isActiveRef.current) {
+      log('Already active, ignoring');
       return;
     }
     
-    // MINIMAL preventDefault - only for mouse to prevent text selection
+    // Only preventDefault for mouse
     if ('button' in e && e.cancelable) {
       e.preventDefault();
     }
     
-    // Record starting position
+    // Record position
     if ('touches' in e && e.touches.length > 0) {
       startPosRef.current = {
         x: e.touches[0].clientX,
@@ -66,132 +67,85 @@ export function useLongPress({
       };
     }
     
-    isStartedRef.current = true;
-    isLongPressRef.current = false;
-    longPressJustFiredRef.current = false;
-    stopAlreadyCalledRef.current = false;
+    isActiveRef.current = true;
+    longPressTriggeredRef.current = false;
+    setIsLongPressing(true);
     
-    // Clear any existing timer
+    // Start timer
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
     }
     
     timerRef.current = window.setTimeout(() => {
-      log('TIMER FIRED');
-      if (isStartedRef.current) {
-        isLongPressRef.current = true;
-        longPressJustFiredRef.current = true;
-        setIsLongPressing(false);
-        
-        log('Calling onLongPress()');
-        onLongPress();
-        
-        // Haptic feedback
-        if ('vibrate' in navigator) {
-          navigator.vibrate(50);
-        }
-        
-        // Reset the flag after a delay
-        setTimeout(() => {
-          longPressJustFiredRef.current = false;
-          log('Guard flag cleared');
-        }, 200); // Increased to 200ms
+      log('LONG PRESS TRIGGERED');
+      longPressTriggeredRef.current = true;
+      setIsLongPressing(false);
+      onLongPress();
+      
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50);
       }
     }, ms);
-    
-    // Show visual feedback
-    setIsLongPressing(true);
   }, [onLongPress, ms, log]);
 
-  const stop = useCallback((isMouse: boolean = false) => {
-    log('STOP called', { 
-      isMouse,
-      isStarted: isStartedRef.current, 
-      wasLongPress: isLongPressRef.current,
-      justFired: longPressJustFiredRef.current,
-      alreadyCalled: stopAlreadyCalledRef.current
-    });
+  // ===== MOUSE HANDLERS =====
+  const stopMouse = useCallback(() => {
+    log('stopMouse', { active: isActiveRef.current, triggered: longPressTriggeredRef.current });
     
-    if (!isStartedRef.current) {
-      log('STOP: Not started, ignoring');
-      return;
-    }
+    if (!isActiveRef.current) return;
     
-    // Prevent double-stop
-    if (stopAlreadyCalledRef.current) {
-      log('STOP: Already called, ignoring');
-      return;
-    }
-    stopAlreadyCalledRef.current = true;
-    
-    // Clear the timer if it's still running
+    // Clear timer
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
       timerRef.current = 0;
     }
     
-    // Check if this was a long press BEFORE resetting
-    const wasLongPress = isLongPressRef.current;
-    const justFired = longPressJustFiredRef.current;
+    const wasLongPress = longPressTriggeredRef.current;
     
-    // Reset all state
-    isStartedRef.current = false;
-    isLongPressRef.current = false;
+    // Reset
+    isActiveRef.current = false;
+    longPressTriggeredRef.current = false;
     startPosRef.current = null;
     setIsLongPressing(false);
-
-    // CRITICAL FIX: Only fire onClick if:
-    // 1. It's a mouse event (clicks should toggle immediately), OR
-    // 2. It's a touch AND it wasn't a long press AND didn't just fire
-    // 
-    // For touch events after long press, we DON'T want onClick to fire
-    const shouldFireClick = isMouse 
-      ? !wasLongPress && !justFired  // Mouse: normal behavior
-      : false;                        // Touch: NEVER fire onClick on touchEnd
-                                      // (touch toggles happen on short taps that clear the timer)
     
-    if (shouldFireClick && !wasLongPress && !justFired) {
-      log('Calling onClick()');
+    // Click only if NOT long press
+    if (!wasLongPress) {
+      log('Mouse click');
       onClick();
-    } else {
-      log('NOT calling onClick', { shouldFireClick, wasLongPress, justFired });
     }
   }, [onClick, log]);
 
-  // Mouse-specific stop handler
-  const stopMouse = useCallback(() => {
-    stop(true);
-  }, [stop]);
-
-  // Touch-specific stop handler  
+  // ===== TOUCH HANDLERS =====
   const stopTouch = useCallback(() => {
-    // For touch: only call onClick if the timer is still running (short tap)
-    // If timer already fired (long press), just clean up
-    const timerStillRunning = timerRef.current !== 0;
+    log('stopTouch', { active: isActiveRef.current, triggered: longPressTriggeredRef.current });
     
-    log('stopTouch', { timerStillRunning, wasLongPress: isLongPressRef.current });
+    if (!isActiveRef.current) return;
     
-    if (timerStillRunning) {
-      // Short tap - cancel timer and fire onClick
-      if (timerRef.current) {
-        window.clearTimeout(timerRef.current);
-        timerRef.current = 0;
-      }
-      
-      isStartedRef.current = false;
-      isLongPressRef.current = false;
-      startPosRef.current = null;
-      setIsLongPressing(false);
-      stopAlreadyCalledRef.current = true;
-      
-      log('Short tap - calling onClick');
+    // Check if long press was triggered
+    const wasLongPress = longPressTriggeredRef.current;
+    
+    // Clear timer if still running
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = 0;
+    }
+    
+    // Reset
+    isActiveRef.current = false;
+    longPressTriggeredRef.current = false;
+    startPosRef.current = null;
+    setIsLongPressing(false);
+    
+    // CRITICAL: Only fire onClick if long press did NOT trigger
+    if (!wasLongPress) {
+      log('Touch tap - calling onClick');
       onClick();
     } else {
-      // Long press already fired - just clean up
-      stop(false);
+      log('Touch after long press - NOT calling onClick');
     }
-  }, [stop, onClick, log]);
+  }, [onClick, log]);
 
+  // ===== CANCEL =====
   const cancel = useCallback(() => {
     log('CANCEL');
     
@@ -200,16 +154,15 @@ export function useLongPress({
       timerRef.current = 0;
     }
     
-    isStartedRef.current = false;
-    isLongPressRef.current = false;
+    isActiveRef.current = false;
+    longPressTriggeredRef.current = false;
     startPosRef.current = null;
-    longPressJustFiredRef.current = false;
-    stopAlreadyCalledRef.current = false;
     setIsLongPressing(false);
   }, [log]);
 
+  // ===== TOUCH MOVE =====
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!startPosRef.current || !isStartedRef.current) return;
+    if (!startPosRef.current || !isActiveRef.current) return;
     
     const touch = e.touches[0];
     const moveThreshold = 50;
@@ -218,13 +171,14 @@ export function useLongPress({
     const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
     
     if (deltaX > moveThreshold || deltaY > moveThreshold) {
-      log('MOVE: Threshold exceeded, canceling');
+      log('Movement threshold exceeded');
       cancel();
     }
   }, [cancel, log]);
 
+  // ===== CONTEXT MENU =====
   const handleContextMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (isLongPressRef.current || isLongPressing) {
+    if (longPressTriggeredRef.current || isLongPressing) {
       e.preventDefault();
     }
   }, [isLongPressing]);
