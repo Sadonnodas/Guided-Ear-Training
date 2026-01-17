@@ -1,0 +1,49 @@
+.debug-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.95);
+  color: #0f0;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  z-index: 9999;
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 2px solid #0f0;
+}
+
+.debug-header {
+  background: #000;
+  padding: 5px 10px;
+  font-weight: bold;
+  border-bottom: 1px solid #0f0;
+  position: sticky;
+  top: 0;
+}
+
+.debug-logs {
+  padding: 5px;
+}
+
+.debug-log {
+  padding: 3px 5px;
+  margin: 2px 0;
+  border-left: 3px solid #0f0;
+  word-wrap: break-word;
+}
+
+.debug-log-click {
+  background: rgba(0, 100, 255, 0.3);
+  border-left-color: #06f;
+}
+
+.debug-log-longpress {
+  background: rgba(255, 215, 0, 0.3);
+  border-left-color: #ffd700;
+}
+
+.debug-log-event {
+  background: rgba(0, 255, 0, 0.2);
+  border-left-color: #0f0;
+}
