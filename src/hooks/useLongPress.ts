@@ -47,15 +47,30 @@ export function useLongPress({
   // ===== SHARED START =====
   const start = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const isTouch = 'touches' in e;
-    log('START', { isTouch });
+    log('START', { isTouch, lastWasTouch: lastInteractionWasTouchRef.current });
+    
+    // CRITICAL: Block ghost mouse events from iOS
+    // If last interaction was touch and this is mouse, ignore it
+    if (!isTouch && lastInteractionWasTouchRef.current) {
+      log('Ignoring ghost mouseDown after touch');
+      return;
+    }
     
     if (isActiveRef.current) {
       log('Already active, ignoring');
       return;
     }
     
-    // Track if this was a touch event
-    lastInteractionWasTouchRef.current = isTouch;
+    // Track if this was a touch event and set a timer to reset it
+    if (isTouch) {
+      lastInteractionWasTouchRef.current = true;
+      
+      // Reset the touch flag after 1 second (plenty of time for ghost events to pass)
+      setTimeout(() => {
+        lastInteractionWasTouchRef.current = false;
+        log('Touch flag reset after timeout');
+      }, 1000);
+    }
     
     // Only preventDefault for mouse
     if ('button' in e && e.cancelable) {
@@ -104,12 +119,11 @@ export function useLongPress({
       lastWasTouch: lastInteractionWasTouchRef.current 
     });
     
-    // CRITICAL iOS FIX: Ignore mouse events if last interaction was touch
-    // iOS fires mouse events 300ms after touch, causing double-triggering
+    // CRITICAL iOS FIX: Ignore ALL mouse events for 1 second after touch
+    // iOS fires mouseDown → mouseUp as ghost events ~300ms after touch
     if (lastInteractionWasTouchRef.current) {
       log('Ignoring mouse event - last interaction was touch');
-      lastInteractionWasTouchRef.current = false; // Reset for next interaction
-      return;
+      return; // DON'T reset the flag - keep blocking mouse events
     }
     
     if (!isActiveRef.current) return;
