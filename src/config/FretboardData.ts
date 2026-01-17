@@ -38,11 +38,23 @@ const PENTATONIC_SHAPES = {
 export function getFretboardConfig(key: MusicalKey, scale: ScaleType, shape: CagedShape) {
     const keyOffset = ROOT_FRET_OFFSETS[key];
     
+    // ORIGINAL FORMULAS RESTORED (these were correct!)
     let anchorFret = keyOffset;
     if (shape === "A" || shape === "C") anchorFret = (keyOffset - 5 + 12) % 12;
     if (shape === "D") anchorFret = (keyOffset - 10 + 12) % 12;
 
-    if (anchorFret < 2) anchorFret += 12;
+    // ONLY FIX: Ensure anchor is high enough for all pattern notes to be playable
+    // Different shapes have different minimum requirements based on their negative offsets
+    let minAnchor = 2; // Default for E, A, D shapes (offset -1)
+    
+    if (shape === "G" || shape === "C") {
+        minAnchor = 4; // G and C shapes have offset -3
+    }
+    
+    // Add octaves (12 frets) until we're above the minimum
+    while (anchorFret < minAnchor) {
+        anchorFret += 12;
+    }
 
     const startFret = anchorFret - 3; 
     const endFret = anchorFret + 4;
