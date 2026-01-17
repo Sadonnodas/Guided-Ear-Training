@@ -38,7 +38,10 @@ export function useLongPress({
   const [isLongPressing, setIsLongPressing] = useState(false);
 
   const log = useCallback((...args: any[]) => {
-    if (debug) console.log('[LongPress]', ...args);
+    if (debug) {
+      const timestamp = performance.now().toFixed(0);
+      console.log(`[LongPress ${timestamp}ms]`, ...args);
+    }
   }, [debug]);
 
   // ===== SHARED START =====

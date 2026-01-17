@@ -38,11 +38,13 @@ const NoteCell = ({
 }: NoteCellProps) => {
   const { isLongPressing, ...handlers } = useLongPress({
     onClick: () => {
-      console.log('🔵 onClick fired for', label);
+      const timestamp = performance.now().toFixed(0);
+      console.log(`🔵 onClick fired for ${label} at ${timestamp}ms`);
       onToggle(label);
     },
     onLongPress: () => {
-      console.log('🟡 onLongPress fired for', label);
+      const timestamp = performance.now().toFixed(0);
+      console.log(`🟡 onLongPress fired for ${label} at ${timestamp}ms`);
       onFocus(label);
     },
     ms: 600,
