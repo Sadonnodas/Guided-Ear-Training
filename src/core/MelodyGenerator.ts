@@ -122,6 +122,10 @@ export function generateFixedPattern(pattern: ScaleDegree[], key: MusicalKey, sc
 
 /**
  * Helper to create the NoteEvent object with correct MIDI pitch
+ * 
+ * ENHANCED: Now properly uses minMidi/maxMidi from constraints when provided
+ * This allows fretboard mode to work with its specific range while still
+ * getting hybrid vocal/synth playback from the AudioEngine
  */
 function createEvent(
   degree: ScaleDegree, 
@@ -132,9 +136,11 @@ function createEvent(
   prevMidi: number | null,
   difficulty: MelodyDifficulty = "normal", 
   hasLeaped: boolean = false,
-  constraints?: MelodyConstraints // Add this parameter
+  constraints?: MelodyConstraints
 ): NoteEvent {
   // Pass the range limits into getNoteForDegree
+  // For fretboard mode, these will be the fretboard-specific range
+  // For other modes, these will be undefined and fall back to default vocal range
   const info = getNoteForDegree(
     key, 
     degree, 
@@ -142,8 +148,8 @@ function createEvent(
     prevMidi, 
     difficulty, 
     hasLeaped,
-    constraints?.minMidi, // Pass from constraints
-    constraints?.maxMidi  // Pass from constraints
+    constraints?.minMidi,
+    constraints?.maxMidi
   );
   
   return {

@@ -7,6 +7,8 @@
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "orientation": "portrait",
+  "version": "2.0.0",
+  "description": "Interactive ear training app with guided lessons and fretboard visualization",
   "icons": [
     {
       "src": "icon.png", 

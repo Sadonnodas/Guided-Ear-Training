@@ -34,53 +34,77 @@
   margin-bottom: 10px;
 }
 
+/* FIXED: Single-row layout that prevents wrapping */
 .key-container {
   display: flex;
-  flex-wrap: wrap; /* Allows icons to drop to a second row if needed */
-  justify-content: center; /* Keeps it centered on mobile */
+  flex-wrap: nowrap; /* CRITICAL: Never wrap to second row */
+  justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 6px; /* Reduced from 8px for tighter mobile spacing */
   background: #21262d;
-  padding: 8px 15px;
+  padding: 6px 10px; /* Reduced padding for mobile */
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.1);
-  max-width: 95%; /* Prevents edges from touching screen sides */
+  max-width: 95%;
   margin: 0 auto;
-
+  overflow: hidden; /* Prevent content from breaking out */
 }
 
-/* SHARED SELECT STYLES */
+/* SHARED SELECT STYLES - Made more compact */
 .key-select, .level-select {
-  font-size: 0.9rem;
+  font-size: 0.85rem; /* Slightly smaller on mobile */
   font-weight: 700;
   border: none;
   background: transparent;
   color: var(--text-main);
   cursor: pointer;
   text-align: center;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0; /* Prevent shrinking */
 }
+
 .key-select:focus, .level-select:focus { outline: none; }
 .key-select option, .level-select option { background: var(--bg-panel); }
 
-/* NEW: EXPANDING LEVEL SELECTOR */
+/* FIXED: More aggressive condensing for level selector */
 .level-select {
-  /* Default State (Condensed) */
-  max-width: 80px; 
-  white-space: nowrap;
+  /* Default State (Very Condensed) */
+  max-width: 70px; /* Even smaller default */
   overflow: hidden;
   text-overflow: ellipsis;
   
   /* Smooth expansion */
   transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-align: left; /* Align left to make "Level 1..." readable */
+  text-align: left;
 }
 
-/* Expanded State (Focus/Active) */
+/* Expanded State (Focus/Active) - Only expands when user interacts */
 .level-select:focus,
-.level-select:hover {
-  max-width: 220px; /* Wide enough for "Level 5: 1-2-3-4-5-6" */
+.level-select:active {
+  max-width: 200px; /* Slightly smaller max */
+}
+
+/* On desktop, allow more space */
+@media (min-width: 600px) {
+  .level-select {
+    max-width: 100px;
+  }
+  
+  .level-select:focus,
+  .level-select:active {
+    max-width: 220px;
+  }
+  
+  .key-select, .level-select {
+    font-size: 0.9rem; /* Normal size on desktop */
+  }
+  
+  .key-container {
+    gap: 8px;
+    padding: 8px 15px;
+  }
 }
 
 .icon-btn {
@@ -93,6 +117,7 @@
   align-items: center;
   border-radius: 4px;
   transition: all 0.2s;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 .icon-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
 
@@ -102,7 +127,18 @@
 }
 
 .separator {
-    width: 1px; height: 20px; background: rgba(255,255,255,0.2); margin: 0 5px;
+  width: 1px; 
+  height: 18px; /* Slightly shorter for mobile */
+  background: rgba(255,255,255,0.2); 
+  margin: 0 3px; /* Tighter margins */
+  flex-shrink: 0;
+}
+
+@media (min-width: 600px) {
+  .separator {
+    height: 20px;
+    margin: 0 5px;
+  }
 }
 
 /* ... View Toggle Styles ... */
@@ -114,29 +150,65 @@
   padding: 2px;
   gap: 2px;
   cursor: pointer;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 .toggle-option {
   position: relative;
   z-index: 2; 
-  width: 28px;
-  height: 24px;
+  width: 26px; /* Slightly smaller on mobile */
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
   transition: color 0.2s;
 }
+
+@media (min-width: 600px) {
+  .toggle-option {
+    width: 28px;
+    height: 24px;
+  }
+}
+
 .toggle-option.active { color: #fff; }
 .toggle-pill {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  width: 28px; 
+  width: 26px; /* Match toggle-option mobile width */
   background: var(--text-muted);
   border-radius: 10px;
   opacity: 0.3;
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   z-index: 1;
 }
+
+@media (min-width: 600px) {
+  .toggle-pill {
+    width: 28px;
+  }
+}
+
 .toggle-pill.tape { transform: translateX(0); }
-.toggle-pill.static { transform: translateX(30px); }
+.toggle-pill.static { transform: translateX(28px); } /* Adjust for mobile */
+
+@media (min-width: 600px) {
+  .toggle-pill.static { transform: translateX(30px); }
+}
+
+/* MOBILE OPTIMIZATION: Hide less critical elements on very small screens */
+@media (max-width: 380px) {
+  .separator {
+    display: none; /* Remove separators on tiny screens */
+  }
+  
+  .key-container {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+  
+  .icon-btn {
+    padding: 2px;
+  }
+}

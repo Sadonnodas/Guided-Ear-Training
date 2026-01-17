@@ -103,24 +103,34 @@ export class AudioEngine {
   }
 
   /**
-   * Play a melody note
-   * Note: The melody generator should already constrain notes to be within vocal range
+   * ENHANCED: Play a melody note with hybrid vocal/synth system
+   * - Uses vocal samples when available (within MIN_VOCAL_MIDI to MAX_VOCAL_MIDI)
+   * - Automatically falls back to synth for notes outside this range
+   * - This allows fretboard mode to use the full guitar range
    */
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
-    if (useSynth) {
+    const midi = note.noteInfo.midi;
+    const degree = note.noteInfo.degree;
+    
+    // HYBRID LOGIC: Check if we should use synth or vocal
+    const isOutsideVocalRange = midi < MIN_VOCAL_MIDI || midi > MAX_VOCAL_MIDI;
+    const shouldUseSynth = useSynth || isOutsideVocalRange;
+    
+    if (shouldUseSynth) {
+      // Use synth for notes outside vocal range OR when explicitly requested
       const shortDuration = note.duration * 0.8; 
       this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
     } else {
-      const degree = note.noteInfo.degree;
-      const midi = note.noteInfo.midi;
+      // Try to use vocal sample
       const id = `${degree}_${midi}`;
-      
       const buffer = this.noteBuffers.get(id);
+      
       if (buffer) {
+        // Vocal sample available - use it
         const source = new Tone.ToneBufferSource(buffer).connect(this.vocalGain);
         source.start(Math.max(0, time), 0, buffer.duration);
       } else {
-        // Sample not found - this shouldn't happen if melody generation is constrained properly
+        // Sample missing - fall back to synth
         console.warn(`Sample not found for ${id}, falling back to synth`);
         const shortDuration = note.duration * 0.8;
         this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
@@ -268,10 +278,18 @@ export class AudioEngine {
   }
   
   /**
-   * Preload vocal samples for the given notes
+   * ENHANCED: Preload vocal samples for notes within vocal range
+   * Notes outside the range will automatically use synth, so we don't try to load them
    */
   public async preloadNotes(notes: NoteEvent[]) {
-    const uniqueIds = Array.from(new Set(notes.map(n => `${n.noteInfo.degree}_${n.noteInfo.midi}`)));
+    // Filter to only notes within vocal range
+    const notesInVocalRange = notes.filter(
+      n => n.noteInfo.midi >= MIN_VOCAL_MIDI && n.noteInfo.midi <= MAX_VOCAL_MIDI
+    );
+    
+    const uniqueIds = Array.from(
+      new Set(notesInVocalRange.map(n => `${n.noteInfo.degree}_${n.noteInfo.midi}`))
+    );
     
     const promises = uniqueIds.map(async (id) => {
       if (this.noteBuffers.has(id)) return;
@@ -283,7 +301,10 @@ export class AudioEngine {
         const buffer = new Tone.ToneAudioBuffer();
         await buffer.load(url);
         this.noteBuffers.set(id, buffer); 
-      } catch (e) { console.warn("Sample load failed:", url); }
+      } catch (e) { 
+        // Don't warn - this is expected for notes outside vocal range
+        // They'll automatically use synth
+      }
     });
     await Promise.all(promises);
   }

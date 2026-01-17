@@ -3,8 +3,10 @@ import * as Tone from "tone";
 /**
  * KeepAlive.ts - Background Audio & Media Controls
  * 
+ * ENHANCED VERSION - Fixed iOS Screen Lock Audio Persistence
+ * 
  * Keeps the audio context alive when:
- * - Screen is off (Pocket Mode)
+ * - Screen is off (Pocket Mode) ✓ FIXED
  * - iOS Silent Mode switch is on
  * - App is in background
  * 
@@ -16,6 +18,7 @@ let mediaSource: MediaElementAudioSourceNode | null = null;
 let bridgeGain: GainNode | null = null;
 let isInitialized = false;
 let isBridgeConnected = false;
+let keepAliveInterval: number | null = null; // NEW: Periodic wake-up timer
 
 type PlaybackHandlers = {
   onPlay: () => void;
@@ -40,7 +43,6 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
   audioEl.id = "keep-alive-audio";
   
   // Use a longer silent audio for better iOS compatibility
-  // Create a proper silent audio blob
   const silentAudioData = createSilentAudioBlob();
   audioEl.src = URL.createObjectURL(silentAudioData);
   
@@ -59,6 +61,15 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
   // Hide from view
   audioEl.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
   document.body.appendChild(audioEl);
+
+  // NEW: Prevent iOS from auto-pausing by monitoring playback state
+  audioEl.addEventListener('pause', () => {
+    // If we didn't intentionally pause, restart immediately
+    if (keepAliveInterval !== null && audioEl) {
+      console.log('[KeepAlive] Auto-restart detected');
+      audioEl.play().catch(() => {});
+    }
+  });
 
   // Setup MediaSession for lock screen controls
   setupMediaSession();
@@ -169,7 +180,7 @@ export function updateMediaSessionState(isPlaying: boolean) {
 }
 
 /**
- * Start the background audio bridge.
+ * ENHANCED: Start the background audio bridge with aggressive persistence.
  * MUST be called from a user gesture (click/tap) for iOS compatibility.
  */
 export async function startKeepAlive(): Promise<void> {
@@ -211,9 +222,37 @@ export async function startKeepAlive(): Promise<void> {
   if (audioEl.paused) {
     try {
       await audioEl.play();
+      console.log('[KeepAlive] Silent audio started');
     } catch (e) {
       console.warn("KeepAlive: Failed to play silent audio", e);
     }
+  }
+  
+  // NEW: Set up watchdog timer to prevent iOS from killing audio
+  // This periodically "pokes" the audio context to keep it alive
+  if (keepAliveInterval === null) {
+    keepAliveInterval = window.setInterval(() => {
+      // 1. Ensure audio element is still playing
+      if (audioEl && audioEl.paused) {
+        audioEl.play().catch(() => {});
+      }
+      
+      // 2. Ensure audio context is still running
+      const ctx = Tone.context.rawContext as AudioContext;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      
+      // 3. Tiny oscillation to prevent iOS from thinking audio is "idle"
+      // This is inaudible but keeps the system active
+      if (bridgeGain) {
+        const currentGain = bridgeGain.gain.value;
+        bridgeGain.gain.setValueAtTime(currentGain * 0.999, ctx.currentTime);
+        bridgeGain.gain.setValueAtTime(currentGain, ctx.currentTime + 0.01);
+      }
+    }, 2000); // Check every 2 seconds
+    
+    console.log('[KeepAlive] Watchdog timer started');
   }
   
   updateMediaSessionState(true);
@@ -223,6 +262,13 @@ export async function startKeepAlive(): Promise<void> {
  * Stop the background audio (allows system to sleep)
  */
 export function stopKeepAlive() {
+  // Clear watchdog timer
+  if (keepAliveInterval !== null) {
+    window.clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+    console.log('[KeepAlive] Watchdog timer stopped');
+  }
+
   if (audioEl && !audioEl.paused) {
     audioEl.pause();
   }

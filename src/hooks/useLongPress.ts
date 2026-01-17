@@ -14,12 +14,13 @@ interface LongPressResult {
   onTouchEnd: (e: React.TouchEvent) => void;
   onTouchMove: (e: React.TouchEvent) => void;
   onTouchCancel: (e: React.TouchEvent) => void;
+  onContextMenu: (e: React.MouseEvent | React.TouchEvent) => void;
   isLongPressing: boolean;
 }
 
 /**
- * Custom hook for handling both click and long-press interactions.
- * Optimized for mobile with proper touch handling.
+ * ENHANCED: Custom hook for handling both click and long-press interactions.
+ * Optimized for mobile with improved touch handling to prevent accidental cancellations.
  * 
  * @param onLongPress - Callback fired on long press (default 350ms)
  * @param onClick - Callback fired on short click/tap
@@ -86,8 +87,10 @@ export function useLongPress({
   const stop = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     if (!isStartedRef.current) return;
     
-    // Prevent ghost clicks on mobile
-    if (e && e.cancelable) {
+    // CRITICAL FIX: Don't prevent default on touch end
+    // This was causing issues with natural finger lifting
+    // Only preventDefault on mouse events
+    if (e && 'button' in e && e.cancelable) {
       e.preventDefault();
     }
 
@@ -117,20 +120,29 @@ export function useLongPress({
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // If the user moves their finger significantly, cancel the long press
-    // This prevents accidental long presses while scrolling
+    // ENHANCED FIX: More forgiving movement threshold
+    // Natural finger lifting causes slight movement - this is now more tolerant
     if (!startPosRef.current || !isStartedRef.current) return;
     
     const touch = e.touches[0];
-    const moveThreshold = 10; // pixels
+    const moveThreshold = 25; // INCREASED from 10px to 25px - more forgiving
     
     const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
     
+    // Only cancel if there's significant intentional movement (like scrolling)
     if (deltaX > moveThreshold || deltaY > moveThreshold) {
       cancel();
     }
   }, [cancel]);
+
+  // ENHANCED: Handle contextmenu to prevent it from interfering
+  const handleContextMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    // Prevent context menu from showing during long press
+    if (isLongPressRef.current || isLongPressing) {
+      e.preventDefault();
+    }
+  }, [isLongPressing]);
 
   return {
     onMouseDown: start,
@@ -140,6 +152,7 @@ export function useLongPress({
     onTouchEnd: stop,
     onTouchMove: handleTouchMove,
     onTouchCancel: cancel,
+    onContextMenu: handleContextMenu,
     isLongPressing
   };
 }

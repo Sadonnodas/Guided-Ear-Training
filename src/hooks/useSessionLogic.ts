@@ -1,6 +1,6 @@
 import * as Tone from "tone";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { audioEngine, MIN_VOCAL_MIDI, MAX_VOCAL_MIDI } from "../audio/AudioEngine";
+import { audioEngine } from "../audio/AudioEngine";
 import { initKeepAlive, updateMediaSessionState, startKeepAlive } from "../audio/KeepAlive";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
 import { useAudioSetup } from "./useAudioSetup";
@@ -410,7 +410,9 @@ export function useSessionLogic() {
     }
 
     // B. Calculate fretboard range if needed
-    // For fretboard mode, we need to find the intersection of fretboard notes and vocal sample range
+    // ENHANCED: For fretboard mode, use the FULL fretboard range
+    // The AudioEngine now has hybrid vocal/synth playback, so notes outside
+    // the vocal sample range will automatically use synth (sounds great!)
     let fretboardRange: { min: number; max: number } | undefined;
     if (activeTabRef.current === 'fretboard') {
       const fretConfig = getFretboardConfig(currentCycleKey, scaleTypeRef.current, settings.refs.selectedShape.current);
@@ -418,20 +420,10 @@ export function useSessionLogic() {
       const fretMin = Math.min(...midis);
       const fretMax = Math.max(...midis);
       
-      // Find the intersection of fretboard range and vocal sample range
-      // This ensures all generated notes have vocal samples available
-      const effectiveMin = Math.max(fretMin, MIN_VOCAL_MIDI);
-      const effectiveMax = Math.min(fretMax, MAX_VOCAL_MIDI);
-      
-      // Only use range if there's a valid intersection
-      if (effectiveMin <= effectiveMax) {
-        fretboardRange = { min: effectiveMin, max: effectiveMax };
-      } else {
-        // No overlap - fall back to vocal range entirely
-        // The melody will still be musically correct, just not visually matching the fretboard position
-        fretboardRange = { min: MIN_VOCAL_MIDI, max: MAX_VOCAL_MIDI };
-        console.warn('Fretboard range has no overlap with vocal samples, using vocal range');
-      }
+      // Use the FULL fretboard range - no restrictions!
+      // Notes within G2-G4 will use vocal samples
+      // Notes outside this range will use synth (handled by AudioEngine)
+      fretboardRange = { min: fretMin, max: fretMax };
     }
 
     // C. Determine Constraints & Generate Melody
