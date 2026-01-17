@@ -43,17 +43,32 @@ export function getFretboardConfig(key: MusicalKey, scale: ScaleType, shape: Cag
     if (shape === "A" || shape === "C") anchorFret = (keyOffset - 5 + 12) % 12;
     if (shape === "D") anchorFret = (keyOffset - 10 + 12) % 12;
 
-    // ONLY FIX: Ensure anchor is high enough for all pattern notes to be playable
-    // Different shapes have different minimum requirements based on their negative offsets
-    let minAnchor = 2; // Default for E, A, D shapes (offset -1)
+    // Calculate the actual minimum anchor by checking the pattern
+    const isMinor = scale === 'PentatonicMinor' || scale === 'Minor';
+    const patternGroup = isMinor ? PENTATONIC_SHAPES.minor : PENTATONIC_SHAPES.major;
+    const activePattern = patternGroup[shape as keyof typeof patternGroup];
     
-    if (shape === "G" || shape === "C") {
-        minAnchor = 4; // G and C shapes have offset -3
+    // Find the most negative offset in this specific pattern
+    let mostNegativeOffset = 0;
+    if (activePattern) {
+        activePattern.forEach(n => {
+            if (n.f < mostNegativeOffset) mostNegativeOffset = n.f;
+        });
     }
+    
+    // Minimum anchor = abs(most negative offset)
+    // This ensures all notes will be at fret 0 or above
+    const minAnchor = Math.abs(mostNegativeOffset);
     
     // Add octaves (12 frets) until we're above the minimum
     while (anchorFret < minAnchor) {
         anchorFret += 12;
+    }
+
+    // Prefer lower octave if it's still playable
+    // Keep dropping octaves as long as the lower position is still valid
+    while (anchorFret - 12 >= minAnchor) {
+        anchorFret = anchorFret - 12;
     }
 
     const startFret = anchorFret - 3; 
@@ -61,10 +76,7 @@ export function getFretboardConfig(key: MusicalKey, scale: ScaleType, shape: Cag
 
     const notes: { string: number; fret: number; degree: ScaleDegree; midi: number }[] = [];
     
-    const isMinor = scale === 'PentatonicMinor' || scale === 'Minor';
-    const patternGroup = isMinor ? PENTATONIC_SHAPES.minor : PENTATONIC_SHAPES.major;
-    const activePattern = patternGroup[shape as keyof typeof patternGroup];
-
+    // Reuse the pattern we already looked up above
     if (activePattern) {
         activePattern.forEach((n) => {
             const absoluteFret = anchorFret + n.f;
