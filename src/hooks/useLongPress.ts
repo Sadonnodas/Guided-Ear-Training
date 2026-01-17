@@ -4,6 +4,7 @@ interface LongPressOptions {
   onLongPress: () => void;
   onClick: () => void;
   ms?: number;
+  debug?: boolean; // Add debug flag
 }
 
 interface LongPressResult {
@@ -18,31 +19,35 @@ interface LongPressResult {
   isLongPressing: boolean;
 }
 
-/**
- * ULTRA-ROBUST v3: Mobile-first long press with maximum forgiveness
- * 
- * Key improvements:
- * - 600ms duration (very deliberate)
- * - 50px movement threshold (extremely forgiving)
- * - Minimal preventDefault (only what's absolutely necessary)
- * - Works on disabled elements
- */
 export function useLongPress({ 
   onLongPress, 
   onClick, 
-  ms = 600 // VERY deliberate - hard to trigger accidentally
+  ms = 600,
+  debug = false
 }: LongPressOptions): LongPressResult {
   
   const timerRef = useRef<number>(0);
   const isLongPressRef = useRef(false);
   const isStartedRef = useRef(false);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
-  const longPressJustFiredRef = useRef(false); // NEW: Prevent click after long press
+  const longPressJustFiredRef = useRef(false);
+  const stopAlreadyCalledRef = useRef(false); // NEW: Prevent double-stop
   
-  // Track long-press state for visual feedback
   const [isLongPressing, setIsLongPressing] = useState(false);
 
+  const log = useCallback((...args: any[]) => {
+    if (debug) console.log('[LongPress]', ...args);
+  }, [debug]);
+
   const start = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    log('START', { isStarted: isStartedRef.current });
+    
+    // Prevent starting if already started
+    if (isStartedRef.current) {
+      log('START: Already started, ignoring');
+      return;
+    }
+    
     // MINIMAL preventDefault - only for mouse to prevent text selection
     if ('button' in e && e.cancelable) {
       e.preventDefault();
@@ -63,6 +68,8 @@ export function useLongPress({
     
     isStartedRef.current = true;
     isLongPressRef.current = false;
+    longPressJustFiredRef.current = false;
+    stopAlreadyCalledRef.current = false;
     
     // Clear any existing timer
     if (timerRef.current) {
@@ -70,10 +77,13 @@ export function useLongPress({
     }
     
     timerRef.current = window.setTimeout(() => {
+      log('TIMER FIRED');
       if (isStartedRef.current) {
         isLongPressRef.current = true;
-        longPressJustFiredRef.current = true; // NEW: Mark that long press fired
+        longPressJustFiredRef.current = true;
         setIsLongPressing(false);
+        
+        log('Calling onLongPress()');
         onLongPress();
         
         // Haptic feedback
@@ -81,21 +91,37 @@ export function useLongPress({
           navigator.vibrate(50);
         }
         
-        // Reset the flag after a short delay to prevent onClick
+        // Reset the flag after a delay
         setTimeout(() => {
           longPressJustFiredRef.current = false;
-        }, 100);
+          log('Guard flag cleared');
+        }, 200); // Increased to 200ms
       }
     }, ms);
     
     // Show visual feedback
     setIsLongPressing(true);
-  }, [onLongPress, ms]);
+  }, [onLongPress, ms, log]);
 
   const stop = useCallback(() => {
-    if (!isStartedRef.current) return;
+    log('STOP called', { 
+      isStarted: isStartedRef.current, 
+      wasLongPress: isLongPressRef.current,
+      justFired: longPressJustFiredRef.current,
+      alreadyCalled: stopAlreadyCalledRef.current
+    });
     
-    // DON'T preventDefault on touch events - let natural behavior happen
+    if (!isStartedRef.current) {
+      log('STOP: Not started, ignoring');
+      return;
+    }
+    
+    // Prevent double-stop
+    if (stopAlreadyCalledRef.current) {
+      log('STOP: Already called, ignoring');
+      return;
+    }
+    stopAlreadyCalledRef.current = true;
     
     // Clear the timer if it's still running
     if (timerRef.current) {
@@ -103,7 +129,7 @@ export function useLongPress({
       timerRef.current = 0;
     }
     
-    // CRITICAL: Check if this was a long press BEFORE resetting the flag
+    // Check if this was a long press BEFORE resetting
     const wasLongPress = isLongPressRef.current;
     const justFired = longPressJustFiredRef.current;
     
@@ -113,40 +139,46 @@ export function useLongPress({
     startPosRef.current = null;
     setIsLongPressing(false);
 
-    // Fire click only if:
-    // 1. It wasn't a long press, AND
-    // 2. A long press didn't just fire (prevents race condition)
+    // Fire click only if it wasn't a long press AND didn't just fire
     if (!wasLongPress && !justFired) {
+      log('Calling onClick()');
       onClick();
+    } else {
+      log('NOT calling onClick (wasLongPress:', wasLongPress, ', justFired:', justFired, ')');
     }
-  }, [onClick]);
+  }, [onClick, log]);
 
   const cancel = useCallback(() => {
-    window.clearTimeout(timerRef.current);
-    timerRef.current = 0;
+    log('CANCEL');
+    
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = 0;
+    }
+    
     isStartedRef.current = false;
     isLongPressRef.current = false;
     startPosRef.current = null;
+    longPressJustFiredRef.current = false;
+    stopAlreadyCalledRef.current = false;
     setIsLongPressing(false);
-  }, []);
+  }, [log]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // EXTREMELY forgiving - 50px threshold
     if (!startPosRef.current || !isStartedRef.current) return;
     
     const touch = e.touches[0];
-    const moveThreshold = 50; // VERY forgiving!
+    const moveThreshold = 50;
     
     const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
     
-    // Only cancel on major movement (scrolling)
     if (deltaX > moveThreshold || deltaY > moveThreshold) {
+      log('MOVE: Threshold exceeded, canceling');
       cancel();
     }
-  }, [cancel]);
+  }, [cancel, log]);
 
-  // Handle context menu
   const handleContextMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (isLongPressRef.current || isLongPressing) {
       e.preventDefault();

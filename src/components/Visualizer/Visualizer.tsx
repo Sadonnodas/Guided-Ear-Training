@@ -39,7 +39,7 @@ const NoteCell = ({
   const { isLongPressing, ...handlers } = useLongPress({
     onClick: () => onToggle(label),
     onLongPress: () => onFocus(label),
-    ms: 350
+    ms: 600 // FIXED: Use correct duration
   });
 
   let classes = `tape-cell d-${label} ${extraClass}`;
@@ -50,7 +50,7 @@ const NoteCell = ({
 
   return (
     <div className={classes} {...handlers}>
-      <span>{label}</span>
+      <span style={{ pointerEvents: 'none' }}>{label}</span>
     </div>
   );
 };
