@@ -91,42 +91,48 @@
   border-color: rgba(255, 215, 0, 0.5);
 }
 
-/* Add a ring animation to show progress */
+/* Ring on tape-cell using transform for perfect centering */
 .tape-cell.pressing::after {
   content: '';
   position: absolute;
+  /* Position at center */
   top: 50%;
   left: 50%;
+  /* Size to match the visual circle */
   width: 56px;
   height: 56px;
-  margin-top: -28px;
-  margin-left: -28px;
+  /* Perfect centering with transform */
+  transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-top-color: #ffd700;
-  animation: long-press-ring 0.35s linear forwards;
+  animation: long-press-ring 0.5s linear forwards;
   pointer-events: none;
+  z-index: 10;
 }
 
 @keyframes long-press-ring {
   0% { 
-    transform: rotate(0deg);
+    transform: translate(-50%, -50%) rotate(0deg);
     border-top-color: #ffd700;
     border-right-color: transparent;
     border-bottom-color: transparent;
     border-left-color: transparent;
   }
   25% { 
+    transform: translate(-50%, -50%) rotate(90deg);
     border-right-color: #ffd700;
   }
   50% { 
+    transform: translate(-50%, -50%) rotate(180deg);
     border-bottom-color: #ffd700;
   }
   75% { 
+    transform: translate(-50%, -50%) rotate(270deg);
     border-left-color: #ffd700;
   }
   100% { 
-    transform: rotate(360deg);
+    transform: translate(-50%, -50%) rotate(360deg);
     border-color: #ffd700;
   }
 }
@@ -197,11 +203,10 @@
     width: 40px; 
     height: 40px; 
   }
+  /* Scale ring down for mobile */
   .tape-cell.pressing::after {
     width: 48px;
     height: 48px;
-    margin-top: -24px;
-    margin-left: -24px;
   }
 }
 

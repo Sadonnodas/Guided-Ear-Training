@@ -29,7 +29,7 @@ interface LongPressResult {
 export function useLongPress({ 
   onLongPress, 
   onClick, 
-  ms = 350 
+  ms = 500 // INCREASED: More deliberate long press, less accidental triggers
 }: LongPressOptions): LongPressResult {
   
   const timerRef = useRef<number>(0);
@@ -120,12 +120,12 @@ export function useLongPress({
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // ENHANCED FIX: More forgiving movement threshold
-    // Natural finger lifting causes slight movement - this is now more tolerant
+    // ENHANCED FIX: Even more forgiving movement threshold
+    // Natural finger lifting causes slight movement - this is very tolerant
     if (!startPosRef.current || !isStartedRef.current) return;
     
     const touch = e.touches[0];
-    const moveThreshold = 25; // INCREASED from 10px to 25px - more forgiving
+    const moveThreshold = 40; // INCREASED from 25px to 40px - very forgiving!
     
     const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
