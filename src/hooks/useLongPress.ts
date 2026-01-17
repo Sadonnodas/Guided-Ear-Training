@@ -31,8 +31,9 @@ export function useLongPress({
   
   const timerRef = useRef<number>(0);
   const isActiveRef = useRef(false);
-  const longPressTriggeredRef = useRef(false); // Did the long press callback fire?
+  const longPressTriggeredRef = useRef(false);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
+  const lastInteractionWasTouchRef = useRef(false); // NEW: Track if last interaction was touch
   
   const [isLongPressing, setIsLongPressing] = useState(false);
 
@@ -42,12 +43,16 @@ export function useLongPress({
 
   // ===== SHARED START =====
   const start = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    log('START');
+    const isTouch = 'touches' in e;
+    log('START', { isTouch });
     
     if (isActiveRef.current) {
       log('Already active, ignoring');
       return;
     }
+    
+    // Track if this was a touch event
+    lastInteractionWasTouchRef.current = isTouch;
     
     // Only preventDefault for mouse
     if ('button' in e && e.cancelable) {
@@ -90,7 +95,19 @@ export function useLongPress({
 
   // ===== MOUSE HANDLERS =====
   const stopMouse = useCallback(() => {
-    log('stopMouse', { active: isActiveRef.current, triggered: longPressTriggeredRef.current });
+    log('stopMouse', { 
+      active: isActiveRef.current, 
+      triggered: longPressTriggeredRef.current,
+      lastWasTouch: lastInteractionWasTouchRef.current 
+    });
+    
+    // CRITICAL iOS FIX: Ignore mouse events if last interaction was touch
+    // iOS fires mouse events 300ms after touch, causing double-triggering
+    if (lastInteractionWasTouchRef.current) {
+      log('Ignoring mouse event - last interaction was touch');
+      lastInteractionWasTouchRef.current = false; // Reset for next interaction
+      return;
+    }
     
     if (!isActiveRef.current) return;
     
