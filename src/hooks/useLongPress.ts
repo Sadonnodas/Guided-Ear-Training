@@ -103,8 +103,9 @@ export function useLongPress({
     setIsLongPressing(true);
   }, [onLongPress, ms, log]);
 
-  const stop = useCallback(() => {
+  const stop = useCallback((isMouse: boolean = false) => {
     log('STOP called', { 
+      isMouse,
       isStarted: isStartedRef.current, 
       wasLongPress: isLongPressRef.current,
       justFired: longPressJustFiredRef.current,
@@ -139,14 +140,57 @@ export function useLongPress({
     startPosRef.current = null;
     setIsLongPressing(false);
 
-    // Fire click only if it wasn't a long press AND didn't just fire
-    if (!wasLongPress && !justFired) {
+    // CRITICAL FIX: Only fire onClick if:
+    // 1. It's a mouse event (clicks should toggle immediately), OR
+    // 2. It's a touch AND it wasn't a long press AND didn't just fire
+    // 
+    // For touch events after long press, we DON'T want onClick to fire
+    const shouldFireClick = isMouse 
+      ? !wasLongPress && !justFired  // Mouse: normal behavior
+      : false;                        // Touch: NEVER fire onClick on touchEnd
+                                      // (touch toggles happen on short taps that clear the timer)
+    
+    if (shouldFireClick && !wasLongPress && !justFired) {
       log('Calling onClick()');
       onClick();
     } else {
-      log('NOT calling onClick (wasLongPress:', wasLongPress, ', justFired:', justFired, ')');
+      log('NOT calling onClick', { shouldFireClick, wasLongPress, justFired });
     }
   }, [onClick, log]);
+
+  // Mouse-specific stop handler
+  const stopMouse = useCallback(() => {
+    stop(true);
+  }, [stop]);
+
+  // Touch-specific stop handler  
+  const stopTouch = useCallback(() => {
+    // For touch: only call onClick if the timer is still running (short tap)
+    // If timer already fired (long press), just clean up
+    const timerStillRunning = timerRef.current !== 0;
+    
+    log('stopTouch', { timerStillRunning, wasLongPress: isLongPressRef.current });
+    
+    if (timerStillRunning) {
+      // Short tap - cancel timer and fire onClick
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = 0;
+      }
+      
+      isStartedRef.current = false;
+      isLongPressRef.current = false;
+      startPosRef.current = null;
+      setIsLongPressing(false);
+      stopAlreadyCalledRef.current = true;
+      
+      log('Short tap - calling onClick');
+      onClick();
+    } else {
+      // Long press already fired - just clean up
+      stop(false);
+    }
+  }, [stop, onClick, log]);
 
   const cancel = useCallback(() => {
     log('CANCEL');
@@ -187,10 +231,10 @@ export function useLongPress({
 
   return {
     onMouseDown: start,
-    onMouseUp: stop,
+    onMouseUp: stopMouse,
     onMouseLeave: cancel,
     onTouchStart: start,
-    onTouchEnd: stop,
+    onTouchEnd: stopTouch,
     onTouchMove: handleTouchMove,
     onTouchCancel: cancel,
     onContextMenu: handleContextMenu,
