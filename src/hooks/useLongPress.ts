@@ -19,34 +19,36 @@ interface LongPressResult {
 }
 
 /**
- * ENHANCED: Custom hook for handling both click and long-press interactions.
- * Optimized for mobile with improved touch handling to prevent accidental cancellations.
+ * ULTRA-ROBUST v3: Mobile-first long press with maximum forgiveness
  * 
- * @param onLongPress - Callback fired on long press (default 350ms)
- * @param onClick - Callback fired on short click/tap
- * @param ms - Long press duration in milliseconds (default 350)
+ * Key improvements:
+ * - 600ms duration (very deliberate)
+ * - 50px movement threshold (extremely forgiving)
+ * - Minimal preventDefault (only what's absolutely necessary)
+ * - Works on disabled elements
  */
 export function useLongPress({ 
   onLongPress, 
   onClick, 
-  ms = 500 // INCREASED: More deliberate long press, less accidental triggers
+  ms = 600 // VERY deliberate - hard to trigger accidentally
 }: LongPressOptions): LongPressResult {
   
   const timerRef = useRef<number>(0);
   const isLongPressRef = useRef(false);
   const isStartedRef = useRef(false);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressJustFiredRef = useRef(false); // NEW: Prevent click after long press
   
   // Track long-press state for visual feedback
   const [isLongPressing, setIsLongPressing] = useState(false);
 
   const start = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    // Prevent default to avoid text selection and context menus
-    if (e.cancelable) {
+    // MINIMAL preventDefault - only for mouse to prevent text selection
+    if ('button' in e && e.cancelable) {
       e.preventDefault();
     }
     
-    // Record starting position for touch move detection
+    // Record starting position
     if ('touches' in e && e.touches.length > 0) {
       startPosRef.current = {
         x: e.touches[0].clientX,
@@ -70,42 +72,51 @@ export function useLongPress({
     timerRef.current = window.setTimeout(() => {
       if (isStartedRef.current) {
         isLongPressRef.current = true;
+        longPressJustFiredRef.current = true; // NEW: Mark that long press fired
         setIsLongPressing(false);
         onLongPress();
         
-        // Optional: Add haptic feedback on supported devices
+        // Haptic feedback
         if ('vibrate' in navigator) {
           navigator.vibrate(50);
         }
+        
+        // Reset the flag after a short delay to prevent onClick
+        setTimeout(() => {
+          longPressJustFiredRef.current = false;
+        }, 100);
       }
     }, ms);
     
-    // Show visual feedback that long press is in progress
+    // Show visual feedback
     setIsLongPressing(true);
   }, [onLongPress, ms]);
 
-  const stop = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+  const stop = useCallback(() => {
     if (!isStartedRef.current) return;
     
-    // CRITICAL FIX: Don't prevent default on touch end
-    // This was causing issues with natural finger lifting
-    // Only preventDefault on mouse events
-    if (e && 'button' in e && e.cancelable) {
-      e.preventDefault();
+    // DON'T preventDefault on touch events - let natural behavior happen
+    
+    // Clear the timer if it's still running
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = 0;
     }
-
-    window.clearTimeout(timerRef.current);
-    timerRef.current = 0;
     
+    // CRITICAL: Check if this was a long press BEFORE resetting the flag
     const wasLongPress = isLongPressRef.current;
+    const justFired = longPressJustFiredRef.current;
     
+    // Reset all state
     isStartedRef.current = false;
     isLongPressRef.current = false;
     startPosRef.current = null;
     setIsLongPressing(false);
 
-    // Fire click only if it wasn't a long press
-    if (!wasLongPress) {
+    // Fire click only if:
+    // 1. It wasn't a long press, AND
+    // 2. A long press didn't just fire (prevents race condition)
+    if (!wasLongPress && !justFired) {
       onClick();
     }
   }, [onClick]);
@@ -120,25 +131,23 @@ export function useLongPress({
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // ENHANCED FIX: Even more forgiving movement threshold
-    // Natural finger lifting causes slight movement - this is very tolerant
+    // EXTREMELY forgiving - 50px threshold
     if (!startPosRef.current || !isStartedRef.current) return;
     
     const touch = e.touches[0];
-    const moveThreshold = 40; // INCREASED from 25px to 40px - very forgiving!
+    const moveThreshold = 50; // VERY forgiving!
     
     const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
     
-    // Only cancel if there's significant intentional movement (like scrolling)
+    // Only cancel on major movement (scrolling)
     if (deltaX > moveThreshold || deltaY > moveThreshold) {
       cancel();
     }
   }, [cancel]);
 
-  // ENHANCED: Handle contextmenu to prevent it from interfering
+  // Handle context menu
   const handleContextMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    // Prevent context menu from showing during long press
     if (isLongPressRef.current || isLongPressing) {
       e.preventDefault();
     }
