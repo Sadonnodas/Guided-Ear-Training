@@ -179,9 +179,13 @@ export function useLongPress({
     // CRITICAL: Only fire onClick if long press did NOT trigger
     if (!wasLongPress) {
       log('Touch tap - calling onClick');
-      // For short taps, reset the touch flag immediately
-      lastInteractionWasTouchRef.current = false;
       onClick();
+      
+      // IMPORTANT: Keep flag true for 500ms to block ghost events from short taps too!
+      setTimeout(() => {
+        lastInteractionWasTouchRef.current = false;
+        log('Touch flag reset after short tap');
+      }, 500);
     } else {
       log('Touch after long press - NOT calling onClick');
       // For long press, the flag stays true for 3 seconds (set in timer callback)
