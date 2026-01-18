@@ -1,14 +1,13 @@
 {
   "name": "Guided Ear Training",
   "short_name": "Ear Training",
-  "start_url": "/Guided-Ear-Training/",
+  "version": "1.0.2",
+  "start_url": "/Guided-Ear-Training/?v=1.0.2",
   "scope": "/Guided-Ear-Training/",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "orientation": "portrait",
-  "version": "2.0.0",
-  "description": "Interactive ear training app with guided lessons and fretboard visualization",
   "icons": [
     {
       "src": "icon.png", 
