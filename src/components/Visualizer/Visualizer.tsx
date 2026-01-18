@@ -37,18 +37,10 @@ const NoteCell = ({
   extraClass = '' 
 }: NoteCellProps) => {
   const { isLongPressing, ...handlers } = useLongPress({
-    onClick: () => {
-      const timestamp = performance.now().toFixed(0);
-      console.log(`🔵 onClick fired for ${label} at ${timestamp}ms`);
-      onToggle(label);
-    },
-    onLongPress: () => {
-      const timestamp = performance.now().toFixed(0);
-      console.log(`🟡 onLongPress fired for ${label} at ${timestamp}ms`);
-      onFocus(label);
-    },
+    onClick: () => onToggle(label),
+    onLongPress: () => onFocus(label),
     ms: 600,
-    debug: true // Enable debug logging
+    debug: false
   });
 
   let classes = `tape-cell d-${label} ${extraClass}`;

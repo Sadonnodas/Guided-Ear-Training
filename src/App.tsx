@@ -9,7 +9,6 @@ import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer"; 
 import Controls from "./components/Controls/Controls";
-import DebugOverlay from "./components/DebugOverlay/DebugOverlay";
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 
@@ -124,7 +123,6 @@ export default function App() {
             activeTab={session.activeTab}
         />
       </div>
-      <DebugOverlay />
     </div>
   );
 }
