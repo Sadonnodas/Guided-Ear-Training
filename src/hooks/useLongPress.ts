@@ -61,15 +61,12 @@ export function useLongPress({
       return;
     }
     
-    // Track if this was a touch event and set a timer to reset it
+    // Track if this was a touch event
     if (isTouch) {
       lastInteractionWasTouchRef.current = true;
-      
-      // Reset the touch flag after 1 second (plenty of time for ghost events to pass)
-      setTimeout(() => {
-        lastInteractionWasTouchRef.current = false;
-        log('Touch flag reset after timeout');
-      }, 1000);
+      // Note: We DON'T set a timeout here anymore
+      // The timeout is set in the long press callback to last 3 seconds
+      // For short taps, stopTouch will reset it immediately
     }
     
     // Only preventDefault for mouse
@@ -105,9 +102,18 @@ export function useLongPress({
       setIsLongPressing(false);
       onLongPress();
       
+      // STRONGER haptic feedback - double pulse for clear indication
       if ('vibrate' in navigator) {
-        navigator.vibrate(50);
+        navigator.vibrate([50, 100, 50]); // Buzz-pause-buzz pattern
       }
+      
+      // CRITICAL: Extend the touch flag protection to 3 seconds
+      // This prevents ghost events even if user holds for a long time
+      lastInteractionWasTouchRef.current = true;
+      setTimeout(() => {
+        lastInteractionWasTouchRef.current = false;
+        log('Touch flag reset after extended timeout');
+      }, 3000); // 3 seconds - plenty of time to lift finger
     }, ms);
   }, [onLongPress, ms, log]);
 
@@ -173,9 +179,12 @@ export function useLongPress({
     // CRITICAL: Only fire onClick if long press did NOT trigger
     if (!wasLongPress) {
       log('Touch tap - calling onClick');
+      // For short taps, reset the touch flag immediately
+      lastInteractionWasTouchRef.current = false;
       onClick();
     } else {
       log('Touch after long press - NOT calling onClick');
+      // For long press, the flag stays true for 3 seconds (set in timer callback)
     }
   }, [onClick, log]);
 
