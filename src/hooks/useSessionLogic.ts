@@ -484,8 +484,8 @@ export function useSessionLogic() {
           scaleType: scaleTypeRef.current, 
           constraints: {
             ...constraints,
-            minMidi: fretboardRange?.min,
-            maxMidi: fretboardRange?.max
+            minMidi: fretboardRange?.min ?? settings.refs.minVocalMidi.current,
+            maxMidi: fretboardRange?.max ?? settings.refs.maxVocalMidi.current
           } 
         });
         playSilent = settings.refs.silentPractice.current; 
@@ -515,26 +515,29 @@ export function useSessionLogic() {
       playSilent = settings.refs.silentPractice.current;
     }
     else {
-      // Random Mode
-      if (forceOneThreeFive) {
-        const pattern: ScaleDegree[] = scaleTypeRef.current === 'Minor' || scaleTypeRef.current === 'PentatonicMinor'
-          ? ["1", "b3", "5", "1"] 
-          : ["1", "3", "5", "1"];
-        noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleTypeRef.current);
-        setStatus("New Key: Settling In");
-      } else {
-        constraints = {
-          allowedDegrees: enabledDegreesRef.current,
-          focusedDegrees: focusedDegreesRef.current, 
-          startDegree: settings.refs.startRoot.current ? "1" : undefined,
-          endDegree: settings.refs.endRoot.current ? "1" : undefined,     
-          length: 4,
-          difficulty: settings.refs.difficulty.current
-        };
-        noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleTypeRef.current, constraints });
-      }
-      playSilent = settings.refs.silentPractice.current;
-    }
+  // Random Mode
+  if (forceOneThreeFive) {
+    const pattern: ScaleDegree[] = scaleTypeRef.current === 'Minor' || scaleTypeRef.current === 'PentatonicMinor'
+      ? ["1", "b3", "5", "1"] 
+      : ["1", "3", "5", "1"];
+    noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleTypeRef.current);
+    setStatus("New Key: Settling In");
+  } else {
+    constraints = {
+      allowedDegrees: enabledDegreesRef.current,
+      focusedDegrees: focusedDegreesRef.current, 
+      startDegree: settings.refs.startRoot.current ? "1" : undefined,
+      endDegree: settings.refs.endRoot.current ? "1" : undefined,     
+      length: 4,
+      difficulty: settings.refs.difficulty.current,
+      // NEW: Add vocal range (but NOT when fretboard range exists)
+      minMidi: fretboardRange ? undefined : settings.refs.minVocalMidi.current,
+      maxMidi: fretboardRange ? undefined : settings.refs.maxVocalMidi.current
+    };
+    noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleTypeRef.current, constraints });
+  }
+  playSilent = settings.refs.silentPractice.current;
+}
 
     // D. Schedule & Play
     if (noteEvents && isPlayingRef.current) {

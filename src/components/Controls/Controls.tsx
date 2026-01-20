@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { DRUM_PATTERNS } from '../../config/AudioConfig';
 import type { MelodyDifficulty } from '../../types'; 
+import VoiceRangeControl from '../VoiceRangeControl/VoiceRangeControl';
+import { calibrateVocalRange } from '../VoiceRangeControl/PitchDetector';
 import './Controls.css';
 
 // --- ICONS ---
@@ -14,6 +16,7 @@ const TrainingWheelsIcon = () => <svg width="20" height="20" viewBox="0 0 24 24"
 const EyeOffIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 const InverseIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>;
 const MetronomeIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L4 20h16L12 2z" /><path d="M12 6v8" /></svg>;
+const TutorialIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
 
 const TEMPOS = [60, 80, 100, 120, 150];
 
@@ -50,14 +53,26 @@ interface ControlsProps {
   hideFretboardVisuals: boolean;
   setHideFretboardVisuals: (v: boolean) => void;
   activeTab: string;
+  
+  // Vocal Range
+  minVocalMidi: number;
+  maxVocalMidi: number;
+  setMinVocalMidi: (n: number) => void;
+  setMaxVocalMidi: (n: number) => void;
 }
 
 export default function Controls(props: ControlsProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [animate, setAnimate] = useState(false);
+  const [showTutorialButton, setShowTutorialButton] = useState(false);
 
-  // Calculate duration of one beat for pulse animation
   const beatDuration = ((60 / props.bpm) * 0.9).toFixed(3);
+
+  useEffect(() => {
+    // Check if tutorial has been completed
+    const completed = localStorage.getItem('tutorial-completed');
+    setShowTutorialButton(!!completed);
+  }, []);
 
   useEffect(() => {
     if (props.isPlaying) {
@@ -72,17 +87,27 @@ export default function Controls(props: ControlsProps) {
     props.setQuestionsPerKey(newVal);
   };
 
-  // Determine when to show certain controls based on active tab
+  const handleAutoCalibrate = async () => {
+    try {
+      const result = await calibrateVocalRange();
+      props.setMinVocalMidi(result.min);
+      props.setMaxVocalMidi(result.max);
+      return result;
+    } catch (e) {
+      console.error('Calibration failed:', e);
+      throw e;
+    }
+  };
+
+  const restartTutorial = () => {
+    localStorage.removeItem('tutorial-completed');
+    window.location.reload();
+  };
+
   const isFretboardTab = props.activeTab === 'fretboard';
   const isRandomTab = props.activeTab === 'random';
-  
-  // Blind Mode: Only show in fretboard tab OR when inverse mode is active
   const showBlindMode = isFretboardTab || props.inverseMode;
-  
-  // Pitch Guide and Inverse Mode: Only show in random tab (not fretboard or training)
   const showPitchGuideAndInverse = isRandomTab;
-  
-  // Guide volume: Show when pitch guide is ON, or inverse mode is ON, or in fretboard tab
   const showGuideVolume = props.trainingWheels || props.inverseMode || isFretboardTab;
 
   return (
@@ -92,6 +117,7 @@ export default function Controls(props: ControlsProps) {
           className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
           onClick={props.onPlayToggle}
           style={{ "--beat-dur": `${beatDuration}s` } as React.CSSProperties}
+          title={props.isPlaying ? "Pause session" : "Start practice session"}
         >
           {props.isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -99,6 +125,7 @@ export default function Controls(props: ControlsProps) {
         <div 
           className={`stop-mini-btn ${props.isPlaying || props.isPaused ? 'visible' : ''}`} 
           onClick={props.onStop}
+          title="Stop and restart session"
         >
           <StopIcon />
           <span className="mini-label">RESTART</span>
@@ -113,80 +140,80 @@ export default function Controls(props: ControlsProps) {
       <div className={`controls-accordion ${settingsOpen ? 'open' : ''}`}>
         <div className="controls-content">
     
-          {/* CATEGORY: MELODY DIFFICULTY */}
+          {/* MELODY DIFFICULTY */}
           <div className="control-section">
             <h3 className="section-title">Melody Difficulty</h3>
             <div className="toggle-grid-sleek">
               <div 
                 className={`toggle-pill-btn ${props.difficulty === 'easy' ? 'active' : ''}`} 
                 onClick={() => props.setDifficulty('easy')}
+                title="Easier melodies with smaller intervals"
               >
                 Easy
               </div>
               <div 
                 className={`toggle-pill-btn ${props.difficulty === 'normal' ? 'active' : ''}`} 
                 onClick={() => props.setDifficulty('normal')}
+                title="Balanced difficulty with varied intervals"
               >
                 Normal
               </div>
               <div 
                 className={`toggle-pill-btn ${props.difficulty === 'hard' ? 'active' : ''}`} 
                 onClick={() => props.setDifficulty('hard')}
+                title="Challenging melodies with larger leaps"
               >
                 Hard
               </div>
             </div>
           </div>
 
-          {/* CATEGORY: MELODY FLOW */}
+          {/* MELODY FLOW */}
           <div className="control-section">
             <h3 className="section-title">Melody Flow</h3>
             <div className="toggle-grid-sleek">
               
-              {/* Start on 1 */}
               <div 
                 className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} 
                 onClick={() => props.setStartRoot(!props.startRoot)}
+                title="Melodies always start on the root note (1)"
               >
                 Start on 1
               </div>
               
-              {/* End on 1 */}
               <div 
                 className={`toggle-pill-btn ${props.endRoot ? 'active' : ''}`} 
                 onClick={() => props.setEndRoot(!props.endRoot)}
+                title="Melodies always end on the root note (1)"
               >
                 End on 1
               </div>
 
-              {/* Pitch Guide - Only in Random tab */}
               {showPitchGuideAndInverse && (
                 <div 
                   className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
                   onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
-                  title="Pitch Guide (synth plays along)"
+                  title="Pitch Guide: Synth plays along with your singing for reference"
                 >
                   <TrainingWheelsIcon />
                 </div>
               )}
 
-              {/* Inverse Mode - Only in Random tab */}
               {showPitchGuideAndInverse && (
                 <div 
                   className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
                   onClick={() => props.setInverseMode(!props.inverseMode)} 
-                  title="Inverse Mode (listen first, sing answer)"
+                  title="Inverse Mode: Listen first, then sing the melody back"
                 >
                   <InverseIcon />
                 </div>
               )}
 
-              {/* Blind Mode - Only when in fretboard OR inverse mode is on */}
               {showBlindMode && (
                 <div 
                   className={`icon-toggle-btn ${props.hideFretboardVisuals ? 'active' : ''}`} 
                   onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
-                  title="Blind Mode (hide note indicators)"
+                  title="Blind Mode: Hide visual indicators during practice"
                 >
                   <EyeOffIcon />
                 </div>
@@ -194,13 +221,19 @@ export default function Controls(props: ControlsProps) {
             </div>
           </div>
 
-          {/* CATEGORY: REPETITION */}
+          {/* REPETITION */}
           <div className="control-section">
             <h3 className="section-title">Repetition</h3>
             <div className="row-split">
               <div className="stepper-label">Melodies Per Key</div>
               <div className="stepper-control">
-                <button className="stepper-btn" onClick={() => adjustQuestions(-1)}><MinusIcon/></button>
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => adjustQuestions(-1)}
+                  title="Decrease repetitions"
+                >
+                  <MinusIcon/>
+                </button>
                 <input 
                   type="number" 
                   className="stepper-input" 
@@ -209,8 +242,15 @@ export default function Controls(props: ControlsProps) {
                     const val = parseInt(e.target.value);
                     if (!isNaN(val)) props.setQuestionsPerKey(Math.max(1, Math.min(50, val)));
                   }}
+                  title="Number of melodies to practice per key"
                 />
-                <button className="stepper-btn" onClick={() => adjustQuestions(1)}><PlusIcon/></button>
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => adjustQuestions(1)}
+                  title="Increase repetitions"
+                >
+                  <PlusIcon/>
+                </button>
               </div>
             </div>
           </div>
@@ -224,6 +264,7 @@ export default function Controls(props: ControlsProps) {
                   key={t} 
                   className={`tempo-btn ${props.bpm === t ? 'active' : ''}`} 
                   onClick={() => props.setBpm(t)}
+                  title={`Set tempo to ${t} BPM`}
                 >
                   {t}
                 </button>
@@ -235,19 +276,19 @@ export default function Controls(props: ControlsProps) {
                 className="pattern-select" 
                 value={props.currentPattern}
                 onChange={(e) => props.setPattern(e.target.value)}
+                title="Select drum pattern style"
               >
                 {Object.keys(DRUM_PATTERNS).map(name => (
                   <option key={name} value={name}>{name}</option>
                 ))}
               </select>
             </div>
-            {/* Metronome Toggle - moved from Header */}
             <div className="row-split">
               <span className="stepper-label">Metronome Click</span>
               <div 
                 className={`icon-toggle-btn ${props.debugClick ? 'active' : ''}`} 
                 onClick={() => props.setDebugClick(!props.debugClick)} 
-                title="Toggle Metronome"
+                title="Toggle metronome click on beats"
                 style={{ background: props.debugClick ? 'var(--btn-play)' : undefined }}
               >
                 <MetronomeIcon />
@@ -259,36 +300,38 @@ export default function Controls(props: ControlsProps) {
           <div className="control-section no-border">
             <h3 className="section-title">Mixer</h3>
             
-            {/* Guide volume - show when pitch guide, inverse mode, or fretboard */}
             {showGuideVolume && (
               <div className="slider-row">
-                <span style={{color:'var(--c-3)'}}>Guide</span>
+                <span style={{color:'var(--c-3)'}} title="Volume of pitch guide synth">Guide</span>
                 <input 
                   type="range" 
                   min="0" 
                   max="1" 
                   step="0.05" 
                   value={props.volTraining} 
-                  onChange={e => props.setVolTraining(parseFloat(e.target.value))} 
+                  onChange={e => props.setVolTraining(parseFloat(e.target.value))}
+                  title="Adjust pitch guide volume"
                 />
               </div>
             )}
 
             <div className="slider-row">
-              <span>Master</span>
+              <span title="Master volume control">Master</span>
               <input 
                 type="range" 
                 min="0" 
                 max="1" 
                 step="0.05" 
                 value={props.volMaster} 
-                onChange={e => props.setVolMaster(parseFloat(e.target.value))} 
+                onChange={e => props.setVolMaster(parseFloat(e.target.value))}
+                title="Adjust master volume"
               />
             </div>
             <div className="slider-row">
               <span 
                 onClick={() => props.toggleMute('voice', props.volVoice, props.setVolVoice)} 
                 className={props.volVoice === 0 ? 'muted-label' : 'active-label'}
+                title="Click to mute/unmute voice samples"
               >
                 Voice
               </span>
@@ -298,24 +341,27 @@ export default function Controls(props: ControlsProps) {
                 max="1.5" 
                 step="0.1" 
                 value={props.volVoice} 
-                onChange={e => props.setVolVoice(parseFloat(e.target.value))} 
+                onChange={e => props.setVolVoice(parseFloat(e.target.value))}
+                title="Adjust vocal sample volume"
               />
             </div>
             <div className="slider-row">
-              <span>Reverb</span>
+              <span title="Reverb amount">Reverb</span>
               <input 
                 type="range" 
                 min="0" 
                 max="1" 
                 step="0.05" 
                 value={props.volReverb} 
-                onChange={e => props.setVolReverb(parseFloat(e.target.value))} 
+                onChange={e => props.setVolReverb(parseFloat(e.target.value))}
+                title="Adjust reverb effect intensity"
               />
             </div>
             <div className="slider-row">
               <span 
                 onClick={() => props.toggleMute('drone', props.volDrone, props.setVolDrone)} 
                 className={props.volDrone === 0 ? 'muted-label' : 'active-label'}
+                title="Click to mute/unmute drone"
               >
                 Drone
               </span>
@@ -325,13 +371,15 @@ export default function Controls(props: ControlsProps) {
                 max="1" 
                 step="0.05" 
                 value={props.volDrone} 
-                onChange={e => props.setVolDrone(parseFloat(e.target.value))} 
+                onChange={e => props.setVolDrone(parseFloat(e.target.value))}
+                title="Adjust root note drone volume"
               />
             </div>
             <div className="slider-row">
               <span 
                 onClick={() => props.toggleMute('groove', props.volGroove, props.setVolGroove)} 
                 className={props.volGroove === 0 ? 'muted-label' : 'active-label'}
+                title="Click to mute/unmute drums"
               >
                 Drums
               </span>
@@ -341,10 +389,36 @@ export default function Controls(props: ControlsProps) {
                 max="1" 
                 step="0.05" 
                 value={props.volGroove} 
-                onChange={e => props.setVolGroove(parseFloat(e.target.value))} 
+                onChange={e => props.setVolGroove(parseFloat(e.target.value))}
+                title="Adjust drum pattern volume"
               />
             </div>
+
+            {/* VOCAL RANGE CONTROL */}
+            <VoiceRangeControl
+              minMidi={props.minVocalMidi}
+              maxMidi={props.maxVocalMidi}
+              onRangeChange={(min, max) => {
+                props.setMinVocalMidi(min);
+                props.setMaxVocalMidi(max);
+              }}
+              onAutoCalibrate={handleAutoCalibrate}
+            />
           </div>
+
+          {/* TUTORIAL RESTART BUTTON */}
+          {showTutorialButton && (
+            <div className="control-section no-border" style={{paddingTop: '15px'}}>
+              <button 
+                className="tutorial-restart-btn-controls"
+                onClick={restartTutorial}
+                title="Restart the interactive tutorial walkthrough"
+              >
+                <TutorialIcon />
+                <span>Restart Tutorial</span>
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

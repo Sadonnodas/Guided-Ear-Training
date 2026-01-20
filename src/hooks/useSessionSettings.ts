@@ -14,8 +14,12 @@ export function useSessionSettings() {
   const [inverseMode, setInverseMode] = useState(false);
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
   const [difficulty, setDifficulty] = useState<MelodyDifficulty>("normal");
-  const [selectedShape, setSelectedShape] = useState<CagedShape>("E"); // New state for Fretboard Tab
-  const [hideFretboardVisuals, setHideFretboardVisuals] = useState(false); // "Blind Mode" toggle
+  const [selectedShape, setSelectedShape] = useState<CagedShape>("E");
+  const [hideFretboardVisuals, setHideFretboardVisuals] = useState(false);
+  
+  // NEW: Vocal Range State
+  const [minVocalMidi, setMinVocalMidi] = useState(43); // G2 - default vocal range min
+  const [maxVocalMidi, setMaxVocalMidi] = useState(67); // G4 - default vocal range max
 
   // --- REFS (For access inside the async Game Loop) ---
   const refs = {
@@ -27,8 +31,10 @@ export function useSessionSettings() {
     inverseMode: useRef(inverseMode),
     questionsPerKey: useRef(questionsPerKey),
     difficulty: useRef(difficulty),
-    selectedShape: useRef(selectedShape), //
-    hideFretboardVisuals: useRef(hideFretboardVisuals) //
+    selectedShape: useRef(selectedShape),
+    hideFretboardVisuals: useRef(hideFretboardVisuals),
+    minVocalMidi: useRef(minVocalMidi), // NEW
+    maxVocalMidi: useRef(maxVocalMidi), // NEW
   };
 
   // --- SYNC REFS & ENGINE ---
@@ -40,8 +46,10 @@ export function useSessionSettings() {
   useEffect(() => { refs.inverseMode.current = inverseMode; }, [inverseMode]);
   useEffect(() => { refs.questionsPerKey.current = questionsPerKey; }, [questionsPerKey]);
   useEffect(() => { refs.difficulty.current = difficulty; }, [difficulty]);
-  useEffect(() => { refs.selectedShape.current = selectedShape; }, [selectedShape]); //
-  useEffect(() => { refs.hideFretboardVisuals.current = hideFretboardVisuals; }, [hideFretboardVisuals]); //
+  useEffect(() => { refs.selectedShape.current = selectedShape; }, [selectedShape]);
+  useEffect(() => { refs.hideFretboardVisuals.current = hideFretboardVisuals; }, [hideFretboardVisuals]);
+  useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]); // NEW
+  useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]); // NEW
 
   const setPattern = (name: string) => {
     setCurrentPattern(name);
@@ -52,14 +60,16 @@ export function useSessionSettings() {
     // Values
     bpm, currentPattern, startRoot, endRoot, silentPractice, 
     trainingWheels, inverseMode, questionsPerKey, difficulty,
+    selectedShape, hideFretboardVisuals,
+    minVocalMidi, maxVocalMidi, // NEW
     
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
+    setSelectedShape, setHideFretboardVisuals,
+    setMinVocalMidi, setMaxVocalMidi, // NEW
     
     // Refs (Expose these to the game loop)
-    selectedShape, setSelectedShape,
-    hideFretboardVisuals, setHideFretboardVisuals,
     refs
   };
 }

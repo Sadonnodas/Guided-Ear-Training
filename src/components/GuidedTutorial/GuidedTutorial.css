@@ -1,0 +1,364 @@
+.tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  pointer-events: none;
+  --target-top: 0px;
+  --target-left: 0px;
+  --target-width: 0px;
+  --target-height: 0px;
+}
+
+.tutorial-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  pointer-events: all;
+  animation: fadeIn 0.3s ease-out;
+  
+  /* Create spotlight effect using radial gradient */
+  -webkit-mask-image: radial-gradient(
+    ellipse calc(var(--target-width) + 40px) calc(var(--target-height) + 40px) 
+    at calc(var(--target-left) + var(--target-width) / 2) calc(var(--target-top) + var(--target-height) / 2),
+    transparent 40%,
+    black 50%
+  );
+  mask-image: radial-gradient(
+    ellipse calc(var(--target-width) + 40px) calc(var(--target-height) + 40px) 
+    at calc(var(--target-left) + var(--target-width) / 2) calc(var(--target-top) + var(--target-height) / 2),
+    transparent 40%,
+    black 50%
+  );
+}
+
+.tutorial-highlight {
+  position: absolute;
+  pointer-events: none;
+  border: 3px solid var(--btn-play);
+  border-radius: 12px;
+  padding: 10px;
+  margin: -10px;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.2),
+              0 0 20px rgba(74, 222, 128, 0.4);
+  animation: pulse-highlight 2s ease-in-out infinite;
+  z-index: 10001;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.2),
+                0 0 20px rgba(74, 222, 128, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(74, 222, 128, 0.3),
+                0 0 30px rgba(74, 222, 128, 0.6);
+  }
+}
+
+.tutorial-tooltip {
+  position: absolute;
+  background: var(--bg-panel);
+  border: 2px solid var(--btn-play);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 400px;
+  min-width: 320px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  pointer-events: all;
+  z-index: 10002;
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Position variants */
+.tooltip-bottom {
+  transform: translate(-50%, calc(100% + 30px));
+}
+
+.tooltip-top {
+  transform: translate(-50%, calc(-100% - 30px));
+}
+
+.tooltip-left {
+  transform: translate(calc(-100% - 30px), -50%);
+}
+
+.tooltip-right {
+  transform: translate(calc(100% + 30px), -50%);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(100% + 50px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, calc(100% + 30px));
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.tooltip-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--btn-play);
+  line-height: 1.3;
+}
+
+.tooltip-close {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-main);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.tooltip-close:hover {
+  background: var(--btn-stop);
+  border-color: var(--btn-stop);
+  transform: rotate(90deg);
+}
+
+.tooltip-description {
+  margin: 0 0 15px 0;
+  color: var(--text-main);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.tooltip-points {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+}
+
+.tooltip-points li {
+  position: relative;
+  padding-left: 24px;
+  margin-bottom: 10px;
+  color: var(--text-main);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.tooltip-points li:before {
+  content: '•';
+  position: absolute;
+  left: 8px;
+  color: var(--btn-play);
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+.tooltip-points li:first-child {
+  font-weight: 600;
+  color: var(--btn-play);
+}
+
+.tooltip-points li:first-child:before {
+  content: '→';
+}
+
+.tooltip-action {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 8px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+}
+
+.action-hint {
+  color: var(--btn-play);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.tooltip-progress {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--btn-play), var(--c-5));
+  transition: width 0.3s ease-out;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+}
+
+.tooltip-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nav-skip {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.nav-skip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+.nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-prev,
+.nav-next {
+  background: var(--btn-play);
+  color: #0d1117;
+  border-color: var(--btn-play);
+}
+
+.nav-prev:hover,
+.nav-next:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+}
+
+.nav-prev:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.step-counter {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Tutorial restart button (in header) */
+.tutorial-restart-btn {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: var(--btn-play);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.tutorial-restart-btn:hover {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: var(--btn-play);
+  transform: translateY(-1px);
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .tutorial-tooltip {
+    min-width: 280px;
+    max-width: calc(100vw - 40px);
+    padding: 15px;
+  }
+
+  .tooltip-title {
+    font-size: 1.1rem;
+  }
+
+  .tooltip-description {
+    font-size: 0.9rem;
+  }
+
+  .nav-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .nav-skip span {
+    display: none;
+  }
+
+  .tutorial-restart-btn span {
+    display: none;
+  }
+}
+
+/* Arrow indicators */
+.tutorial-tooltip::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+}
+
+.tooltip-bottom::before {
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: var(--btn-play);
+}
+
+.tooltip-top::before {
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: var(--btn-play);
+}
+
+.tooltip-left::before {
+  right: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: var(--btn-play);
+}
+
+.tooltip-right::before {
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: var(--btn-play);
+}

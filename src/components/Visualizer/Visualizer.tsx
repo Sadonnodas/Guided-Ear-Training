@@ -14,7 +14,8 @@ interface VisualizerProps {
   focusedDegrees: ScaleDegree[]; 
   toggleDegree: (d: ScaleDegree) => void;
   toggleFocus: (d: ScaleDegree) => void;
-  scaleType: ScaleType; 
+  scaleType: ScaleType;
+  hideMovement?: boolean; // NEW: Prevents tape from moving in inverse blind mode
 }
 
 interface NoteCellProps {
@@ -64,7 +65,8 @@ export default function Visualizer({
   focusedDegrees, 
   toggleDegree, 
   toggleFocus, 
-  scaleType
+  scaleType,
+  hideMovement = false
 }: VisualizerProps) {
 
   // Helper to get cell props
@@ -83,7 +85,9 @@ export default function Visualizer({
       (_, i) => i - TAPE_RANGE
     );
     const initialOffset = (TAPE_RANGE * CELL_WIDTH) + (CELL_WIDTH / 2);
-    const dynamicOffset = lastValidStep * CELL_WIDTH;
+    
+    // FIX: When hideMovement is true (inverse mode + blind mode), keep tape centered
+    const dynamicOffset = hideMovement ? 0 : (lastValidStep * CELL_WIDTH);
     const totalTranslate = -(initialOffset + dynamicOffset);
 
     return (

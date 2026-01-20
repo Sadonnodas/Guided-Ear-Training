@@ -25,11 +25,9 @@ interface HeaderProps {
   scaleType: ScaleType;
   setScaleType: (s: ScaleType) => void;
   
-  // Training Props
   activeLevelId?: number;
   setActiveLevelId?: (id: number) => void;
   levels?: TrainingLevel[];
-  // Add Fretboard Props
   selectedShape?: CagedShape;
   setSelectedShape?: (s: CagedShape) => void;
 }
@@ -38,7 +36,7 @@ export default function Header({
   activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, 
   viewMode, setViewMode, scaleType, setScaleType,
   activeLevelId, setActiveLevelId, levels,
-  selectedShape, setSelectedShape // Added these two
+  selectedShape, setSelectedShape
 }: HeaderProps) {
 
   const handleTabChange = (tab: string) => {
@@ -51,52 +49,59 @@ export default function Header({
   return (
     <>
       <div className="tabs">
-  <button className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} onClick={() => handleTabChange("random")}>Random</button>
-  <button className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} onClick={() => handleTabChange("training")}>Training</button>
-  {/* Added Fretboard Tab Button */}
-  <button className={`tab-btn ${activeTab === 'fretboard' ? 'active' : ''}`} onClick={() => handleTabChange("fretboard")}>Fretboard</button>
-</div>
+        <button className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} onClick={() => handleTabChange("random")}>Random</button>
+        <button className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} onClick={() => handleTabChange("training")}>Training</button>
+        <button className={`tab-btn ${activeTab === 'fretboard' ? 'active' : ''}`} onClick={() => handleTabChange("fretboard")}>Fretboard</button>
+      </div>
 
       <div className="info-display">
         <div className="key-container">
           
           {/* SCALE TYPE */}
-<select 
-  className="key-select" 
-  value={scaleType} 
-  onChange={(e) => setScaleType(e.target.value as ScaleType)}
-  style={{ marginRight: '5px' }}
->
-  {activeTab === 'fretboard' ? (
-    <>
-      <option value="PentatonicMajor">Major Pentatonic</option>
-      <option value="PentatonicMinor">Minor Pentatonic</option>
-    </>
-  ) : activeTab === 'training' ? (
-    /* Only show Major and Minor when in the Training tab */
-    <>
-      <option value="Major">Major</option>
-      <option value="Minor">Minor</option>
-    </>
-  ) : (
-    /* Show all options for the Random tab */
-    <>
-      <option value="Major">Major</option>
-      <option value="Minor">Minor</option>
-      <option value="PentatonicMajor">Major Pentatonic</option>
-      <option value="PentatonicMinor">Minor Pentatonic</option>
-    </>
-  )}
-</select>
+          <select 
+            className="key-select" 
+            value={scaleType} 
+            onChange={(e) => setScaleType(e.target.value as ScaleType)}
+            style={{ marginRight: '5px' }}
+            title="Select the scale type for practice"
+          >
+            {activeTab === 'fretboard' ? (
+              <>
+                <option value="PentatonicMajor">Major Pentatonic</option>
+                <option value="PentatonicMinor">Minor Pentatonic</option>
+              </>
+            ) : activeTab === 'training' ? (
+              <>
+                <option value="Major">Major</option>
+                <option value="Minor">Minor</option>
+              </>
+            ) : (
+              <>
+                <option value="Major">Major</option>
+                <option value="Minor">Minor</option>
+                <option value="PentatonicMajor">Major Pentatonic</option>
+                <option value="PentatonicMinor">Minor Pentatonic</option>
+              </>
+            )}
+          </select>
 
           <div className="separator"></div>
 
           {/* KEY SELECTOR */}
-          <select className="key-select" value={currentKey} onChange={(e) => setKeyManually(e.target.value as MusicalKey)}>
+          <select 
+            className="key-select" 
+            value={currentKey} 
+            onChange={(e) => setKeyManually(e.target.value as MusicalKey)}
+            title="Select the musical key"
+          >
             {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]}</option>))}
           </select>
           
-          <button className="icon-btn" onClick={pickRandomKey} title="Random Key">
+          <button 
+            className="icon-btn" 
+            onClick={pickRandomKey} 
+            title="Pick a random key"
+          >
             <ShuffleIcon />
           </button>
           
@@ -108,6 +113,7 @@ export default function Header({
                     className="level-select"
                     value={activeLevelId}
                     onChange={(e) => setActiveLevelId(Number(e.target.value))}
+                    title="Select training level"
                 >
                     {levels.map(l => (
                         <option key={l.id} value={l.id}>{l.name}</option>
@@ -125,6 +131,7 @@ export default function Header({
               className="key-select" 
               value={selectedShape} 
               onChange={(e) => setSelectedShape(e.target.value as CagedShape)}
+              title="Select CAGED shape position"
             >
               <option value="C">C-Shape</option>
               <option value="A">A-Shape</option>
@@ -133,17 +140,16 @@ export default function Header({
               <option value="D">D-Shape</option>
             </select>
           ) : (
-            <div className="view-toggle">
-              <div className={`toggle-option ${viewMode === 'tape' ? 'active' : ''}`} onClick={() => setViewMode('tape')} title="Tape View">
+            <div className="view-toggle" title="Switch between tape and static view">
+              <div className={`toggle-option ${viewMode === 'tape' ? 'active' : ''}`} onClick={() => setViewMode('tape')} title="Tape View - scrolling visualization">
                 <TapeIcon />
               </div>
-              <div className={`toggle-option ${viewMode === 'static' ? 'active' : ''}`} onClick={() => setViewMode('static')} title="Static View">
+              <div className={`toggle-option ${viewMode === 'static' ? 'active' : ''}`} onClick={() => setViewMode('static')} title="Static View - all degrees visible">
                 <StaticIcon />
               </div>
               <div className={`toggle-pill ${viewMode}`} />
             </div>
           )}
-
           
         </div>
       </div>

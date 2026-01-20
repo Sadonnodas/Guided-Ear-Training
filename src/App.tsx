@@ -9,6 +9,7 @@ import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer"; 
 import Controls from "./components/Controls/Controls";
+import GuidedTutorial from "./components/GuidedTutorial/GuidedTutorial";
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 
@@ -44,8 +45,18 @@ export default function App() {
     && session.status !== 'Answer' 
     && session.status !== 'Affirm';
 
+  // NEW: Determine if tape should stop moving (inverse blind mode fix)
+  const shouldHideMovement = session.activeTab === 'random' 
+    && session.inverseMode 
+    && session.hideFretboardVisuals
+    && session.status !== 'Answer' 
+    && session.status !== 'Affirm';
+
   return (
     <div className="app-container">
+      {/* Guided Tutorial Overlay */}
+      <GuidedTutorial />
+
       <div className="main-panel">
         
         <Header 
@@ -89,6 +100,7 @@ export default function App() {
             toggleDegree={session.toggleDegree}
             toggleFocus={session.toggleFocus} 
             scaleType={session.scaleType}
+            hideMovement={shouldHideMovement} // NEW: Prevents tape scrolling in blind mode
           />
         )}
 
@@ -121,6 +133,10 @@ export default function App() {
             hideFretboardVisuals={session.hideFretboardVisuals}
             setHideFretboardVisuals={session.setHideFretboardVisuals}
             activeTab={session.activeTab}
+            minVocalMidi={session.minVocalMidi} // NEW
+            maxVocalMidi={session.maxVocalMidi} // NEW
+            setMinVocalMidi={session.setMinVocalMidi} // NEW
+            setMaxVocalMidi={session.setMaxVocalMidi} // NEW
         />
       </div>
     </div>

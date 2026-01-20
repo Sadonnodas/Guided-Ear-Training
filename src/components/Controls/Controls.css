@@ -127,13 +127,39 @@
   transition: max-height 0.4s cubic-bezier(0, 1, 0, 1);
   width: 100%;
 }
+
+/* FIXED: Increased max-height and added overflow-y auto for scrolling */
 .controls-accordion.open {
-  max-height: 800px; 
+  max-height: calc(100vh - 400px); /* Dynamic height based on viewport */
+  min-height: 400px; /* Ensure minimum visible height */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal scroll */
   transition: max-height 0.5s ease-in-out;
+  padding-right: 5px; /* Space for scrollbar */
+}
+
+/* Custom scrollbar styling */
+.controls-accordion::-webkit-scrollbar {
+  width: 6px;
+}
+
+.controls-accordion::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+}
+
+.controls-accordion::-webkit-scrollbar-thumb {
+  background: rgba(74, 222, 128, 0.3);
+  border-radius: 3px;
+}
+
+.controls-accordion::-webkit-scrollbar-thumb:hover {
+  background: rgba(74, 222, 128, 0.5);
 }
 
 .controls-content {
   padding-top: 10px;
+  padding-bottom: 20px; /* Add bottom padding so last item isn't cut off */
   display: flex;
   flex-direction: column;
   gap: 0; 
@@ -353,12 +379,43 @@
 .muted-label { text-decoration: line-through; opacity: 0.6; cursor: pointer; }
 .active-label { cursor: pointer; }
 
+/* Tutorial restart button in controls */
+.tutorial-restart-btn-controls {
+  width: 100%;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: var(--btn-play);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.tutorial-restart-btn-controls:hover {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: var(--btn-play);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.2);
+}
+
 /* --- RESPONSIVE --- */
 @media (max-width: 600px) {
     .play-btn-container { margin: 20px auto; }
     .slider-row { flex-wrap: wrap; }
     .slider-row span { min-width: 60px; }
     .settings-trigger { padding: 20px 10px; }
+    
+    /* Adjust accordion height for mobile */
+    .controls-accordion.open {
+      max-height: calc(100vh - 300px);
+      min-height: 300px;
+    }
 }
 
 /* Ensure the input doesn't look like a standard box */
