@@ -7,13 +7,13 @@ export function useSessionSettings() {
   const [bpm, setBpm] = useState(80);
   const [currentPattern, setCurrentPattern] = useState("Lofi Chill");
   
-  const [startRoot, setStartRoot] = useState(false);
+  const [startRoot, setStartRoot] = useState(true);
   const [endRoot, setEndRoot] = useState(false);
   const [silentPractice, setSilentPractice] = useState(true);
   const [trainingWheels, setTrainingWheels] = useState(false);
   const [inverseMode, setInverseMode] = useState(false);
   const [questionsPerKey, setQuestionsPerKey] = useState(10);
-  const [difficulty, setDifficulty] = useState<MelodyDifficulty>("normal");
+  const [difficulty, setDifficulty] = useState<MelodyDifficulty>("easy");
   const [selectedShape, setSelectedShape] = useState<CagedShape>("E");
   const [hideFretboardVisuals, setHideFretboardVisuals] = useState(false);
   
