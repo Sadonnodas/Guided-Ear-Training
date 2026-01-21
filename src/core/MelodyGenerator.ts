@@ -104,14 +104,30 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
 /**
  * Generates a specific, pre-defined pattern (used for training levels/intros)
  */
-export function generateFixedPattern(pattern: ScaleDegree[], key: MusicalKey, scaleType: ScaleType): NoteEvent[] {
+export function generateFixedPattern(
+  pattern: ScaleDegree[], 
+  key: MusicalKey, 
+  scaleType: ScaleType,
+  minMidi?: number,
+  maxMidi?: number
+): NoteEvent[] {
     const melody: NoteEvent[] = [];
     let currentBeat = 0;
     let lastMidi: number | null = null;
     
     pattern.forEach(degree => {
         const duration = 2; 
-        const event = createEvent(degree, key, scaleType, currentBeat, duration, lastMidi);
+        const event = createEvent(
+          degree, 
+          key, 
+          scaleType, 
+          currentBeat, 
+          duration, 
+          lastMidi,
+          "normal",
+          false,
+          minMidi && maxMidi ? { minMidi, maxMidi } as MelodyConstraints : undefined
+        );
         melody.push(event);
         currentBeat += duration;
         lastMidi = event.noteInfo.midi;

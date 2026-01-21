@@ -10,9 +10,9 @@ interface TutorialStep {
   smartPosition?: boolean;
   action?: {
     hint: string;
-    check?: () => boolean; // Optional: verify user completed action
+    check?: () => boolean;
   };
-  switchToTab?: string; // Navigate to tab before showing this step
+  switchToTab?: string;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -111,13 +111,13 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     ],
     position: 'top',
     highlightPadding: 15,
-    switchToTab: 'random' // Go back to random for final step
+    switchToTab: 'random'
   }
 ];
 
 interface GuidedTutorialProps {
   onComplete?: () => void;
-  onTabChange?: (tab: string) => void; // NEW: Allow tutorial to switch tabs
+  onTabChange?: (tab: string) => void;
 }
 
 export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutorialProps) {
@@ -139,10 +139,8 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
 
     const step = TUTORIAL_STEPS[currentStep];
     
-    // Switch tab if needed
     if (step.switchToTab && onTabChange) {
       onTabChange(step.switchToTab);
-      // Wait for tab to render
       setTimeout(() => updateHighlight(), 100);
     } else {
       updateHighlight();
@@ -179,14 +177,12 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
         overlayRef.current.style.setProperty('--target-height', `${rect.height + (padding * 2)}px`);
       }
 
-      // Smart positioning: avoid blocking target
       let finalPosition = step.position || 'bottom';
       
       if (step.smartPosition) {
         const viewportHeight = window.innerHeight;
         const elementCenter = rect.top + (rect.height / 2);
         
-        // If element is in bottom half and tooltip would go below, put it on top
         if (elementCenter > viewportHeight / 2 && finalPosition === 'bottom') {
           finalPosition = 'top';
         }
@@ -194,6 +190,16 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
       
       setTooltipPosition(finalPosition);
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  // IMPROVED: Check if click is on backdrop (not on highlighted element or tooltip)
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    
+    // Only close if clicking directly on the backdrop
+    if (target.classList.contains('tutorial-backdrop')) {
+      handleSkip();
     }
   };
 
@@ -228,15 +234,18 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
 
   return (
     <div className="tutorial-overlay" ref={overlayRef}>
-      <div className="tutorial-backdrop" onClick={handleSkip} />
+      {/* IMPROVED: Click handler only triggers on backdrop itself */}
+      <div className="tutorial-backdrop" onClick={handleBackdropClick} />
       
+      {/* Highlighted element area - clicks pass through */}
       <div 
         className="tutorial-highlight"
         style={{
           top: position.top,
           left: position.left,
           width: position.width,
-          height: position.height
+          height: position.height,
+          pointerEvents: 'none' // CRITICAL: Allow clicks to pass through
         }}
       />
 

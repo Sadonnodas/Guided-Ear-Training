@@ -34,11 +34,13 @@ const SCALE_DEGREES: Record<ScaleType, ScaleDegree[]> = {
  * - Octave selection for smooth voice leading
  *
  * ENHANCED: Now supports "easiest" difficulty with strict interval limits
+ * FIXED: Strictly enforces vocal range - will NEVER return notes outside minMidi/maxMidi
+ * FIXED: Recalculates degree after clamping to prevent wrong vocal samples
  */
 export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
-  _scaleType: ScaleType, 
+  scaleType: ScaleType, 
   previousMidi: number | null = null,
   difficulty: MelodyDifficulty = "normal",
   hasLeaped: boolean = false,
@@ -79,9 +81,14 @@ export function getNoteForDegree(
     if (valid.length > 0) {
       targetMidi = valid[Math.floor(Math.random() * valid.length)];
     } else {
+        // If no candidates respect jump limit, ignore jump limit but KEEP range constraint
         const validInRange = candidates.filter(m => m >= minMidi && m <= maxMidi);
         if (validInRange.length > 0) {
             targetMidi = validInRange[Math.floor(Math.random() * validInRange.length)];
+        } else {
+            // CRITICAL FIX: If still no candidates, clamp to range
+            // This happens when the root+degree is outside range in all octaves
+            targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
         }
     }
   } else {
@@ -91,18 +98,68 @@ export function getNoteForDegree(
     
     if (validStart.length > 0) {
         targetMidi = validStart[Math.floor(Math.random() * validStart.length)];
+    } else {
+        // CRITICAL FIX: Clamp if no valid starting notes
+        targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
     }
+  }
+
+  // CRITICAL: Final safety clamp to ensure we NEVER go outside range
+  const originalMidi = targetMidi;
+  targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
+
+  // CRITICAL FIX: If MIDI was clamped, recalculate the degree!
+  // Otherwise we'll load the wrong vocal sample
+  let actualDegree = degree;
+  if (targetMidi !== originalMidi) {
+    actualDegree = getDegreeFromMidi(targetMidi, key, scaleType);
   }
 
   // Build the final frequency
   const freq = 440 * Math.pow(2, (targetMidi - 69) / 12);
 
   return {
-    degree,
+    degree: actualDegree,  // Use recalculated degree
     midi: targetMidi,
     frequency: freq,
-    label: `${degree} (${targetMidi})`
+    label: `${actualDegree} (${targetMidi})`
   };
+}
+
+/**
+ * Convert a MIDI note back to its scale degree in a given key
+ * Used when MIDI gets clamped - need to figure out what degree it actually is now
+ */
+export function getDegreeFromMidi(
+  midi: number, 
+  key: MusicalKey, 
+  scaleType: ScaleType
+): ScaleDegree {
+  const rootMidi = ROOT_MIDI[key];
+  const semitones = ((midi - rootMidi) % 12 + 12) % 12; // Modulo 12 for interval within octave
+  
+  // Find which degree corresponds to this interval
+  const degrees = SCALE_DEGREES[scaleType];
+  
+  for (const degree of degrees) {
+    if (DEGREE_TO_SEMITONE[degree] === semitones) {
+      return degree;
+    }
+  }
+  
+  // If not an exact match (chromatic or edge case), find closest
+  let closestDegree: ScaleDegree = degrees[0];
+  let minDiff = 12;
+  
+  for (const degree of degrees) {
+    const diff = Math.abs(DEGREE_TO_SEMITONE[degree] - semitones);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestDegree = degree;
+    }
+  }
+  
+  return closestDegree;
 }
 
 /**

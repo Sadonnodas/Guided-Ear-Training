@@ -128,7 +128,7 @@
 }
 
 .controls-accordion.open {
-  max-height: 600px; /* Fixed height - enough for any single tab */
+  max-height: 800px; /* More room for locked controls + messages */
   transition: max-height 0.5s ease-in-out;
 }
 

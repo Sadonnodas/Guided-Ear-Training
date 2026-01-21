@@ -479,11 +479,23 @@ export function useSessionLogic() {
 
       // Generate appropriate melody
       if (config.scalePreview && !hasPlayedScalePreview.current) {
-        noteEvents = generateFixedPattern(config.scalePreview, currentCycleKey, scaleTypeRef.current); 
+        noteEvents = generateFixedPattern(
+          config.scalePreview, 
+          currentCycleKey, 
+          scaleTypeRef.current,
+          settings.refs.minVocalMidi.current,
+          settings.refs.maxVocalMidi.current
+        ); 
         hasPlayedScalePreview.current = true; 
       } 
       else if (config.introSequence && !hasPlayedIntroSequence.current) {
-        noteEvents = generateFixedPattern(config.introSequence, currentCycleKey, scaleTypeRef.current);
+        noteEvents = generateFixedPattern(
+          config.introSequence, 
+          currentCycleKey, 
+          scaleTypeRef.current,
+          settings.refs.minVocalMidi.current,
+          settings.refs.maxVocalMidi.current
+        );
         hasPlayedIntroSequence.current = true; 
       }
       else {
@@ -505,7 +517,13 @@ export function useSessionLogic() {
         const pattern: ScaleDegree[] = scaleTypeRef.current === 'PentatonicMinor' 
           ? ["1", "b3", "5", "1"] 
           : ["1", "3", "5", "1"];
-        noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleTypeRef.current);
+        noteEvents = generateFixedPattern(
+          pattern, 
+          currentCycleKey, 
+          scaleTypeRef.current,
+          fretboardRange?.min ?? settings.refs.minVocalMidi.current,
+          fretboardRange?.max ?? settings.refs.maxVocalMidi.current
+        );
         setStatus("New Key: Settling In");
       } else {
         constraints = {
@@ -528,7 +546,13 @@ export function useSessionLogic() {
     const pattern: ScaleDegree[] = scaleTypeRef.current === 'Minor' || scaleTypeRef.current === 'PentatonicMinor'
       ? ["1", "b3", "5", "1"] 
       : ["1", "3", "5", "1"];
-    noteEvents = generateFixedPattern(pattern, currentCycleKey, scaleTypeRef.current);
+    noteEvents = generateFixedPattern(
+      pattern, 
+      currentCycleKey, 
+      scaleTypeRef.current,
+      settings.refs.minVocalMidi.current,
+      settings.refs.maxVocalMidi.current
+    );
     setStatus("New Key: Settling In");
   } else {
     constraints = {
