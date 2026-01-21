@@ -4,9 +4,10 @@ import './GuidedTutorial.css';
 interface TutorialStep {
   target: string;
   title: string;
-  points: string[]; // Structured bullet points instead of paragraph
+  points: string[];
   position?: 'top' | 'bottom' | 'left' | 'right';
-  highlightPadding?: number; // Extra padding around highlight
+  highlightPadding?: number;
+  smartPosition?: boolean;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -14,10 +15,11 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     target: '.tabs',
     title: '🎵 Welcome to Guided Ear Training!',
     points: [
-      'Three practice modes available',
-      'Random: Freeform practice with any scale degree',
-      'Training: Structured curriculum with progressive levels',
-      'Fretboard: Guitar-specific CAGED shape training'
+      'Three practice modes to choose from',
+      'Random: Freeform practice with full control',
+      'Training: Structured curriculum (explained later)',
+      'Fretboard: Guitar CAGED shapes (explained later)',
+      '💡 Hover over each tab to see what it does'
     ],
     position: 'bottom',
     highlightPadding: 15
@@ -29,6 +31,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       'Choose your scale type (Major, Minor, Pentatonic)',
       'Select the musical key to practice in',
       'Shuffle button picks a random key',
+      'Switch between Tape (scrolling) and Static (grid) views',
       'All melodies will be generated in your selected key'
     ],
     position: 'bottom',
@@ -43,30 +46,58 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       'Pause anytime to take a break',
       'Restart button resets the current session'
     ],
-    position: 'top',
-    highlightPadding: 20
+    position: 'bottom',
+    highlightPadding: 20,
+    smartPosition: true
   },
   {
     target: '.visualizer-container, .degree-grid',
-    title: '👁️ Visual Feedback',
+    title: '👁️ Visual Feedback & Scale Degrees',
     points: [
-      'Watch notes scroll by as melodies play',
+      'Watch notes scroll/light up as melodies play',
       'Click/tap degrees to enable or disable them',
-      'Long-press (600ms) to focus on specific degrees',
-      'Focused degrees appear more frequently in practice'
+      'Long-press (600ms) to FOCUS on specific degrees',
+      'Focused degrees appear more frequently in melodies',
+      '💡 Hover over degrees for click/long-press instructions'
     ],
     position: 'top',
     highlightPadding: 25
   },
   {
+    target: '.tabs button:nth-child(2)',
+    title: '📚 Training Mode Explained',
+    points: [
+      'Structured curriculum with progressive levels',
+      'Each level focuses on specific scale degrees',
+      'Practice one level at a time to build skills',
+      'Levels unlock as you master earlier ones',
+      'Perfect for systematic ear training development'
+    ],
+    position: 'bottom',
+    highlightPadding: 15
+  },
+  {
+    target: '.tabs button:nth-child(3)',
+    title: '🎸 Fretboard Mode Explained',
+    points: [
+      'Guitar-specific practice using CAGED system',
+      'Practice scale shapes across the fretboard',
+      'Visual fretboard shows note positions',
+      'Switch between shapes (C, A, G, E, D)',
+      'Helps guitarists visualize scales on the neck'
+    ],
+    position: 'bottom',
+    highlightPadding: 15
+  },
+  {
     target: '.settings-trigger',
     title: '⚙️ Customize Everything',
     points: [
-      'Adjust melody difficulty (Easy/Normal/Hard)',
-      'Set tempo and drum patterns',
-      'Configure your vocal range',
-      'Mix audio levels to your preference',
-      'Enable Pitch Guide, Inverse Mode, or Blind Mode'
+      'Open to access all control settings',
+      'Four tabs: Melody, Rhythm, Mixer, and More',
+      'Adjust difficulty, tempo, vocal range, and audio levels',
+      'Enable special modes: Pitch Guide, Inverse, or Blind',
+      '💡 Hover over any button for helpful tooltips!'
     ],
     position: 'top',
     highlightPadding: 15
@@ -97,7 +128,6 @@ export default function GuidedTutorial({ onComplete }: GuidedTutorialProps) {
     const step = TUTORIAL_STEPS[currentStep];
     const selectors = step.target.split(',').map(s => s.trim());
     
-    // Try each selector until we find one
     let element: HTMLElement | null = null;
     for (const selector of selectors) {
       element = document.querySelector(selector) as HTMLElement;
@@ -124,7 +154,22 @@ export default function GuidedTutorial({ onComplete }: GuidedTutorialProps) {
         overlayRef.current.style.setProperty('--target-height', `${rect.height + (padding * 2)}px`);
       }
 
-      setTooltipPosition(step.position || 'bottom');
+      // Smart positioning: check if tooltip would block the target
+      let finalPosition = step.position || 'bottom';
+      
+      if (step.smartPosition) {
+        const viewportHeight = window.innerHeight;
+        const elementCenter = rect.top + (rect.height / 2);
+        
+        if (elementCenter > viewportHeight / 2 && finalPosition === 'bottom') {
+          finalPosition = 'top';
+        }
+        else if (elementCenter < viewportHeight / 2 && finalPosition === 'top') {
+          finalPosition = 'bottom';
+        }
+      }
+      
+      setTooltipPosition(finalPosition);
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [currentStep, isActive]);

@@ -15,7 +15,7 @@ interface VisualizerProps {
   toggleDegree: (d: ScaleDegree) => void;
   toggleFocus: (d: ScaleDegree) => void;
   scaleType: ScaleType;
-  hideMovement?: boolean; // NEW: Prevents tape from moving in inverse blind mode
+  hideMovement?: boolean; // NEW: Prevents tape scrolling in blind mode
 }
 
 interface NoteCellProps {
@@ -51,7 +51,11 @@ const NoteCell = ({
   if (isLongPressing) classes += ' pressing';
 
   return (
-    <div className={classes} {...handlers}>
+    <div 
+      className={classes} 
+      {...handlers}
+      title={`Scale degree ${label} - Click to ${isEnabled ? 'disable' : 'enable'} | Long-press (600ms) to focus`}
+    >
       <span style={{ pointerEvents: 'none' }}>{label}</span>
     </div>
   );
@@ -66,7 +70,7 @@ export default function Visualizer({
   toggleDegree, 
   toggleFocus, 
   scaleType,
-  hideMovement = false
+  hideMovement = false // NEW: Prevents tape from scrolling
 }: VisualizerProps) {
 
   // Helper to get cell props
@@ -85,9 +89,8 @@ export default function Visualizer({
       (_, i) => i - TAPE_RANGE
     );
     const initialOffset = (TAPE_RANGE * CELL_WIDTH) + (CELL_WIDTH / 2);
-    
-    // FIX: When hideMovement is true (inverse mode + blind mode), keep tape centered
-    const dynamicOffset = hideMovement ? 0 : (lastValidStep * CELL_WIDTH);
+    // If hideMovement is true, keep tape centered (don't scroll)
+    const dynamicOffset = hideMovement ? 0 : lastValidStep * CELL_WIDTH;
     const totalTranslate = -(initialOffset + dynamicOffset);
 
     return (

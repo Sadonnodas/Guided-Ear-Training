@@ -18,7 +18,15 @@ const InverseIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="
 const MetronomeIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L4 20h16L12 2z" /><path d="M12 6v8" /></svg>;
 const TutorialIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
 
+// Tab icons
+const MelodyIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+const RhythmIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
+const MixerIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;
+const MoreIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>;
+
 const TEMPOS = [60, 80, 100, 120, 150];
+
+type ControlTab = 'melody' | 'rhythm' | 'mixer' | 'more';
 
 interface ControlsProps {
   isPlaying: boolean;
@@ -38,7 +46,6 @@ interface ControlsProps {
   debugClick: boolean;
   setDebugClick: (v: boolean) => void;
   
-  // MIXER
   volMaster: number; setVolMaster: (v: number) => void;
   volVoice: number; setVolVoice: (v: number) => void;
   volDrone: number; setVolDrone: (v: number) => void;
@@ -54,7 +61,6 @@ interface ControlsProps {
   setHideFretboardVisuals: (v: boolean) => void;
   activeTab: string;
   
-  // Vocal Range
   minVocalMidi: number;
   maxVocalMidi: number;
   setMinVocalMidi: (n: number) => void;
@@ -63,13 +69,13 @@ interface ControlsProps {
 
 export default function Controls(props: ControlsProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeControlTab, setActiveControlTab] = useState<ControlTab>('melody');
   const [animate, setAnimate] = useState(false);
   const [showTutorialButton, setShowTutorialButton] = useState(false);
 
   const beatDuration = ((60 / props.bpm) * 0.9).toFixed(3);
 
   useEffect(() => {
-    // Check if tutorial has been completed
     const completed = localStorage.getItem('tutorial-completed');
     setShowTutorialButton(!!completed);
   }, []);
@@ -138,285 +144,349 @@ export default function Controls(props: ControlsProps) {
       </div>
 
       <div className={`controls-accordion ${settingsOpen ? 'open' : ''}`}>
+        {/* Control Tabs */}
+        <div className="control-tabs">
+          <button
+            className={`control-tab ${activeControlTab === 'melody' ? 'active' : ''}`}
+            onClick={() => setActiveControlTab('melody')}
+            title="Melody settings: difficulty, flow, repetitions, and vocal range"
+          >
+            <MelodyIcon />
+            <span>Melody</span>
+          </button>
+          <button
+            className={`control-tab ${activeControlTab === 'rhythm' ? 'active' : ''}`}
+            onClick={() => setActiveControlTab('rhythm')}
+            title="Rhythm settings: tempo, groove, and metronome"
+          >
+            <RhythmIcon />
+            <span>Rhythm</span>
+          </button>
+          <button
+            className={`control-tab ${activeControlTab === 'mixer' ? 'active' : ''}`}
+            onClick={() => setActiveControlTab('mixer')}
+            title="Audio mixer: volume levels for all instruments"
+          >
+            <MixerIcon />
+            <span>Mixer</span>
+          </button>
+          <button
+            className={`control-tab ${activeControlTab === 'more' ? 'active' : ''}`}
+            onClick={() => setActiveControlTab('more')}
+            title="Additional options and tutorial"
+          >
+            <MoreIcon />
+            <span>More</span>
+          </button>
+        </div>
+
+        {/* Tab Content */}
         <div className="controls-content">
-    
-          {/* MELODY DIFFICULTY */}
-          <div className="control-section">
-            <h3 className="section-title">Melody Difficulty</h3>
-            <div className="toggle-grid-sleek">
-              <div 
-                className={`toggle-pill-btn ${props.difficulty === 'easy' ? 'active' : ''}`} 
-                onClick={() => props.setDifficulty('easy')}
-                title="Easier melodies with smaller intervals"
-              >
-                Easy
-              </div>
-              <div 
-                className={`toggle-pill-btn ${props.difficulty === 'normal' ? 'active' : ''}`} 
-                onClick={() => props.setDifficulty('normal')}
-                title="Balanced difficulty with varied intervals"
-              >
-                Normal
-              </div>
-              <div 
-                className={`toggle-pill-btn ${props.difficulty === 'hard' ? 'active' : ''}`} 
-                onClick={() => props.setDifficulty('hard')}
-                title="Challenging melodies with larger leaps"
-              >
-                Hard
-              </div>
-            </div>
-          </div>
-
-          {/* MELODY FLOW */}
-          <div className="control-section">
-            <h3 className="section-title">Melody Flow</h3>
-            <div className="toggle-grid-sleek">
-              
-              <div 
-                className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} 
-                onClick={() => props.setStartRoot(!props.startRoot)}
-                title="Melodies always start on the root note (1)"
-              >
-                Start on 1
-              </div>
-              
-              <div 
-                className={`toggle-pill-btn ${props.endRoot ? 'active' : ''}`} 
-                onClick={() => props.setEndRoot(!props.endRoot)}
-                title="Melodies always end on the root note (1)"
-              >
-                End on 1
-              </div>
-
-              {showPitchGuideAndInverse && (
-                <div 
-                  className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
-                  onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
-                  title="Pitch Guide: Synth plays along with your singing for reference"
-                >
-                  <TrainingWheelsIcon />
+          
+          {/* MELODY TAB */}
+          {activeControlTab === 'melody' && (
+            <>
+              <div className="control-section">
+                <h3 className="section-title">Difficulty</h3>
+                <div className="toggle-grid-sleek">
+                  <div 
+                    className={`toggle-pill-btn ${props.difficulty === 'easiest' ? 'active' : ''}`} 
+                    onClick={() => props.setDifficulty('easiest')}
+                    title="Easiest: Very small steps, mostly 2nds and 3rds with one 5th allowed"
+                  >
+                    Easiest
+                  </div>
+                  <div 
+                    className={`toggle-pill-btn ${props.difficulty === 'easy' ? 'active' : ''}`} 
+                    onClick={() => props.setDifficulty('easy')}
+                    title="Easy: Smaller intervals, mostly stepwise motion"
+                  >
+                    Easy
+                  </div>
+                  <div 
+                    className={`toggle-pill-btn ${props.difficulty === 'normal' ? 'active' : ''}`} 
+                    onClick={() => props.setDifficulty('normal')}
+                    title="Normal: Balanced difficulty with varied intervals"
+                  >
+                    Normal
+                  </div>
+                  <div 
+                    className={`toggle-pill-btn ${props.difficulty === 'hard' ? 'active' : ''}`} 
+                    onClick={() => props.setDifficulty('hard')}
+                    title="Hard: Challenging melodies with larger leaps"
+                  >
+                    Hard
+                  </div>
                 </div>
-              )}
+              </div>
 
-              {showPitchGuideAndInverse && (
-                <div 
-                  className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
-                  onClick={() => props.setInverseMode(!props.inverseMode)} 
-                  title="Inverse Mode: Listen first, then sing the melody back"
-                >
-                  <InverseIcon />
+              <div className="control-section">
+                <h3 className="section-title">Melody Flow</h3>
+                <div className="toggle-grid-sleek">
+                  <div 
+                    className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} 
+                    onClick={() => props.setStartRoot(!props.startRoot)}
+                    title="Melodies always start on the root note (1)"
+                  >
+                    Start on 1
+                  </div>
+                  
+                  <div 
+                    className={`toggle-pill-btn ${props.endRoot ? 'active' : ''}`} 
+                    onClick={() => props.setEndRoot(!props.endRoot)}
+                    title="Melodies always end on the root note (1)"
+                  >
+                    End on 1
+                  </div>
+
+                  {showPitchGuideAndInverse && (
+                    <div 
+                      className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
+                      onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
+                      title="Pitch Guide: Synth plays along with your singing for reference"
+                    >
+                      <TrainingWheelsIcon />
+                    </div>
+                  )}
+
+                  {showPitchGuideAndInverse && (
+                    <div 
+                      className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
+                      onClick={() => props.setInverseMode(!props.inverseMode)} 
+                      title="Inverse Mode: Listen first, then sing the melody back"
+                    >
+                      <InverseIcon />
+                    </div>
+                  )}
+
+                  {showBlindMode && (
+                    <div 
+                      className={`icon-toggle-btn ${props.hideFretboardVisuals ? 'active' : ''}`} 
+                      onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
+                      title="Blind Mode: Hide visual indicators during practice"
+                    >
+                      <EyeOffIcon />
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {showBlindMode && (
-                <div 
-                  className={`icon-toggle-btn ${props.hideFretboardVisuals ? 'active' : ''}`} 
-                  onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
-                  title="Blind Mode: Hide visual indicators during practice"
-                >
-                  <EyeOffIcon />
+              <div className="control-section">
+                <h3 className="section-title">Repetition</h3>
+                <div className="row-split">
+                  <div className="stepper-label">Melodies Per Key</div>
+                  <div className="stepper-control">
+                    <button 
+                      className="stepper-btn" 
+                      onClick={() => adjustQuestions(-1)}
+                      title="Decrease repetitions"
+                    >
+                      <MinusIcon/>
+                    </button>
+                    <input 
+                      type="number" 
+                      className="stepper-input" 
+                      value={props.questionsPerKey}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) props.setQuestionsPerKey(Math.max(1, Math.min(50, val)));
+                      }}
+                      title="Number of melodies to practice per key"
+                    />
+                    <button 
+                      className="stepper-btn" 
+                      onClick={() => adjustQuestions(1)}
+                      title="Increase repetitions"
+                    >
+                      <PlusIcon/>
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* REPETITION */}
-          <div className="control-section">
-            <h3 className="section-title">Repetition</h3>
-            <div className="row-split">
-              <div className="stepper-label">Melodies Per Key</div>
-              <div className="stepper-control">
-                <button 
-                  className="stepper-btn" 
-                  onClick={() => adjustQuestions(-1)}
-                  title="Decrease repetitions"
-                >
-                  <MinusIcon/>
-                </button>
-                <input 
-                  type="number" 
-                  className="stepper-input" 
-                  value={props.questionsPerKey}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) props.setQuestionsPerKey(Math.max(1, Math.min(50, val)));
+              <div className="control-section no-border">
+                <VoiceRangeControl
+                  minMidi={props.minVocalMidi}
+                  maxMidi={props.maxVocalMidi}
+                  onRangeChange={(min, max) => {
+                    props.setMinVocalMidi(min);
+                    props.setMaxVocalMidi(max);
                   }}
-                  title="Number of melodies to practice per key"
-                />
-                <button 
-                  className="stepper-btn" 
-                  onClick={() => adjustQuestions(1)}
-                  title="Increase repetitions"
-                >
-                  <PlusIcon/>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* RHYTHM */}
-          <div className="control-section">
-            <h3 className="section-title">Rhythm</h3>
-            <div className="tempo-row" style={{marginBottom: '8px'}}>
-              {TEMPOS.map(t => (
-                <button 
-                  key={t} 
-                  className={`tempo-btn ${props.bpm === t ? 'active' : ''}`} 
-                  onClick={() => props.setBpm(t)}
-                  title={`Set tempo to ${t} BPM`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="row-split" style={{marginBottom: '8px'}}>
-              <span className="stepper-label">Groove</span>
-              <select 
-                className="pattern-select" 
-                value={props.currentPattern}
-                onChange={(e) => props.setPattern(e.target.value)}
-                title="Select drum pattern style"
-              >
-                {Object.keys(DRUM_PATTERNS).map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="row-split">
-              <span className="stepper-label">Metronome Click</span>
-              <div 
-                className={`icon-toggle-btn ${props.debugClick ? 'active' : ''}`} 
-                onClick={() => props.setDebugClick(!props.debugClick)} 
-                title="Toggle metronome click on beats"
-                style={{ background: props.debugClick ? 'var(--btn-play)' : undefined }}
-              >
-                <MetronomeIcon />
-              </div>
-            </div>
-          </div>
-
-          {/* MIXER */}
-          <div className="control-section no-border">
-            <h3 className="section-title">Mixer</h3>
-            
-            {showGuideVolume && (
-              <div className="slider-row">
-                <span style={{color:'var(--c-3)'}} title="Volume of pitch guide synth">Guide</span>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="1" 
-                  step="0.05" 
-                  value={props.volTraining} 
-                  onChange={e => props.setVolTraining(parseFloat(e.target.value))}
-                  title="Adjust pitch guide volume"
+                  onAutoCalibrate={handleAutoCalibrate}
                 />
               </div>
-            )}
+            </>
+          )}
 
-            <div className="slider-row">
-              <span title="Master volume control">Master</span>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.05" 
-                value={props.volMaster} 
-                onChange={e => props.setVolMaster(parseFloat(e.target.value))}
-                title="Adjust master volume"
-              />
-            </div>
-            <div className="slider-row">
-              <span 
-                onClick={() => props.toggleMute('voice', props.volVoice, props.setVolVoice)} 
-                className={props.volVoice === 0 ? 'muted-label' : 'active-label'}
-                title="Click to mute/unmute voice samples"
-              >
-                Voice
-              </span>
-              <input 
-                type="range" 
-                min="0" 
-                max="1.5" 
-                step="0.1" 
-                value={props.volVoice} 
-                onChange={e => props.setVolVoice(parseFloat(e.target.value))}
-                title="Adjust vocal sample volume"
-              />
-            </div>
-            <div className="slider-row">
-              <span title="Reverb amount">Reverb</span>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.05" 
-                value={props.volReverb} 
-                onChange={e => props.setVolReverb(parseFloat(e.target.value))}
-                title="Adjust reverb effect intensity"
-              />
-            </div>
-            <div className="slider-row">
-              <span 
-                onClick={() => props.toggleMute('drone', props.volDrone, props.setVolDrone)} 
-                className={props.volDrone === 0 ? 'muted-label' : 'active-label'}
-                title="Click to mute/unmute drone"
-              >
-                Drone
-              </span>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.05" 
-                value={props.volDrone} 
-                onChange={e => props.setVolDrone(parseFloat(e.target.value))}
-                title="Adjust root note drone volume"
-              />
-            </div>
-            <div className="slider-row">
-              <span 
-                onClick={() => props.toggleMute('groove', props.volGroove, props.setVolGroove)} 
-                className={props.volGroove === 0 ? 'muted-label' : 'active-label'}
-                title="Click to mute/unmute drums"
-              >
-                Drums
-              </span>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.05" 
-                value={props.volGroove} 
-                onChange={e => props.setVolGroove(parseFloat(e.target.value))}
-                title="Adjust drum pattern volume"
-              />
-            </div>
+          {/* RHYTHM TAB */}
+          {activeControlTab === 'rhythm' && (
+            <>
+              <div className="control-section">
+                <h3 className="section-title">Tempo</h3>
+                <div className="tempo-row">
+                  {TEMPOS.map(t => (
+                    <button 
+                      key={t} 
+                      className={`tempo-btn ${props.bpm === t ? 'active' : ''}`} 
+                      onClick={() => props.setBpm(t)}
+                      title={`Set tempo to ${t} BPM`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {/* VOCAL RANGE CONTROL */}
-            <VoiceRangeControl
-              minMidi={props.minVocalMidi}
-              maxMidi={props.maxVocalMidi}
-              onRangeChange={(min, max) => {
-                props.setMinVocalMidi(min);
-                props.setMaxVocalMidi(max);
-              }}
-              onAutoCalibrate={handleAutoCalibrate}
-            />
-          </div>
+              <div className="control-section no-border">
+                <h3 className="section-title">Groove & Click</h3>
+                <div className="row-split" style={{marginBottom: '12px'}}>
+                  <span className="stepper-label">Drum Pattern</span>
+                  <select 
+                    className="pattern-select" 
+                    value={props.currentPattern}
+                    onChange={(e) => props.setPattern(e.target.value)}
+                    title="Select drum pattern style"
+                  >
+                    {Object.keys(DRUM_PATTERNS).map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="row-split">
+                  <span className="stepper-label">Metronome Click</span>
+                  <div 
+                    className={`icon-toggle-btn ${props.debugClick ? 'active' : ''}`} 
+                    onClick={() => props.setDebugClick(!props.debugClick)} 
+                    title="Toggle metronome click on beats"
+                    style={{ background: props.debugClick ? 'var(--btn-play)' : undefined }}
+                  >
+                    <MetronomeIcon />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
-          {/* TUTORIAL RESTART BUTTON */}
-          {showTutorialButton && (
-            <div className="control-section no-border" style={{paddingTop: '15px'}}>
-              <button 
-                className="tutorial-restart-btn-controls"
-                onClick={restartTutorial}
-                title="Restart the interactive tutorial walkthrough"
-              >
-                <TutorialIcon />
-                <span>Restart Tutorial</span>
-              </button>
+          {/* MIXER TAB */}
+          {activeControlTab === 'mixer' && (
+            <>
+              <div className="control-section no-border">
+                <h3 className="section-title">Volume Levels</h3>
+                
+                {showGuideVolume && (
+                  <div className="slider-row">
+                    <span style={{color:'var(--c-3)'}} title="Volume of pitch guide synth">Guide</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.05" 
+                      value={props.volTraining} 
+                      onChange={e => props.setVolTraining(parseFloat(e.target.value))}
+                      title="Adjust pitch guide volume"
+                    />
+                  </div>
+                )}
+
+                <div className="slider-row">
+                  <span title="Master volume control">Master</span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05" 
+                    value={props.volMaster} 
+                    onChange={e => props.setVolMaster(parseFloat(e.target.value))}
+                    title="Adjust master volume"
+                  />
+                </div>
+                <div className="slider-row">
+                  <span 
+                    onClick={() => props.toggleMute('voice', props.volVoice, props.setVolVoice)} 
+                    className={props.volVoice === 0 ? 'muted-label' : 'active-label'}
+                    title="Click to mute/unmute voice samples"
+                  >
+                    Voice
+                  </span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1.5" 
+                    step="0.1" 
+                    value={props.volVoice} 
+                    onChange={e => props.setVolVoice(parseFloat(e.target.value))}
+                    title="Adjust vocal sample volume"
+                  />
+                </div>
+                <div className="slider-row">
+                  <span title="Reverb amount">Reverb</span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05" 
+                    value={props.volReverb} 
+                    onChange={e => props.setVolReverb(parseFloat(e.target.value))}
+                    title="Adjust reverb effect intensity"
+                  />
+                </div>
+                <div className="slider-row">
+                  <span 
+                    onClick={() => props.toggleMute('drone', props.volDrone, props.setVolDrone)} 
+                    className={props.volDrone === 0 ? 'muted-label' : 'active-label'}
+                    title="Click to mute/unmute drone"
+                  >
+                    Drone
+                  </span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05" 
+                    value={props.volDrone} 
+                    onChange={e => props.setVolDrone(parseFloat(e.target.value))}
+                    title="Adjust root note drone volume"
+                  />
+                </div>
+                <div className="slider-row">
+                  <span 
+                    onClick={() => props.toggleMute('groove', props.volGroove, props.setVolGroove)} 
+                    className={props.volGroove === 0 ? 'muted-label' : 'active-label'}
+                    title="Click to mute/unmute drums"
+                  >
+                    Drums
+                  </span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05" 
+                    value={props.volGroove} 
+                    onChange={e => props.setVolGroove(parseFloat(e.target.value))}
+                    title="Adjust drum pattern volume"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* MORE TAB */}
+          {activeControlTab === 'more' && (
+            <div className="control-section no-border">
+              <h3 className="section-title">Help & Tutorial</h3>
+              <p className="help-text">
+                💡 <strong>Tip:</strong> Hover over any button or control to see helpful information about what it does!
+              </p>
+              {showTutorialButton && (
+                <button 
+                  className="tutorial-restart-btn-full"
+                  onClick={restartTutorial}
+                  title="Restart the interactive tutorial walkthrough"
+                >
+                  <TutorialIcon />
+                  <span>Restart Interactive Tutorial</span>
+                </button>
+              )}
             </div>
           )}
 

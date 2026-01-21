@@ -1,42 +1,40 @@
-import * as Tone from "tone";
 import type { MusicalKey, ScaleDegree, ScaleType, NoteInfo, MelodyDifficulty } from "../types";
 
+// --- Root notes in MIDI ---
 const ROOT_MIDI: Record<MusicalKey, number> = {
-  "C": 48, "Cs": 49, "D": 50, "Ds": 51, "E": 52, "F": 53,
-  "Fs": 54, "G": 55, "Gs": 56, "A": 57, "As": 58, "B": 59
+  "C": 60, "Cs": 61, "D": 62, "Ds": 63,
+  "E": 64, "F": 65, "Fs": 66, "G": 67,
+  "Gs": 68, "A": 69, "As": 70, "B": 71
 };
 
+// --- Global vocal range constraints (used as default) ---
+const DEFAULT_MIN_MIDI = 43; // G2 - lowest sample
+const DEFAULT_MAX_MIDI = 67; // G4 - highest sample
+
+// --- Degree to Semitone Mapping ---
 const DEGREE_TO_SEMITONE: Record<ScaleDegree, number> = {
-  "1": 0, "b2": 1, "2": 2, "b3": 3, "3": 4, "4": 5, "#4": 6, 
-  "5": 7, "b6": 8, "6": 9, "b7": 10, "7": 11
+  "1": 0, "b2": 1, "2": 2, "b3": 3,
+  "3": 4, "4": 5, "#4": 6, "5": 7,
+  "b6": 8, "6": 9, "b7": 10, "7": 11
 };
 
-const SCALES: Record<ScaleType, { degrees: ScaleDegree[], intervals: number[] }> = {
-  Major: {
-    degrees: ["1", "2", "3", "4", "5", "6", "7"],
-    intervals: [0, 2, 4, 5, 7, 9, 11]
-  },
-  Minor: {
-    degrees: ["1", "2", "b3", "4", "5", "b6", "b7"],
-    intervals: [0, 2, 3, 5, 7, 8, 10]
-  },
-  PentatonicMajor: {
-    degrees: ["1", "2", "3", "5", "6"],
-    intervals: [0, 2, 4, 7, 9]
-  },
-  PentatonicMinor: {
-    degrees: ["1", "b3", "4", "5", "b7"],
-    intervals: [0, 3, 5, 7, 10]
-  },
-  Chromatic: {
-    degrees: ["1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7"],
-    intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-  }
+// --- Define Which Notes Exist in Each Scale ---
+const SCALE_DEGREES: Record<ScaleType, ScaleDegree[]> = {
+  "Major": ["1", "2", "3", "4", "5", "6", "7"],
+  "Minor": ["1", "2", "b3", "4", "5", "b6", "b7"],
+  "PentatonicMajor": ["1", "2", "3", "5", "6"],
+  "PentatonicMinor": ["1", "b3", "4", "5", "b7"],
+  "Chromatic": ["1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7"]
 };
 
-const DEFAULT_MIN_MIDI = 43; // G2
-const DEFAULT_MAX_MIDI = 67; // G4
-
+/**
+ * Get a valid MIDI note for a given degree, respecting:
+ * - Difficulty-based jump limits
+ * - Vocal or fretboard range constraints
+ * - Octave selection for smooth voice leading
+ *
+ * ENHANCED: Now supports "easiest" difficulty with strict interval limits
+ */
 export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
@@ -44,13 +42,12 @@ export function getNoteForDegree(
   previousMidi: number | null = null,
   difficulty: MelodyDifficulty = "normal",
   hasLeaped: boolean = false,
-  minLimit?: number, // Dynamic lower bound
-  maxLimit?: number  // Dynamic upper bound
+  minLimit?: number,
+  maxLimit?: number
 ): NoteInfo {
   const rootMidi = ROOT_MIDI[key];
   const interval = DEGREE_TO_SEMITONE[degree]; 
   
-  // Use provided limits (fretboard range) or fall back to global vocal range
   const minMidi = minLimit ?? DEFAULT_MIN_MIDI;
   const maxMidi = maxLimit ?? DEFAULT_MAX_MIDI;
 
@@ -59,12 +56,19 @@ export function getNoteForDegree(
   if (previousMidi !== null) {
     const candidates = [targetMidi - 12, targetMidi, targetMidi + 12];
     
-    let jumpLimit = 12; 
-    if (difficulty === "easy") {
-        jumpLimit = 7; 
+    let jumpLimit = 12;
+    
+    // DIFFICULTY SETTINGS
+    if (difficulty === "easiest") {
+      // Easiest: Max interval is Major 3rd (4 semitones)
+      // One perfect 5th (7 semitones) allowed per melody (tracked by hasLeaped)
+      jumpLimit = hasLeaped ? 4 : 7;
+    } else if (difficulty === "easy") {
+      jumpLimit = 7; // Perfect 5th
     } else if (difficulty === "normal" && hasLeaped) {
-        jumpLimit = 7; 
+      jumpLimit = 7;
     }
+    // hard has no limit (jumpLimit = 12)
 
     let valid = candidates.filter(m => {
         const withinRange = m >= minMidi && m <= maxMidi;
@@ -75,7 +79,6 @@ export function getNoteForDegree(
     if (valid.length > 0) {
       targetMidi = valid[Math.floor(Math.random() * valid.length)];
     } else {
-        // Fallback: if range is too tight for the jump limit, ignore jump limit but keep range
         const validInRange = candidates.filter(m => m >= minMidi && m <= maxMidi);
         if (validInRange.length > 0) {
             targetMidi = validInRange[Math.floor(Math.random() * validInRange.length)];
@@ -91,44 +94,56 @@ export function getNoteForDegree(
     }
   }
 
-  // Final safety clamp
-  while (targetMidi < minMidi) targetMidi += 12;
-  while (targetMidi > maxMidi) targetMidi -= 12;
+  // Build the final frequency
+  const freq = 440 * Math.pow(2, (targetMidi - 69) / 12);
 
   return {
     degree,
     midi: targetMidi,
-    frequency: Tone.Frequency(targetMidi, "midi").toFrequency(),
-    label: Tone.Frequency(targetMidi, "midi").toNote()
+    frequency: freq,
+    label: `${degree} (${targetMidi})`
   };
 }
 
-export function getAvailableDegrees(scaleType: ScaleType): ScaleDegree[] {
-  return SCALES[scaleType].degrees;
+/**
+ * Convert a step offset from root note to the corresponding scale degree
+ */
+export function getDegreeLabelFromStep(step: number, scaleType: ScaleType): ScaleDegree {
+  const degrees = SCALE_DEGREES[scaleType];
+  const index = ((step % degrees.length) + degrees.length) % degrees.length;
+  return degrees[index];
 }
 
-export function getScaleStepsFromRoot(midi: number, key: MusicalKey, scaleType: ScaleType): number {
-  const rootMidi = ROOT_MIDI[key];
-  const semitoneDiff = midi - rootMidi;
-  const remainder = ((semitoneDiff % 12) + 12) % 12; 
-
-  const degreeLabels = Object.keys(DEGREE_TO_SEMITONE) as ScaleDegree[];
-  const degree = degreeLabels.find(d => DEGREE_TO_SEMITONE[d] === remainder) || "1";
+/**
+ * Get steps from root for a given MIDI note
+ */
+export function getScaleStepsFromRoot(midi: number, rootNote: MusicalKey, scaleType: ScaleType): number {
+  const rootMidi = ROOT_MIDI[rootNote];
+  const semitones = midi - rootMidi;
+  const degrees = SCALE_DEGREES[scaleType];
   
-  const scaleDef = SCALES[scaleType];
-  let stepIndex = scaleDef.degrees.indexOf(degree);
+  const allSemitones = degrees.map(d => DEGREE_TO_SEMITONE[d]);
   
-  if (stepIndex === -1) {
-      stepIndex = remainder; 
+  let bestMatch = 0;
+  let minDiff = Infinity;
+  
+  for (let octaveShift = -3; octaveShift <= 3; octaveShift++) {
+    for (let i = 0; i < allSemitones.length; i++) {
+      const candidateSemitones = allSemitones[i] + (octaveShift * 12);
+      const diff = Math.abs(candidateSemitones - semitones);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestMatch = i + (octaveShift * degrees.length);
+      }
+    }
   }
-
-  const octaves = Math.floor(semitoneDiff / 12);
-  return (octaves * scaleDef.degrees.length) + stepIndex;
+  
+  return bestMatch;
 }
 
-export function getDegreeLabelFromStep(stepIndex: number, scaleType: ScaleType): string {
-    const scaleDef = SCALES[scaleType];
-    const len = scaleDef.degrees.length;
-    const wrappedIndex = ((stepIndex % len) + len) % len;
-    return scaleDef.degrees[wrappedIndex];
+/**
+ * Get all available degrees for a given scale
+ */
+export function getAvailableDegrees(scaleType: ScaleType): ScaleDegree[] {
+  return SCALE_DEGREES[scaleType];
 }
