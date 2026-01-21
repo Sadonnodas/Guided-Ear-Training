@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import './GuidedTutorial.css';
 
+// Detect mobile
+const isMobile = () => window.innerWidth <= 600;
+
 interface TutorialStep {
   target: string;
   title: string;
@@ -188,8 +191,14 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
         }
       }
       
-      setTooltipPosition(finalPosition);
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // On mobile, always use bottom position and scroll element to top
+      if (isMobile()) {
+        setTooltipPosition('bottom');
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        setTooltipPosition(finalPosition);
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   };
 
