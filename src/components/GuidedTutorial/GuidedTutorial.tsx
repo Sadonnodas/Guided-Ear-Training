@@ -206,10 +206,34 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
   const handleBackdropClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     
-    // Only close if clicking directly on the backdrop
-    if (target.classList.contains('tutorial-backdrop')) {
-      handleSkip();
+    // Check if click is on backdrop
+    if (!target.classList.contains('tutorial-backdrop')) {
+      return;
     }
+    
+    // Check if click is within highlighted element bounds
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+    
+    const highlightBounds = {
+      left: position.left,
+      right: position.left + position.width,
+      top: position.top,
+      bottom: position.top + position.height
+    };
+    
+    // If click is within highlighted area, don't close
+    if (
+      clickX >= highlightBounds.left &&
+      clickX <= highlightBounds.right &&
+      clickY >= highlightBounds.top &&
+      clickY <= highlightBounds.bottom
+    ) {
+      return; // Click is on highlighted element - ignore
+    }
+    
+    // Click is outside highlighted area - close tutorial
+    handleSkip();
   };
 
   const handleNext = () => {
@@ -233,6 +257,10 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
   const completeTutorial = () => {
     localStorage.setItem('tutorial-completed', 'true');
     setIsActive(false);
+    
+    // Dispatch custom event so Controls knows to show button
+    window.dispatchEvent(new Event('tutorial-completed'));
+    
     if (onComplete) onComplete();
   };
 

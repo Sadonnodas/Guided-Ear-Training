@@ -82,6 +82,25 @@ export default function Controls(props: ControlsProps) {
     setShowTutorialButton(!!completed);
   }, []);
 
+  // NEW: Listen for tutorial completion events
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const completed = localStorage.getItem('tutorial-completed');
+      setShowTutorialButton(!!completed);
+    };
+
+    // Listen for storage changes (from other tabs)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Listen for custom event (from same tab)
+    window.addEventListener('tutorial-completed', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('tutorial-completed', handleStorageChange);
+    };
+  }, []);
+
   useEffect(() => {
     if (props.isPlaying) {
       setAnimate(true);
