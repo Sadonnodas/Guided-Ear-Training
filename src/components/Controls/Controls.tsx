@@ -73,6 +73,8 @@ export default function Controls(props: ControlsProps) {
   const [animate, setAnimate] = useState(false);
   const [showTutorialButton, setShowTutorialButton] = useState(false);
 
+  const isTrainingMode = props.activeTab === 'training';
+
   const beatDuration = ((60 / props.bpm) * 0.9).toFixed(3);
 
   useEffect(() => {
@@ -191,50 +193,98 @@ export default function Controls(props: ControlsProps) {
                 <div className="toggle-grid-sleek">
                   <div 
                     className={`toggle-pill-btn ${props.difficulty === 'easiest' ? 'active' : ''}`} 
-                    onClick={() => props.setDifficulty('easiest')}
-                    title="Easiest: Very small steps, mostly 2nds and 3rds with one 5th allowed"
+                    onClick={() => !isTrainingMode && props.setDifficulty('easiest')}
+                    style={{ 
+                      opacity: isTrainingMode ? 0.5 : 1,
+                      cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isTrainingMode 
+                      ? "Training mode controls difficulty progression" 
+                      : "Easiest: Stepwise motion with occasional small leaps"}
                   >
                     Easiest
                   </div>
                   <div 
                     className={`toggle-pill-btn ${props.difficulty === 'easy' ? 'active' : ''}`} 
-                    onClick={() => props.setDifficulty('easy')}
-                    title="Easy: Smaller intervals, mostly stepwise motion"
+                    onClick={() => !isTrainingMode && props.setDifficulty('easy')}
+                    style={{ 
+                      opacity: isTrainingMode ? 0.5 : 1,
+                      cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isTrainingMode 
+                      ? "Training mode controls difficulty progression" 
+                      : "Easy: Smaller intervals, mostly stepwise motion"}
                   >
                     Easy
                   </div>
                   <div 
                     className={`toggle-pill-btn ${props.difficulty === 'normal' ? 'active' : ''}`} 
-                    onClick={() => props.setDifficulty('normal')}
-                    title="Normal: Balanced difficulty with varied intervals"
+                    onClick={() => !isTrainingMode && props.setDifficulty('normal')}
+                    style={{ 
+                      opacity: isTrainingMode ? 0.5 : 1,
+                      cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isTrainingMode 
+                      ? "Training mode controls difficulty progression" 
+                      : "Normal: Balanced difficulty with varied intervals"}
                   >
                     Normal
                   </div>
                   <div 
                     className={`toggle-pill-btn ${props.difficulty === 'hard' ? 'active' : ''}`} 
-                    onClick={() => props.setDifficulty('hard')}
-                    title="Hard: Challenging melodies with larger leaps"
+                    onClick={() => !isTrainingMode && props.setDifficulty('hard')}
+                    style={{ 
+                      opacity: isTrainingMode ? 0.5 : 1,
+                      cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isTrainingMode 
+                      ? "Training mode controls difficulty progression" 
+                      : "Hard: Challenging melodies with larger leaps"}
                   >
                     Hard
                   </div>
                 </div>
+                
+                {/* NEW: Show explanation in training mode */}
+                {isTrainingMode && (
+                  <div style={{ 
+                    fontSize: '0.7rem', 
+                    color: 'var(--text-muted)', 
+                    marginTop: '8px',
+                    textAlign: 'center',
+                    opacity: 0.8
+                  }}>
+                    Training mode automatically adjusts difficulty
+                  </div>
+                )}
               </div>
-
               <div className="control-section">
                 <h3 className="section-title">Melody Flow</h3>
                 <div className="toggle-grid-sleek">
                   <div 
                     className={`toggle-pill-btn ${props.startRoot ? 'active' : ''}`} 
-                    onClick={() => props.setStartRoot(!props.startRoot)}
-                    title="Melodies always start on the root note (1)"
+                    onClick={() => !isTrainingMode && props.setStartRoot(!props.startRoot)}
+                    style={{ 
+                      opacity: isTrainingMode ? 0.5 : 1,
+                      cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isTrainingMode 
+                      ? "Training mode controls start/end constraints" 
+                      : "Melodies always start on the root note (1)"}
                   >
                     Start on 1
                   </div>
                   
                   <div 
                     className={`toggle-pill-btn ${props.endRoot ? 'active' : ''}`} 
-                    onClick={() => props.setEndRoot(!props.endRoot)}
-                    title="Melodies always end on the root note (1)"
+                    onClick={() => !isTrainingMode && props.setEndRoot(!props.endRoot)}
+                    style={{ 
+                      opacity: isTrainingMode ? 0.5 : 1,
+                      cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                    }}
+                    title={isTrainingMode 
+                      ? "Training mode controls start/end constraints" 
+                      : "Melodies always end on the root note (1)"}
                   >
                     End on 1
                   </div>
@@ -242,8 +292,14 @@ export default function Controls(props: ControlsProps) {
                   {showPitchGuideAndInverse && (
                     <div 
                       className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
-                      onClick={() => props.setTrainingWheels(!props.trainingWheels)} 
-                      title="Pitch Guide: Synth plays along with your singing for reference"
+                      onClick={() => !isTrainingMode && props.setTrainingWheels(!props.trainingWheels)}
+                      style={{ 
+                        opacity: isTrainingMode ? 0.5 : 1,
+                        cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                      }}
+                      title={isTrainingMode 
+                        ? "Training mode controls pitch guide (enabled in Stages 1-2)" 
+                        : "Pitch Guide: Synth plays along with your singing for reference"}
                     >
                       <TrainingWheelsIcon />
                     </div>
@@ -270,6 +326,8 @@ export default function Controls(props: ControlsProps) {
                   )}
                 </div>
               </div>
+                
+              
 
               <div className="control-section">
                 <h3 className="section-title">Repetition</h3>
@@ -278,8 +336,14 @@ export default function Controls(props: ControlsProps) {
                   <div className="stepper-control">
                     <button 
                       className="stepper-btn" 
-                      onClick={() => adjustQuestions(-1)}
-                      title="Decrease repetitions"
+                      onClick={() => !isTrainingMode && adjustQuestions(-1)}
+                      style={{ 
+                        opacity: isTrainingMode ? 0.5 : 1,
+                        cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                      }}
+                      title={isTrainingMode 
+                        ? "Training mode controls key changes" 
+                        : "Decrease repetitions"}
                     >
                       <MinusIcon/>
                     </button>
@@ -288,20 +352,47 @@ export default function Controls(props: ControlsProps) {
                       className="stepper-input" 
                       value={props.questionsPerKey}
                       onChange={(e) => {
+                        if (isTrainingMode) return;
                         const val = parseInt(e.target.value);
                         if (!isNaN(val)) props.setQuestionsPerKey(Math.max(1, Math.min(50, val)));
                       }}
-                      title="Number of melodies to practice per key"
+                      style={{ 
+                        opacity: isTrainingMode ? 0.5 : 1,
+                        cursor: isTrainingMode ? 'not-allowed' : 'text'
+                      }}
+                      title={isTrainingMode 
+                        ? "Training mode controls key changes" 
+                        : "Number of melodies to practice per key"}
+                      disabled={isTrainingMode}
                     />
                     <button 
                       className="stepper-btn" 
-                      onClick={() => adjustQuestions(1)}
-                      title="Increase repetitions"
+                      onClick={() => !isTrainingMode && adjustQuestions(1)}
+                      style={{ 
+                        opacity: isTrainingMode ? 0.5 : 1,
+                        cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+                      }}
+                      title={isTrainingMode 
+                        ? "Training mode controls key changes" 
+                        : "Increase repetitions"}
                     >
                       <PlusIcon/>
                     </button>
                   </div>
                 </div>
+                
+                {/* NEW: Show explanation in training mode */}
+                {isTrainingMode && (
+                  <div style={{ 
+                    fontSize: '0.7rem', 
+                    color: 'var(--text-muted)', 
+                    marginTop: '8px',
+                    textAlign: 'center',
+                    opacity: 0.8
+                  }}>
+                    Stage 4 modulates every 10 melodies
+                  </div>
+                )}
               </div>
 
               <div className="control-section no-border">

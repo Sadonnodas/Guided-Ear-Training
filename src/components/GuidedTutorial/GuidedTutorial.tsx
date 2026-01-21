@@ -8,6 +8,11 @@ interface TutorialStep {
   position?: 'top' | 'bottom' | 'left' | 'right';
   highlightPadding?: number;
   smartPosition?: boolean;
+  action?: {
+    hint: string;
+    check?: () => boolean; // Optional: verify user completed action
+  };
+  switchToTab?: string; // Navigate to tab before showing this step
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -17,8 +22,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     points: [
       'Three practice modes to choose from',
       'Random: Freeform practice with full control',
-      'Training: Structured curriculum (explained later)',
-      'Fretboard: Guitar CAGED shapes (explained later)',
+      'Training: Structured curriculum (next step!)',
+      'Fretboard: Guitar CAGED shapes (we\'ll explain later)',
       '💡 Hover over each tab to see what it does'
     ],
     position: 'bottom',
@@ -44,9 +49,9 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       'Press Play to begin your session',
       'Session flow: Listen → Sing Along → Your Turn',
       'Pause anytime to take a break',
-      'Restart button resets the current session'
+      'Stop button resets the current session'
     ],
-    position: 'bottom',
+    position: 'top',
     highlightPadding: 20,
     smartPosition: true
   },
@@ -55,26 +60,30 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     title: '👁️ Visual Feedback & Scale Degrees',
     points: [
       'Watch notes scroll/light up as melodies play',
-      'Click/tap degrees to enable or disable them',
-      'Long-press (600ms) to FOCUS on specific degrees',
+      '🎯 Try it: Click on a degree to enable or disable it',
+      '⏱️ Try it: Long-press (600ms) a degree to FOCUS on it',
       'Focused degrees appear more frequently in melodies',
       '💡 Hover over degrees for click/long-press instructions'
     ],
     position: 'top',
-    highlightPadding: 25
+    highlightPadding: 25,
+    action: {
+      hint: 'Try clicking or long-pressing a scale degree!'
+    }
   },
   {
     target: '.tabs button:nth-child(2)',
     title: '📚 Training Mode Explained',
     points: [
       'Structured curriculum with progressive levels',
-      'Each level focuses on specific scale degrees',
-      'Practice one level at a time to build skills',
-      'Levels unlock as you master earlier ones',
+      'Each level introduces ONE new scale degree',
+      'Four stages per level: Introduction → Practice → Integration → Mastery',
+      'Spend 10 minutes in a level to unlock the next one',
       'Perfect for systematic ear training development'
     ],
     position: 'bottom',
-    highlightPadding: 15
+    highlightPadding: 15,
+    switchToTab: 'training'
   },
   {
     target: '.tabs button:nth-child(3)',
@@ -84,10 +93,11 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       'Practice scale shapes across the fretboard',
       'Visual fretboard shows note positions',
       'Switch between shapes (C, A, G, E, D)',
-      'Helps guitarists visualize scales on the neck'
+      'Helps guitarists associate scale degrees with positions in specific CAGED shapes'
     ],
     position: 'bottom',
-    highlightPadding: 15
+    highlightPadding: 15,
+    switchToTab: 'fretboard'
   },
   {
     target: '.settings-trigger',
@@ -100,15 +110,17 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       '💡 Hover over any button for helpful tooltips!'
     ],
     position: 'top',
-    highlightPadding: 15
+    highlightPadding: 15,
+    switchToTab: 'random' // Go back to random for final step
   }
 ];
 
 interface GuidedTutorialProps {
   onComplete?: () => void;
+  onTabChange?: (tab: string) => void; // NEW: Allow tutorial to switch tabs
 }
 
-export default function GuidedTutorial({ onComplete }: GuidedTutorialProps) {
+export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
@@ -125,6 +137,19 @@ export default function GuidedTutorial({ onComplete }: GuidedTutorialProps) {
   useEffect(() => {
     if (!isActive) return;
 
+    const step = TUTORIAL_STEPS[currentStep];
+    
+    // Switch tab if needed
+    if (step.switchToTab && onTabChange) {
+      onTabChange(step.switchToTab);
+      // Wait for tab to render
+      setTimeout(() => updateHighlight(), 100);
+    } else {
+      updateHighlight();
+    }
+  }, [currentStep, isActive]);
+
+  const updateHighlight = () => {
     const step = TUTORIAL_STEPS[currentStep];
     const selectors = step.target.split(',').map(s => s.trim());
     
@@ -154,25 +179,23 @@ export default function GuidedTutorial({ onComplete }: GuidedTutorialProps) {
         overlayRef.current.style.setProperty('--target-height', `${rect.height + (padding * 2)}px`);
       }
 
-      // Smart positioning: check if tooltip would block the target
+      // Smart positioning: avoid blocking target
       let finalPosition = step.position || 'bottom';
       
       if (step.smartPosition) {
         const viewportHeight = window.innerHeight;
         const elementCenter = rect.top + (rect.height / 2);
         
+        // If element is in bottom half and tooltip would go below, put it on top
         if (elementCenter > viewportHeight / 2 && finalPosition === 'bottom') {
           finalPosition = 'top';
-        }
-        else if (elementCenter < viewportHeight / 2 && finalPosition === 'top') {
-          finalPosition = 'bottom';
         }
       }
       
       setTooltipPosition(finalPosition);
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [currentStep, isActive]);
+  };
 
   const handleNext = () => {
     if (currentStep < TUTORIAL_STEPS.length - 1) {
@@ -234,6 +257,12 @@ export default function GuidedTutorial({ onComplete }: GuidedTutorialProps) {
             <li key={idx}>{point}</li>
           ))}
         </ul>
+
+        {step.action && (
+          <div className="tooltip-action">
+            <div className="action-hint">💡 {step.action.hint}</div>
+          </div>
+        )}
 
         <div className="tooltip-progress">
           <div className="progress-bar" style={{ width: `${progress}%` }} />

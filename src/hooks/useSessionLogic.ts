@@ -437,6 +437,10 @@ export function useSessionLogic() {
       constraints = config.constraints;
       const stageIndex = config.stageIndex;
 
+      if (stageIndex === 2) { // Stage 3 has alternating constraints
+        training.incrementStage3Counter();
+      }
+
       // Training Modulation Check
       const effectiveQuestionsPerKey = config.questionsPerKey || Infinity;
       if (questionCount.current > effectiveQuestionsPerKey) {
@@ -456,9 +460,13 @@ export function useSessionLogic() {
         setStatus(`Learning: ${newestDegree}`);
       }
 
-      if (config.forceTrainingWheels !== undefined) {
-        useTrainingWheels = config.forceTrainingWheels;
+      // NEW: Force training wheels in Stages 1-2, respect user choice in Stages 3-4
+      if (config.forceTrainingWheels === true) {
+        useTrainingWheels = true;
+      } else if (config.forceTrainingWheels === false) {
+        useTrainingWheels = false;
       }
+      // If undefined, use user's setting
 
       setEnabledDegrees(constraints.allowedDegrees);
 
@@ -571,7 +579,9 @@ export function useSessionLogic() {
     status,
     activeMidi,
     enabledDegrees, toggleDegree,
-    focusedDegrees, toggleFocus, 
+    setEnabledDegrees,
+    focusedDegrees, toggleFocus,
+    setFocusedDegrees, 
     triggerPulse,
     debugClick, setDebugClick,
     

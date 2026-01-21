@@ -15,7 +15,8 @@ interface VisualizerProps {
   toggleDegree: (d: ScaleDegree) => void;
   toggleFocus: (d: ScaleDegree) => void;
   scaleType: ScaleType;
-  hideMovement?: boolean; // NEW: Prevents tape scrolling in blind mode
+  hideMovement?: boolean; // Prevents tape scrolling in blind mode
+  activeTab?: string; // NEW: For training mode locking
 }
 
 interface NoteCellProps {
@@ -26,6 +27,7 @@ interface NoteCellProps {
   onToggle: (d: ScaleDegree) => void;
   onFocus: (d: ScaleDegree) => void;
   extraClass?: string;
+  isTrainingMode?: boolean; // NEW: Disable interactions in training mode
 }
 
 const NoteCell = ({ 
@@ -35,11 +37,12 @@ const NoteCell = ({
   isFocused, 
   onToggle, 
   onFocus, 
-  extraClass = '' 
+  extraClass = '',
+  isTrainingMode = false
 }: NoteCellProps) => {
   const { isLongPressing, ...handlers } = useLongPress({
-    onClick: () => onToggle(label),
-    onLongPress: () => onFocus(label),
+    onClick: () => !isTrainingMode && onToggle(label),
+    onLongPress: () => !isTrainingMode && onFocus(label),
     ms: 600,
     debug: false
   });
@@ -48,13 +51,26 @@ const NoteCell = ({
   if (isActive) classes += ' active';
   if (isFocused) classes += ' focused';
   if (!isEnabled && !isFocused) classes += ' disabled';
-  if (isLongPressing) classes += ' pressing';
+  if (isLongPressing && !isTrainingMode) classes += ' pressing';
+
+  // Style adjustments for training mode
+  const style: React.CSSProperties = isTrainingMode ? {
+    cursor: 'not-allowed',
+    opacity: 0.8
+  } : {};
 
   return (
     <div 
-      className={classes} 
-      {...handlers}
-      title={`Scale degree ${label} - Click to ${isEnabled ? 'disable' : 'enable'} | Long-press (600ms) to focus`}
+      className={classes}
+      {...(!isTrainingMode && handlers)} // Only attach handlers if not in training mode
+      style={{ 
+        pointerEvents: isTrainingMode ? 'none' : 'auto',
+        ...style
+      }}
+      title={isTrainingMode 
+        ? "Training mode controls scale degrees" 
+        : `Scale degree ${label} - Click to ${isEnabled ? 'disable' : 'enable'} | Long-press (600ms) to focus`
+      }
     >
       <span style={{ pointerEvents: 'none' }}>{label}</span>
     </div>
@@ -70,8 +86,12 @@ export default function Visualizer({
   toggleDegree, 
   toggleFocus, 
   scaleType,
-  hideMovement = false // NEW: Prevents tape from scrolling
+  hideMovement = false,
+  activeTab = 'random' // NEW: Default to random
 }: VisualizerProps) {
+
+  // Check if we're in training mode
+  const isTrainingMode = activeTab === 'training';
 
   // Helper to get cell props
   const getCellProps = (d: ScaleDegree) => ({
@@ -79,7 +99,8 @@ export default function Visualizer({
     isEnabled: enabledDegrees.includes(d),
     isFocused: focusedDegrees.includes(d),
     onToggle: toggleDegree,
-    onFocus: toggleFocus
+    onFocus: toggleFocus,
+    isTrainingMode // NEW: Pass training mode flag
   });
 
   // --- Tape View ---
@@ -113,6 +134,7 @@ export default function Visualizer({
               isFocused={isFocused}
               onToggle={toggleDegree}
               onFocus={toggleFocus}
+              isTrainingMode={isTrainingMode} // NEW: Pass training mode flag
             />
           );
         })}

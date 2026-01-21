@@ -5,6 +5,7 @@ import './Header.css';
 const ShuffleIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>;
 const TapeIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12h20M2 8h20M2 16h20" /></svg>;
 const StaticIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>;
+const LockIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>;
 
 
 const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
@@ -30,13 +31,15 @@ interface HeaderProps {
   levels?: TrainingLevel[];
   selectedShape?: CagedShape;
   setSelectedShape?: (s: CagedShape) => void;
+  isLevelUnlocked?: (id: number) => boolean; // NEW
 }
 
 export default function Header({ 
   activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, 
   viewMode, setViewMode, scaleType, setScaleType,
   activeLevelId, setActiveLevelId, levels,
-  selectedShape, setSelectedShape
+  selectedShape, setSelectedShape,
+  isLevelUnlocked
 }: HeaderProps) {
 
   const handleTabChange = (tab: string) => {
@@ -130,12 +133,23 @@ export default function Header({
                 <select 
                     className="level-select"
                     value={activeLevelId}
-                    onChange={(e) => setActiveLevelId(Number(e.target.value))}
-                    title="Select training level - each focuses on specific scale degrees"
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      // Only allow selection if unlocked
+                      if (!isLevelUnlocked || isLevelUnlocked(id)) {
+                        setActiveLevelId(id);
+                      }
+                    }}
+                    title="Select training level - complete previous levels to unlock"
                 >
-                    {levels.map(l => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
+                    {levels.map(l => {
+                      const locked = isLevelUnlocked && !isLevelUnlocked(l.id);
+                      return (
+                        <option key={l.id} value={l.id} disabled={locked}>
+                          {locked && <><LockIcon /> </>}{l.name}
+                        </option>
+                      );
+                    })}
                 </select>
                 
             </>

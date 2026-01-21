@@ -37,6 +37,23 @@ export default function App() {
     }
   }, [session.activeMidi, session.visualizerKey, session.scaleType]);
 
+  // NEW: Update visualizer immediately when level changes in training mode
+  useEffect(() => {
+    if (session.activeTab === 'training') {
+      const config = session.training.getCurrentConfig();
+      
+      // Update enabled degrees to match level
+      session.setEnabledDegrees(config.constraints.allowedDegrees);
+      
+      // Update focused degrees if level specifies one
+      if (config.focusedDegree) {
+        session.setFocusedDegrees([config.focusedDegree]);
+      } else {
+        session.setFocusedDegrees([]);
+      }
+    }
+  }, [session.training.activeLevelId, session.activeTab]);
+
   // Determine if we should hide visuals in the Visualizer (for Blind Mode in Random tab)
   // In Random tab with inverse mode + blind mode: hide during Listen phases, show during Answer/Affirm
   const shouldHideVisualizerNotes = session.activeTab === 'random' 
@@ -45,7 +62,7 @@ export default function App() {
     && session.status !== 'Answer' 
     && session.status !== 'Affirm';
 
-  // NEW: Determine if tape should stop moving (inverse blind mode fix)
+  // Determine if tape should stop moving (inverse blind mode fix)
   const shouldHideMovement = session.activeTab === 'random' 
     && session.inverseMode 
     && session.hideFretboardVisuals
@@ -54,26 +71,33 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Guided Tutorial Overlay */}
-      <GuidedTutorial />
+      {/* Guided Tutorial Overlay - Now can control tab changes */}
+      <GuidedTutorial 
+        onTabChange={session.setActiveTab}
+      />
 
       <div className="main-panel">
         
         <Header 
-          activeTab={session.activeTab} setActiveTab={session.setActiveTab}
-          currentKey={session.currentKey} setKeyManually={session.setKeyManually}
+          activeTab={session.activeTab} 
+          setActiveTab={session.setActiveTab}
+          currentKey={session.currentKey} 
+          setKeyManually={session.setKeyManually}
           pickRandomKey={() => session.setKeyManually(KEYS[Math.floor(Math.random() * KEYS.length)])} 
-          viewMode={viewMode} setViewMode={setViewMode}
+          viewMode={viewMode} 
+          setViewMode={setViewMode}
           scaleType={session.scaleType}
           setScaleType={session.handleScaleChange}
           
+          // Training Mode Props
           activeLevelId={session.training.activeLevelId}
           setActiveLevelId={session.training.setActiveLevelId}
           levels={session.training.levels}
+          isLevelUnlocked={session.training.isLevelUnlocked} // NEW: For lock icons
+          
           // Fretboard Props
           selectedShape={session.selectedShape}
           setSelectedShape={session.setSelectedShape}
-          
         />
 
         {/* Status Text (Sing Along / Listen) */}
@@ -100,7 +124,8 @@ export default function App() {
             toggleDegree={session.toggleDegree}
             toggleFocus={session.toggleFocus} 
             scaleType={session.scaleType}
-            hideMovement={shouldHideMovement} // NEW: Prevents tape scrolling in blind mode
+            hideMovement={shouldHideMovement}
+            activeTab={session.activeTab} // NEW: Pass activeTab for training mode locking
           />
         )}
 
@@ -109,34 +134,49 @@ export default function App() {
             isPaused={session.isPaused}
             onPlayToggle={session.startSession}
             onStop={session.stopSession} 
-            bpm={session.bpm} setBpm={session.setBpm}
+            bpm={session.bpm} 
+            setBpm={session.setBpm}
             difficulty={session.difficulty}
             setDifficulty={session.setDifficulty}
             triggerPulse={session.triggerPulse} 
             currentPattern={session.currentPattern}
             setPattern={session.setPattern}
-            startRoot={session.startRoot} setStartRoot={session.setStartRoot}
-            endRoot={session.endRoot} setEndRoot={session.setEndRoot}
-            silentPractice={session.silentPractice} setSilentPractice={session.setSilentPractice}
-            trainingWheels={session.trainingWheels} setTrainingWheels={session.setTrainingWheels}
-            inverseMode={session.inverseMode} setInverseMode={session.setInverseMode}
-            questionsPerKey={session.questionsPerKey} setQuestionsPerKey={session.setQuestionsPerKey}
-            debugClick={session.debugClick} setDebugClick={session.setDebugClick}
-            volMaster={session.volMaster} setVolMaster={session.setVolMaster}
-            volVoice={session.volVoice} setVolVoice={session.setVolVoice}
-            volGroove={session.volGroove} setVolGroove={session.setVolGroove}
-            volMetronome={session.volMetronome} setVolMetronome={session.setVolMetronome}
-            volDrone={session.volDrone} setVolDrone={session.setVolDrone}
-            volTraining={session.volTraining} setVolTraining={session.setVolTraining}
-            volReverb={session.volReverb} setVolReverb={session.setVolReverb}
+            startRoot={session.startRoot} 
+            setStartRoot={session.setStartRoot}
+            endRoot={session.endRoot} 
+            setEndRoot={session.setEndRoot}
+            silentPractice={session.silentPractice} 
+            setSilentPractice={session.setSilentPractice}
+            trainingWheels={session.trainingWheels} 
+            setTrainingWheels={session.setTrainingWheels}
+            inverseMode={session.inverseMode} 
+            setInverseMode={session.setInverseMode}
+            questionsPerKey={session.questionsPerKey} 
+            setQuestionsPerKey={session.setQuestionsPerKey}
+            debugClick={session.debugClick} 
+            setDebugClick={session.setDebugClick}
+            volMaster={session.volMaster} 
+            setVolMaster={session.setVolMaster}
+            volVoice={session.volVoice} 
+            setVolVoice={session.setVolVoice}
+            volGroove={session.volGroove} 
+            setVolGroove={session.setVolGroove}
+            volMetronome={session.volMetronome} 
+            setVolMetronome={session.setVolMetronome}
+            volDrone={session.volDrone} 
+            setVolDrone={session.setVolDrone}
+            volTraining={session.volTraining} 
+            setVolTraining={session.setVolTraining}
+            volReverb={session.volReverb} 
+            setVolReverb={session.setVolReverb}
             toggleMute={toggleMute}
             hideFretboardVisuals={session.hideFretboardVisuals}
             setHideFretboardVisuals={session.setHideFretboardVisuals}
             activeTab={session.activeTab}
-            minVocalMidi={session.minVocalMidi} // NEW
-            maxVocalMidi={session.maxVocalMidi} // NEW
-            setMinVocalMidi={session.setMinVocalMidi} // NEW
-            setMaxVocalMidi={session.setMaxVocalMidi} // NEW
+            minVocalMidi={session.minVocalMidi}
+            maxVocalMidi={session.maxVocalMidi}
+            setMinVocalMidi={session.setMinVocalMidi}
+            setMaxVocalMidi={session.setMaxVocalMidi}
         />
       </div>
     </div>
