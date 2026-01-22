@@ -17,9 +17,9 @@ export class AudioEngine {
   private vocalGain!: Tone.Gain;
   private droneGain!: Tone.Gain;
   private dronePlayer!: Tone.Player;
-  private trainingSynth!: Tone.FMSynth;
+  private trainingSynth!: Tone.Synth;
   private trainingGain!: Tone.Gain;
-  private trainingVol: number = 0.3;
+  private trainingVol: number = 0.75; // Increased from 0.5 to 0.75 for better default presence
   private transitionSynth!: Tone.MetalSynth;
   private metronome!: Metronome;
   private drumMachine!: DrumMachine;
@@ -55,28 +55,50 @@ export class AudioEngine {
     this.droneGain = new Tone.Gain(vols.drone).connect(this.masterGain);
     this.dronePlayer = new Tone.Player({ loop: true, fadeIn: 2, fadeOut: 2 }).connect(this.droneGain);
 
-    // FMSynth creates the "tine" and "bell" quality of a Rhodes
-    this.trainingSynth = new Tone.FMSynth({
-      harmonicity: 2,
-      modulationIndex: 15,
-      oscillator: { type: "sine" }, 
-      modulation: { type: "sawtooth" },
-      envelope: {
-        attack: 0.005,
-        decay: 0.5,
-        sustain: 0.3,
-        release: 0.5
+    // WARM INTIMATE PIANO SOUND
+    // Using a carefully tuned synth to emulate a soft, felt-hammer piano
+    // Think Nils Frahm or Ólafur Arnalds - close-miked, intimate, warm
+    this.trainingSynth = new Tone.Synth({
+      oscillator: {
+        type: "triangle"   // Warm, round tone with soft harmonics
       },
-      modulationEnvelope: {
-        attack: 0.01,
-        decay: 0.5,
-        sustain: 0.6,
-        release: 1.0
-      }
-    }).connect(new Tone.Vibrato(3, 0.05).toDestination());
+      envelope: {
+        attack: 0.008,     // Soft hammer attack
+        decay: 0.4,        // Faster decay (was 0.6)
+        sustain: 0.2,      // Lower sustain (was 0.3)
+        release: 0.5       // Much shorter release (was 1.2) - prevents overlap
+      },
+      volume: 8  // Needs volume to be intimate but present (+8dB)
+    });
 
+    // Intimate Piano signal chain: Synth -> Short Reverb -> Compressor -> Makeup Gain -> TrainingGain -> Master
+    // The reverb adds air and space without being overwhelming
+    const pianoReverb = new Tone.Reverb({
+      decay: 1.8,        // Short, intimate room (not a cathedral)
+      preDelay: 0.01,    // Slight pre-delay for depth
+      wet: 0.35          // Noticeable but not drowning
+    });
+    
+    // Generate the reverb impulse response
+    pianoReverb.generate();
+    
+    const trainingCompressor = new Tone.Compressor({
+      threshold: -30,    // Much lower threshold to catch quiet low notes
+      ratio: 6,          // Aggressive 6:1 ratio to really boost lows
+      attack: 0.008,     // Slightly slower to preserve piano character
+      release: 0.15,     // Fairly quick release
+      knee: 10           // Very smooth knee for transparent compression
+    });
+    
+    // Makeup gain to compensate for compression - adds back ~12dB
+    const makeupGain = new Tone.Gain(4); // 4x = ~12dB boost
+    
     this.trainingGain = new Tone.Gain(this.trainingVol).connect(this.masterGain); 
-    this.trainingSynth.connect(this.trainingGain);
+    
+    this.trainingSynth.connect(pianoReverb);
+    pianoReverb.connect(trainingCompressor);
+    trainingCompressor.connect(makeupGain);
+    makeupGain.connect(this.trainingGain);
 
     this.transitionSynth = new Tone.MetalSynth({
       envelope: { attack: 0.001, decay: 0.3, release: 0.1 },
@@ -118,7 +140,7 @@ export class AudioEngine {
     
     if (shouldUseSynth) {
       // Use synth for notes outside vocal range OR when explicitly requested
-      const shortDuration = note.duration * 0.8; 
+      const shortDuration = note.duration * 0.75; // 75% of 2 beats = 1.5 beats
       this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
     } else {
       // Try to use vocal sample
@@ -132,7 +154,7 @@ export class AudioEngine {
       } else {
         // Sample missing - fall back to synth
         console.warn(`Sample not found for ${id}, falling back to synth`);
-        const shortDuration = note.duration * 0.8;
+        const shortDuration = note.duration * 0.75; // 75% of 2 beats = 1.5 beats
         this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
       }
     }
@@ -273,7 +295,11 @@ export class AudioEngine {
   public setTrainingVol(v: number) { 
     this.trainingVol = v; 
     if (this.isInitialized && this.trainingGain) {
-      this.trainingGain.gain.rampTo(v, 0.1); 
+      // Use gentler exponential scaling (1.5 power instead of 2)
+      // When slider is at 0.5, actual volume is ~0.35 (vs 0.25 with square)
+      // This gives louder overall volume while still having good control at low end
+      const exponentialVol = Math.pow(v, 1.5);
+      this.trainingGain.gain.rampTo(exponentialVol, 0.1); 
     }
   }
   
