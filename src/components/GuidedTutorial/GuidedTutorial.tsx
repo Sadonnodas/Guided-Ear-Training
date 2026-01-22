@@ -66,16 +66,15 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       '🎯 Try it: Click on a degree to enable or disable it',
       '⏱️ Try it: Long-press (600ms) a degree to FOCUS on it',
       'Focused degrees appear more frequently in melodies',
-      '💡 Hover over degrees for click/long-press instructions'
     ],
-    position: 'top',
-    highlightPadding: 25,
+    position: 'bottom', // Changed from 'top' to 'bottom' to fit below
+    highlightPadding: 5, // Reduced from 25 to 10 for tighter fit
     action: {
       hint: 'Try clicking or long-pressing a scale degree!'
     }
   },
   {
-    target: '.tabs button:nth-child(2)',
+    target: '.info-display, .tabs button:nth-child(2)', // Highlight both tab AND controls
     title: '📚 Training Mode Explained',
     points: [
       'Structured curriculum with progressive levels',
@@ -85,7 +84,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
       'Perfect for systematic ear training development'
     ],
     position: 'bottom',
-    highlightPadding: 15,
+    highlightPadding: 20,
     switchToTab: 'training'
   },
   {
@@ -182,57 +181,59 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
 
       let finalPosition = step.position || 'bottom';
       
-      if (step.smartPosition) {
+      // Smart positioning: check if tooltip would go off-screen
+      if (!isMobile()) { // Only do smart positioning on desktop
         const viewportHeight = window.innerHeight;
-        const elementCenter = rect.top + (rect.height / 2);
+        const tooltipHeight = 380; // Approximate tooltip height (increased for safety)
+        const margin = 20; // Safety margin from viewport edges
         
-        if (elementCenter > viewportHeight / 2 && finalPosition === 'bottom') {
-          finalPosition = 'top';
+        // Check vertical space from VIEWPORT perspective (not just element position)
+        const spaceBelow = viewportHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        
+        // If requesting 'top' position but not enough room, force 'bottom'
+        if (finalPosition === 'top' && spaceAbove < tooltipHeight + margin) {
+          finalPosition = 'bottom'; // Force bottom - not enough space above
+        } 
+        // If requesting 'bottom' position but not enough room, try 'top'
+        else if (finalPosition === 'bottom' && spaceBelow < tooltipHeight + margin) {
+          if (spaceAbove > tooltipHeight + margin) {
+            finalPosition = 'top'; // Switch to top if space available
+          }
+          // Otherwise keep bottom and let it be scrollable
         }
+        
+        console.log(`Step ${currentStep}: position=${finalPosition}, spaceAbove=${spaceAbove}, spaceBelow=${spaceBelow}`);
       }
+      
+      setTooltipPosition(finalPosition);
       
       // On mobile, always use bottom position and scroll element to top
       if (isMobile()) {
-        setTooltipPosition('bottom');
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
-        setTooltipPosition(finalPosition);
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Scroll to ensure both element AND tooltip are visible
+        if (finalPosition === 'top') {
+          // Position element lower in viewport so tooltip has space above
+          window.scrollTo({
+            top: rect.top + window.scrollY - window.innerHeight * 0.6,
+            behavior: 'smooth'
+          });
+        } else {
+          // Position element higher in viewport so tooltip has space below
+          window.scrollTo({
+            top: rect.top + window.scrollY - window.innerHeight * 0.2,
+            behavior: 'smooth'
+          });
+        }
       }
     }
   };
 
   // IMPROVED: Check if click is on backdrop (not on highlighted element or tooltip)
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    
-    // Check if click is on backdrop
-    if (!target.classList.contains('tutorial-backdrop')) {
-      return;
-    }
-    
-    // Check if click is within highlighted element bounds
-    const clickX = e.clientX;
-    const clickY = e.clientY;
-    
-    const highlightBounds = {
-      left: position.left,
-      right: position.left + position.width,
-      top: position.top,
-      bottom: position.top + position.height
-    };
-    
-    // If click is within highlighted area, don't close
-    if (
-      clickX >= highlightBounds.left &&
-      clickX <= highlightBounds.right &&
-      clickY >= highlightBounds.top &&
-      clickY <= highlightBounds.bottom
-    ) {
-      return; // Click is on highlighted element - ignore
-    }
-    
-    // Click is outside highlighted area - close tutorial
+  const handleBackdropClick = () => {
+    // Just close the tutorial - our 4-div approach already ensures
+    // we're only catching clicks outside the highlighted area
     handleSkip();
   };
 
@@ -271,8 +272,75 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
 
   return (
     <div className="tutorial-overlay" ref={overlayRef}>
-      {/* IMPROVED: Click handler only triggers on backdrop itself */}
-      <div className="tutorial-backdrop" onClick={handleBackdropClick} />
+      {/* Backdrop with cutout - no pointer events */}
+      <div className="tutorial-backdrop" />
+      
+      {/* Four divs covering each side, leaving the highlighted area clickable */}
+      {/* Top */}
+      <div 
+        onClick={handleBackdropClick}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: Math.max(0, position.top),
+          pointerEvents: 'all',
+          zIndex: 9998
+        }}
+      />
+      {/* Bottom */}
+      <div 
+        onClick={handleBackdropClick}
+        style={{
+          position: 'absolute',
+          top: position.top + position.height,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'all',
+          zIndex: 9998
+        }}
+      />
+      {/* Left */}
+      <div 
+        onClick={handleBackdropClick}
+        style={{
+          position: 'absolute',
+          top: position.top,
+          left: 0,
+          width: Math.max(0, position.left),
+          height: position.height,
+          pointerEvents: 'all',
+          zIndex: 9998
+        }}
+      />
+      {/* Right */}
+      <div 
+        onClick={handleBackdropClick}
+        style={{
+          position: 'absolute',
+          top: position.top,
+          left: position.left + position.width,
+          right: 0,
+          height: position.height,
+          pointerEvents: 'all',
+          zIndex: 9998
+        }}
+      />
+      
+      {/* Invisible div over highlighted area to ensure clicks pass through */}
+      <div 
+        style={{
+          position: 'absolute',
+          top: position.top,
+          left: position.left,
+          width: position.width,
+          height: position.height,
+          pointerEvents: 'none',
+          zIndex: 10000
+        }}
+      />
       
       {/* Highlighted element area - clicks pass through */}
       <div 
@@ -282,15 +350,22 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
           left: position.left,
           width: position.width,
           height: position.height,
-          pointerEvents: 'none' // CRITICAL: Allow clicks to pass through
+          pointerEvents: 'none',
+          zIndex: 10001 // Higher z-index to ensure it's visible but still non-blocking
         }}
       />
 
       <div 
         className={`tutorial-tooltip tooltip-${tooltipPosition}`}
         style={{
-          top: position.top + (position.height / 2),
-          left: position.left + (position.width / 2)
+          // For 'top': position at element's top, transform will move it up
+          // For 'bottom': position at element's bottom, transform will move it down
+          top: tooltipPosition === 'bottom' 
+            ? position.top + position.height
+            : tooltipPosition === 'top' 
+              ? Math.max(370, position.top) // Ensure tooltip has room (370px = approx tooltip height)
+              : position.top + (position.height / 2),
+          left: position.left + (position.width / 2),
         }}
       >
         <div className="tooltip-header">

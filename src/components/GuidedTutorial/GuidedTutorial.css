@@ -19,7 +19,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.75);
-  pointer-events: all;
+  pointer-events: none; /* Changed from 'all' to 'none' */
   animation: fadeIn 0.3s ease-out;
   
   /* Create spotlight effect using radial gradient */
@@ -35,6 +35,14 @@
     transparent 40%,
     black 50%
   );
+}
+
+/* Create clickable cutout for highlighted element */
+.tutorial-highlight-clickable {
+  position: absolute;
+  pointer-events: all;
+  z-index: 10001;
+  background: transparent;
 }
 
 .tutorial-highlight {
@@ -73,11 +81,13 @@
   pointer-events: all;
   z-index: 10002;
   animation: slideIn 0.3s ease-out;
+  max-height: calc(100vh - 100px); /* Prevent tooltip from being too tall */
+  overflow-y: auto; /* Allow scrolling if content is too long */
 }
 
 /* Position variants */
 .tooltip-bottom {
-  transform: translate(-50%, calc(100% + 30px));
+  transform: translate(-50%, 30px);
 }
 
 .tooltip-top {
@@ -332,7 +342,10 @@
   .tutorial-highlight {
     pointer-events: none;
   }
-
+/* On mobile, make sure highlighted elements are clickable */
+  .tutorial-backdrop-clickable {
+    z-index: 9997; /* Lower than highlight on mobile */
+  }
   .tooltip-title {
     font-size: 1rem;
     line-height: 1.2;
