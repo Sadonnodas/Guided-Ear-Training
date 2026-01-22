@@ -56,7 +56,12 @@ export function getNoteForDegree(
   let targetMidi = rootMidi + interval;
 
   if (previousMidi !== null) {
-    const candidates = [targetMidi - 12, targetMidi, targetMidi + 12];
+    // FIXED: Check wider range of octaves to handle all key/range combinations
+    // Generate candidates from -48 to +48 semitones (4 octaves in each direction)
+    const candidates: number[] = [];
+    for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
+      candidates.push(targetMidi + octaveOffset);
+    }
     
     let jumpLimit = 12;
     
@@ -92,8 +97,11 @@ export function getNoteForDegree(
         }
     }
   } else {
-    // Starting note logic
-    const startCandidates = [targetMidi - 12, targetMidi, targetMidi + 12];
+    // Starting note logic - also check wider range
+    const startCandidates: number[] = [];
+    for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
+      startCandidates.push(targetMidi + octaveOffset);
+    }
     const validStart = startCandidates.filter(m => m >= minMidi && m <= maxMidi);
     
     if (validStart.length > 0) {

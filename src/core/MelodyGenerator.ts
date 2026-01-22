@@ -23,6 +23,8 @@ const DEGREE_TO_SEMITONE: Record<ScaleDegree, number> = {
 /**
  * Check if a degree can be played within the vocal range
  * A degree is playable if at least one octave of it fits within minMidi to maxMidi
+ * 
+ * FIXED: Now checks a wider range of octaves to handle all key/range combinations
  */
 function isDegreePlayableInRange(
   degree: ScaleDegree,
@@ -33,15 +35,19 @@ function isDegreePlayableInRange(
   const rootMidi = ROOT_MIDI[key];
   const interval = DEGREE_TO_SEMITONE[degree];
   
-  // Check 3 octaves: one below, at root, and one above
-  const candidates = [
-    rootMidi + interval - 12,
-    rootMidi + interval,
-    rootMidi + interval + 12
-  ];
+  // Calculate base pitch (degree relative to root)
+  const basePitch = rootMidi + interval;
   
-  // If ANY octave fits in range, the degree is playable
-  return candidates.some(midi => midi >= minMidi && midi <= maxMidi);
+  // Check octaves from very low to very high (covers full MIDI range)
+  // This ensures we find the note even if root is in a high octave
+  for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
+    const candidate = basePitch + octaveOffset;
+    if (candidate >= minMidi && candidate <= maxMidi) {
+      return true; // Found at least one playable octave
+    }
+  }
+  
+  return false; // No octaves of this degree fit in range
 }
 
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
