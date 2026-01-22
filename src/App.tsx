@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
 import { useSessionLogic } from "./hooks/useSessionLogic";
-import type { MusicalKey } from "./types";
 import "./App.css";
 
 // Components
@@ -10,8 +9,6 @@ import Visualizer from "./components/Visualizer/Visualizer";
 import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer"; 
 import Controls from "./components/Controls/Controls";
 import GuidedTutorial from "./components/GuidedTutorial/GuidedTutorial";
-
-const KEYS: MusicalKey[] = ["C", "Cs", "D", "Ds", "E", "F", "Fs", "G", "Gs", "A", "As", "B"];
 
 export default function App() {
   const session = useSessionLogic();
@@ -83,7 +80,6 @@ export default function App() {
           setActiveTab={session.setActiveTab}
           currentKey={session.currentKey} 
           setKeyManually={session.setKeyManually}
-          pickRandomKey={() => session.setKeyManually(KEYS[Math.floor(Math.random() * KEYS.length)])} 
           viewMode={viewMode} 
           setViewMode={setViewMode}
           scaleType={session.scaleType}
@@ -93,11 +89,15 @@ export default function App() {
           activeLevelId={session.training.activeLevelId}
           setActiveLevelId={session.training.setActiveLevelId}
           levels={session.training.levels}
-          isLevelUnlocked={session.training.isLevelUnlocked} // NEW: For lock icons
+          isLevelUnlocked={session.training.isLevelUnlocked}
           
           // Fretboard Props
           selectedShape={session.selectedShape}
           setSelectedShape={session.setSelectedShape}
+          
+          // NEW: Session control for fretboard mode
+          isPlaying={session.isPlaying}
+          stopSession={session.stopSession}
         />
 
         {/* Status Text (Sing Along / Listen) */}

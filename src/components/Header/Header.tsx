@@ -19,7 +19,6 @@ interface HeaderProps {
   setActiveTab: (tab: string) => void;
   currentKey: MusicalKey;
   setKeyManually: (k: MusicalKey) => void;
-  pickRandomKey: () => void;
   viewMode: 'tape' | 'static';
   setViewMode: (mode: 'tape' | 'static') => void;
   
@@ -31,15 +30,20 @@ interface HeaderProps {
   levels?: TrainingLevel[];
   selectedShape?: CagedShape;
   setSelectedShape?: (s: CagedShape) => void;
-  isLevelUnlocked?: (id: number) => boolean; // NEW
+  isLevelUnlocked?: (id: number) => boolean;
+  
+  // NEW: For stopping playback when fretboard settings change
+  isPlaying?: boolean;
+  stopSession?: () => void;
 }
 
 export default function Header({ 
-  activeTab, setActiveTab, currentKey, setKeyManually, pickRandomKey, 
+  activeTab, setActiveTab, currentKey, setKeyManually, 
   viewMode, setViewMode, scaleType, setScaleType,
   activeLevelId, setActiveLevelId, levels,
   selectedShape, setSelectedShape,
-  isLevelUnlocked
+  isLevelUnlocked,
+  isPlaying, stopSession
 }: HeaderProps) {
 
   const handleTabChange = (tab: string) => {
@@ -47,6 +51,32 @@ export default function Header({
       if (tab === 'training' && scaleType === 'Chromatic') {
           setScaleType('Major');
       }
+  };
+
+  // NEW: Handle scale type change - stop if playing in fretboard mode
+  const handleScaleTypeChange = (newScaleType: ScaleType) => {
+    if (activeTab === 'fretboard' && isPlaying && stopSession) {
+      stopSession();
+    }
+    setScaleType(newScaleType);
+  };
+
+  // NEW: Handle shape change - stop if playing in fretboard mode
+  const handleShapeChange = (newShape: CagedShape) => {
+    if (activeTab === 'fretboard' && isPlaying && stopSession && setSelectedShape) {
+      stopSession();
+      setSelectedShape(newShape);
+    } else if (setSelectedShape) {
+      setSelectedShape(newShape);
+    }
+  };
+
+  // NEW: Handle key change - stop if playing in fretboard mode, otherwise modulate gracefully
+  const handleKeyChange = (newKey: MusicalKey) => {
+    if (activeTab === 'fretboard' && isPlaying && stopSession) {
+      stopSession();
+    }
+    setKeyManually(newKey);
   };
 
   return (
@@ -82,7 +112,7 @@ export default function Header({
           <select 
             className="key-select" 
             value={scaleType} 
-            onChange={(e) => setScaleType(e.target.value as ScaleType)}
+            onChange={(e) => handleScaleTypeChange(e.target.value as ScaleType)}
             style={{ marginRight: '5px' }}
             title="Select the scale type for practice"
           >
@@ -112,7 +142,7 @@ export default function Header({
           <select 
             className="key-select" 
             value={currentKey} 
-            onChange={(e) => setKeyManually(e.target.value as MusicalKey)}
+            onChange={(e) => handleKeyChange(e.target.value as MusicalKey)}
             title="Select the musical key - all melodies will be in this key"
           >
             {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]}</option>))}
@@ -120,7 +150,7 @@ export default function Header({
           
           <button 
             className="icon-btn" 
-            onClick={pickRandomKey} 
+            onClick={() => handleKeyChange(KEYS[Math.floor(Math.random() * KEYS.length)])} 
             title="Pick a random key to practice in"
           >
             <ShuffleIcon />
@@ -162,7 +192,7 @@ export default function Header({
             <select 
               className="key-select" 
               value={selectedShape} 
-              onChange={(e) => setSelectedShape(e.target.value as CagedShape)}
+              onChange={(e) => handleShapeChange(e.target.value as CagedShape)}
               title="Select CAGED shape position on the fretboard"
             >
               <option value="C">C-Shape</option>
