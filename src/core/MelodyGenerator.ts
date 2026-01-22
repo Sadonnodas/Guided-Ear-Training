@@ -7,19 +7,70 @@ interface GeneratorOptions {
   constraints: MelodyConstraints;
 }
 
+// --- Root notes in MIDI (duplicated from MusicTheory.ts for range checking) ---
+const ROOT_MIDI: Record<MusicalKey, number> = {
+  "C": 60, "Cs": 61, "D": 62, "Ds": 63,
+  "E": 64, "F": 65, "Fs": 66, "G": 67,
+  "Gs": 68, "A": 69, "As": 70, "B": 71
+};
+
+const DEGREE_TO_SEMITONE: Record<ScaleDegree, number> = {
+  "1": 0, "b2": 1, "2": 2, "b3": 3,
+  "3": 4, "4": 5, "#4": 6, "5": 7,
+  "b6": 8, "6": 9, "b7": 10, "7": 11
+};
+
+/**
+ * Check if a degree can be played within the vocal range
+ * A degree is playable if at least one octave of it fits within minMidi to maxMidi
+ */
+function isDegreePlayableInRange(
+  degree: ScaleDegree,
+  key: MusicalKey,
+  minMidi: number,
+  maxMidi: number
+): boolean {
+  const rootMidi = ROOT_MIDI[key];
+  const interval = DEGREE_TO_SEMITONE[degree];
+  
+  // Check 3 octaves: one below, at root, and one above
+  const candidates = [
+    rootMidi + interval - 12,
+    rootMidi + interval,
+    rootMidi + interval + 12
+  ];
+  
+  // If ANY octave fits in range, the degree is playable
+  return candidates.some(midi => midi >= minMidi && midi <= maxMidi);
+}
+
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
   const { key, scaleType, constraints } = options;
   const { allowedDegrees, focusedDegrees, startDegree, endDegree, length } = constraints;
+  
+  // CRITICAL FIX: Filter allowed degrees to only those playable in the current vocal range
+  const minMidi = constraints.minMidi ?? 43; // Default vocal range
+  const maxMidi = constraints.maxMidi ?? 67;
+  
+  const playableDegrees = allowedDegrees.filter(degree => 
+    isDegreePlayableInRange(degree, key, minMidi, maxMidi)
+  );
+  
+  // Safety: If no degrees are playable (shouldn't happen), fall back to "1"
+  if (playableDegrees.length === 0) {
+    console.warn(`No degrees playable in range ${minMidi}-${maxMidi} for key ${key}. Falling back to degree "1".`);
+    playableDegrees.push("1");
+  }
   
   // 1. Initialize empty slots
   const degrees: (ScaleDegree | null)[] = new Array(length).fill(null);
   
   // 2. Set Constraints (Start/End)
-  // We only set them if they are actually in the allowed list (safety check)
-  if (startDegree && allowedDegrees.includes(startDegree)) {
+  // Only set them if they are in the playable list
+  if (startDegree && playableDegrees.includes(startDegree)) {
       degrees[0] = startDegree;
   }
-  if (endDegree && allowedDegrees.includes(endDegree)) {
+  if (endDegree && playableDegrees.includes(endDegree)) {
       degrees[length - 1] = endDegree;
   }
 
@@ -38,8 +89,8 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
       emptyIndices.sort(() => Math.random() - 0.5);
 
       // Place focused notes into the empty slots
-      // SAFEGUARD: Ensure focused note is actually allowed in the current scale
-      const validFocusPool = focusPool.filter(d => allowedDegrees.includes(d));
+      // SAFEGUARD: Ensure focused note is playable in current range
+      const validFocusPool = focusPool.filter(d => playableDegrees.includes(d));
       
       while (validFocusPool.length > 0 && emptyIndices.length > 0) {
           const note = validFocusPool.pop()!;
@@ -48,10 +99,8 @@ export function generateMelody(options: GeneratorOptions): NoteEvent[] {
       }
   }
 
-  // 4. Fill remaining slots randomly from Allowed Degrees
-  // Safety: If allowed is empty, default to "1" to prevent crashes.
-  // FIX: Explicitly cast the default array to ScaleDegree[]
-  const pool: ScaleDegree[] = allowedDegrees.length > 0 ? allowedDegrees : ["1"];
+  // 4. Fill remaining slots randomly from Playable Degrees
+  const pool: ScaleDegree[] = playableDegrees.length > 0 ? playableDegrees : ["1"];
   
   for (let i = 0; i < length; i++) {
       // Only fill if the slot wasn't already taken by Start, End, or Focus

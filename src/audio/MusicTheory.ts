@@ -40,7 +40,7 @@ const SCALE_DEGREES: Record<ScaleType, ScaleDegree[]> = {
 export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
-  scaleType: ScaleType, 
+  _scaleType: ScaleType, 
   previousMidi: number | null = null,
   difficulty: MelodyDifficulty = "normal",
   hasLeaped: boolean = false,
@@ -105,24 +105,16 @@ export function getNoteForDegree(
   }
 
   // CRITICAL: Final safety clamp to ensure we NEVER go outside range
-  const originalMidi = targetMidi;
   targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
-
-  // CRITICAL FIX: If MIDI was clamped, recalculate the degree!
-  // Otherwise we'll load the wrong vocal sample
-  let actualDegree = degree;
-  if (targetMidi !== originalMidi) {
-    actualDegree = getDegreeFromMidi(targetMidi, key, scaleType);
-  }
 
   // Build the final frequency
   const freq = 440 * Math.pow(2, (targetMidi - 69) / 12);
 
   return {
-    degree: actualDegree,  // Use recalculated degree
+    degree: degree,  // Use original requested degree
     midi: targetMidi,
     frequency: freq,
-    label: `${actualDegree} (${targetMidi})`
+    label: `${degree} (${targetMidi})`
   };
 }
 
