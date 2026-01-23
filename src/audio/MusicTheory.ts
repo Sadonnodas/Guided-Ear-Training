@@ -29,13 +29,12 @@ const SCALE_DEGREES: Record<ScaleType, ScaleDegree[]> = {
 
 /**
  * Get a valid MIDI note for a given degree, respecting:
- * - Difficulty-based jump limits
+ * - Difficulty-based jump limits (STRICTLY ENFORCED)
  * - Vocal or fretboard range constraints
  * - Octave selection for smooth voice leading
  *
- * ENHANCED: Now supports "easiest" difficulty with strict interval limits
- * FIXED: Strictly enforces vocal range - will NEVER return notes outside minMidi/maxMidi
- * FIXED: Recalculates degree after clamping to prevent wrong vocal samples
+ * ENHANCED: Stricter difficulty enforcement - will never violate jump limits
+ * even if it means using a less optimal octave choice
  */
 export function getNoteForDegree(
   key: MusicalKey,
@@ -56,45 +55,45 @@ export function getNoteForDegree(
   let targetMidi = rootMidi + interval;
 
   if (previousMidi !== null) {
-    // FIXED: Check wider range of octaves to handle all key/range combinations
     // Generate candidates from -48 to +48 semitones (4 octaves in each direction)
     const candidates: number[] = [];
     for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
       candidates.push(targetMidi + octaveOffset);
     }
     
+    // STRICT DIFFICULTY ENFORCEMENT
     let jumpLimit = 12;
     
-    // DIFFICULTY SETTINGS
     if (difficulty === "easiest") {
       // Easiest: Max interval is Major 3rd (4 semitones)
       // One perfect 5th (7 semitones) allowed per melody (tracked by hasLeaped)
       jumpLimit = hasLeaped ? 4 : 7;
     } else if (difficulty === "easy") {
-      jumpLimit = 7; // Perfect 5th
+      jumpLimit = 7; // Perfect 5th - NO EXCEPTIONS
     } else if (difficulty === "normal" && hasLeaped) {
       jumpLimit = 7;
     }
     // hard has no limit (jumpLimit = 12)
 
+    // STEP 1: Find all candidates that respect BOTH range AND jump limit
     let valid = candidates.filter(m => {
         const withinRange = m >= minMidi && m <= maxMidi;
         const jumpDist = Math.abs(m - previousMidi);
         return withinRange && jumpDist <= jumpLimit;
     });
 
+    // STEP 2: If we have valid candidates, prefer the closest one
     if (valid.length > 0) {
-      targetMidi = valid[Math.floor(Math.random() * valid.length)];
+      // Sort by distance from previous note (closest first)
+      valid.sort((a, b) => Math.abs(a - previousMidi) - Math.abs(b - previousMidi));
+      targetMidi = valid[0];
     } else {
-        // If no candidates respect jump limit, ignore jump limit but KEEP range constraint
-        const validInRange = candidates.filter(m => m >= minMidi && m <= maxMidi);
-        if (validInRange.length > 0) {
-            targetMidi = validInRange[Math.floor(Math.random() * validInRange.length)];
-        } else {
-            // CRITICAL FIX: If still no candidates, clamp to range
-            // This happens when the root+degree is outside range in all octaves
-            targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
-        }
+      // STEP 3: NO VALID CANDIDATES
+      // This means we cannot play this degree without violating difficulty rules
+      // SOLUTION: Stay on the same note (repeat previous) to maintain melodic flow
+      // This is better than breaking difficulty rules or going out of range
+      console.warn(`Cannot play degree ${degree} in key ${key} within range ${minMidi}-${maxMidi} and difficulty ${difficulty}. Repeating previous note.`);
+      targetMidi = previousMidi;
     }
   } else {
     // Starting note logic - also check wider range
@@ -105,7 +104,12 @@ export function getNoteForDegree(
     const validStart = startCandidates.filter(m => m >= minMidi && m <= maxMidi);
     
     if (validStart.length > 0) {
-        targetMidi = validStart[Math.floor(Math.random() * validStart.length)];
+        // Prefer middle of range for starting notes
+        validStart.sort((a, b) => {
+          const midRange = (minMidi + maxMidi) / 2;
+          return Math.abs(a - midRange) - Math.abs(b - midRange);
+        });
+        targetMidi = validStart[0];
     } else {
         // CRITICAL FIX: Clamp if no valid starting notes
         targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));

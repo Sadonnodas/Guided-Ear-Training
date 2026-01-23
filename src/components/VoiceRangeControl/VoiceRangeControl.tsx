@@ -61,9 +61,10 @@ export default function VoiceRangeControl({
     osc.type = 'sine';
     osc.frequency.value = midiToFreq(midi);
     
+    // FIXED: Increased volume from 0.25 to 0.6 for much better audibility
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.05);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime + 0.5);
+    gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.05); // Was 0.25, now 0.6
+    gain.gain.setValueAtTime(0.6, ctx.currentTime + 0.5);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.0);
 
     osc.connect(gain);
