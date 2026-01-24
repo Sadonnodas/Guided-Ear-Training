@@ -12,6 +12,7 @@
   --target-height: 0px;
 }
 
+/* FIX #3: Softer vignette effect with gentler gradient */
 .tutorial-backdrop {
   position: absolute;
   top: 0;
@@ -19,25 +20,50 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.75);
-  pointer-events: none; /* Changed from 'all' to 'none' */
+  pointer-events: none;
   animation: fadeIn 0.3s ease-out;
   
-  /* Create spotlight effect using radial gradient */
+  /* Original harsh gradient - REPLACED */
   -webkit-mask-image: radial-gradient(
-    ellipse calc(var(--target-width) + 40px) calc(var(--target-height) + 40px) 
+    ellipse calc(var(--target-width) + 60px) calc(var(--target-height) + 60px) 
     at calc(var(--target-left) + var(--target-width) / 2) calc(var(--target-top) + var(--target-height) / 2),
-    transparent 40%,
-    black 50%
+    transparent 30%,
+    rgba(0,0,0,0.3) 50%,
+    rgba(0,0,0,0.7) 70%,
+    black 85%
   );
   mask-image: radial-gradient(
-    ellipse calc(var(--target-width) + 40px) calc(var(--target-height) + 40px) 
+    ellipse calc(var(--target-width) + 60px) calc(var(--target-height) + 60px) 
     at calc(var(--target-left) + var(--target-width) / 2) calc(var(--target-top) + var(--target-height) / 2),
-    transparent 40%,
-    black 50%
+    transparent 30%,
+    rgba(0,0,0,0.3) 50%,
+    rgba(0,0,0,0.7) 70%,
+    black 85%
   );
 }
 
-/* Create clickable cutout for highlighted element */
+/* Alternative: Even softer option (use .tutorial-backdrop-soft class) */
+.tutorial-backdrop-soft {
+  -webkit-mask-image: radial-gradient(
+    ellipse calc(var(--target-width) + 80px) calc(var(--target-height) + 80px) 
+    at calc(var(--target-left) + var(--target-width) / 2) calc(var(--target-top) + var(--target-height) / 2),
+    transparent 25%,
+    rgba(0,0,0,0.2) 45%,
+    rgba(0,0,0,0.5) 65%,
+    rgba(0,0,0,0.8) 80%,
+    black 95%
+  );
+  mask-image: radial-gradient(
+    ellipse calc(var(--target-width) + 80px) calc(var(--target-height) + 80px) 
+    at calc(var(--target-left) + var(--target-width) / 2) calc(var(--target-top) + var(--target-height) / 2),
+    transparent 25%,
+    rgba(0,0,0,0.2) 45%,
+    rgba(0,0,0,0.5) 65%,
+    rgba(0,0,0,0.8) 80%,
+    black 95%
+  );
+}
+
 .tutorial-highlight-clickable {
   position: absolute;
   pointer-events: all;
@@ -69,20 +95,19 @@
   }
 }
 
+/* FIX #4: Scrollable tooltip */
 .tutorial-tooltip {
   position: absolute;
   background: var(--bg-panel);
   border: 2px solid var(--btn-play);
   border-radius: 12px;
   padding: 20px;
-  max-width: 400px;
+  max-width: 420px;
   min-width: 320px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
   pointer-events: all;
   z-index: 10002;
   animation: slideIn 0.3s ease-out;
-  max-height: calc(100vh - 100px); /* Prevent tooltip from being too tall */
-  overflow-y: auto; /* Allow scrolling if content is too long */
 }
 
 /* Position variants */
@@ -125,12 +150,31 @@
   margin-bottom: 15px;
 }
 
+.tooltip-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
 .tooltip-title {
   margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--btn-play);
   line-height: 1.3;
+}
+
+.substep-badge {
+  background: rgba(74, 222, 128, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: var(--btn-play);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tooltip-close {
@@ -166,13 +210,13 @@
 .tooltip-points {
   list-style: none;
   padding: 0;
-  margin: 0 0 20px 0;
+  margin: 0 0 15px 0;
 }
 
 .tooltip-points li {
   position: relative;
   padding-left: 24px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--text-main);
   line-height: 1.5;
   font-size: 0.9rem;
@@ -187,13 +231,19 @@
   font-size: 1.2em;
 }
 
-.tooltip-points li:first-child {
-  font-weight: 600;
+/* NEW: Learn More button style */
+.nav-learn-more {
+  background: rgba(74, 222, 128, 0.15);
   color: var(--btn-play);
+  border-color: rgba(74, 222, 128, 0.4);
+  font-weight: 700;
 }
 
-.tooltip-points li:first-child:before {
-  content: '→';
+.nav-learn-more:hover {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: var(--btn-play);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
 }
 
 .tooltip-action {
@@ -240,14 +290,19 @@
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: inherit;
 }
 
-.nav-skip {
+/* FIX #1: Skip buttons styled for far left position */
+.nav-skip-tutorial,
+.nav-skip-substeps {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.nav-skip:hover {
+.nav-skip-tutorial:hover,
+.nav-skip-substeps:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-main);
 }
@@ -284,7 +339,6 @@
   white-space: nowrap;
 }
 
-/* Tutorial restart button (in header) */
 .tutorial-restart-btn {
   background: rgba(74, 222, 128, 0.1);
   border: 1px solid rgba(74, 222, 128, 0.3);
@@ -309,21 +363,17 @@
 /* Mobile adjustments */
 @media (max-width: 600px) {
   .tutorial-tooltip {
-    min-width: 0;  /* Remove min-width constraint */
-    max-width: calc(100vw - 30px);  /* More room on small screens */
-    width: calc(100vw - 30px);  /* Force full available width */
-    max-height: calc(100vh - 100px);  /* Don't exceed viewport height */
-    overflow-y: auto;  /* Allow scrolling if content is too tall */
+    min-width: 0;
+    max-width: calc(100vw - 30px);
+    width: calc(100vw - 30px);
+    max-height: calc(100vh - 80px); /* More room on mobile */
     padding: 12px;
-    left: 50% !important;  /* Force center */
-    transform: translateX(-50%) !important;  /* Override positioning */
-    
-    /* Position at safe distance from edges */
+    left: 50% !important;
+    transform: translateX(-50%) !important;
     top: auto !important;
     bottom: 20px;
   }
 
-  /* Make tooltip always appear at bottom on mobile */
   .tutorial-tooltip.tooltip-top,
   .tutorial-tooltip.tooltip-bottom,
   .tutorial-tooltip.tooltip-left,
@@ -333,19 +383,18 @@
     bottom: 20px;
   }
 
-  /* Hide arrows on mobile - they don't make sense with forced positioning */
   .tutorial-tooltip::before {
     display: none;
   }
 
-  /* Adjust highlight to not interfere */
   .tutorial-highlight {
     pointer-events: none;
   }
-/* On mobile, make sure highlighted elements are clickable */
+
   .tutorial-backdrop-clickable {
-    z-index: 9997; /* Lower than highlight on mobile */
+    z-index: 9997;
   }
+  
   .tooltip-title {
     font-size: 1rem;
     line-height: 1.2;
@@ -366,25 +415,20 @@
     font-size: 0.8rem;
   }
 
-  /* Hide "Skip Tutorial" text, keep icon/minimal text */
-  .nav-skip {
+  .nav-skip-tutorial,
+  .nav-skip-substeps {
     padding: 6px 10px;
-  }
-  
-  .nav-skip::after {
-    content: 'Skip';
+    font-size: 0.75rem;
   }
 
   .tutorial-restart-btn span {
     display: none;
   }
 
-  /* Make step counter smaller */
   .step-counter {
     font-size: 0.75rem;
   }
 
-  /* Tighter navigation */
   .nav-controls {
     gap: 6px;
   }
