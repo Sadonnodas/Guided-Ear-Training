@@ -19,7 +19,7 @@ export class AudioEngine {
   private dronePlayer!: Tone.Player;
   private trainingSynth!: Tone.Synth;
   private trainingGain!: Tone.Gain;
-  private trainingVol: number = 0.75; // Increased from 0.5 to 0.75 for better default presence
+  private trainingVol: number = 0.75;
   private transitionSynth!: Tone.MetalSynth;
   private metronome!: Metronome;
   private drumMachine!: DrumMachine;
@@ -30,6 +30,9 @@ export class AudioEngine {
   
   // Track intended state to prevent race conditions
   private shouldBePlaying = false; 
+  
+  // FIX #3 & #4: Track fretboard mode to force synth-only playback
+  private isFretboardMode = false;
 
   public onNotePlay: ((note: NoteEvent | null, isClick?: boolean) => void) | null = null;
   public onBeat: ((beatNumber: number) => void) | null = null;
@@ -56,42 +59,36 @@ export class AudioEngine {
     this.dronePlayer = new Tone.Player({ loop: true, fadeIn: 2, fadeOut: 2 }).connect(this.droneGain);
 
     // WARM INTIMATE PIANO SOUND
-    // Using a carefully tuned synth to emulate a soft, felt-hammer piano
-    // Think Nils Frahm or Ólafur Arnalds - close-miked, intimate, warm
     this.trainingSynth = new Tone.Synth({
       oscillator: {
-        type: "triangle"   // Warm, round tone with soft harmonics
+        type: "triangle"
       },
       envelope: {
-        attack: 0.008,     // Soft hammer attack
-        decay: 0.4,        // Faster decay (was 0.6)
-        sustain: 0.2,      // Lower sustain (was 0.3)
-        release: 0.5       // Much shorter release (was 1.2) - prevents overlap
+        attack: 0.008,
+        decay: 0.4,
+        sustain: 0.2,
+        release: 0.5
       },
-      volume: 8  // Needs volume to be intimate but present (+8dB)
+      volume: 8
     });
 
-    // Intimate Piano signal chain: Synth -> Short Reverb -> Compressor -> Makeup Gain -> TrainingGain -> Master
-    // The reverb adds air and space without being overwhelming
     const pianoReverb = new Tone.Reverb({
-      decay: 1.8,        // Short, intimate room (not a cathedral)
-      preDelay: 0.01,    // Slight pre-delay for depth
-      wet: 0.35          // Noticeable but not drowning
+      decay: 1.8,
+      preDelay: 0.01,
+      wet: 0.35
     });
     
-    // Generate the reverb impulse response
     pianoReverb.generate();
     
     const trainingCompressor = new Tone.Compressor({
-      threshold: -30,    // Much lower threshold to catch quiet low notes
-      ratio: 6,          // Aggressive 6:1 ratio to really boost lows
-      attack: 0.008,     // Slightly slower to preserve piano character
-      release: 0.15,     // Fairly quick release
-      knee: 10           // Very smooth knee for transparent compression
+      threshold: -30,
+      ratio: 6,
+      attack: 0.008,
+      release: 0.15,
+      knee: 10
     });
     
-    // Makeup gain to compensate for compression - adds back ~12dB
-    const makeupGain = new Tone.Gain(4); // 4x = ~12dB boost
+    const makeupGain = new Tone.Gain(4);
     
     this.trainingGain = new Tone.Gain(this.trainingVol).connect(this.masterGain); 
     
@@ -106,8 +103,6 @@ export class AudioEngine {
     }).connect(this.masterGain);
 
     this.metronome = new Metronome(this.masterGain);
-    
-    // PASS REVERB TO DRUMS
     this.drumMachine = new DrumMachine(this.masterGain, this.reverb);
     
     this.scheduler = new Scheduler({
@@ -125,22 +120,36 @@ export class AudioEngine {
   }
 
   /**
+   * FIX #3 & #4: Set fretboard mode flag
+   * When true, ALWAYS uses synth (no vocal samples, no latency compensation)
+   */
+  public setFretboardMode(isFretboard: boolean) {
+    this.isFretboardMode = isFretboard;
+  }
+
+  /**
    * ENHANCED: Play a melody note with hybrid vocal/synth system
-   * - Uses vocal samples when available (within MIN_VOCAL_MIDI to MAX_VOCAL_MIDI)
-   * - Automatically falls back to synth for notes outside this range
-   * - This allows fretboard mode to use the full guitar range
+   * FIX #3 & #4: In fretboard mode, ALWAYS use synth (no vocal samples)
+   * This eliminates the mixed vocal/synth issue and timing problems
    */
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
     const midi = note.noteInfo.midi;
     const degree = note.noteInfo.degree;
     
-    // HYBRID LOGIC: Check if we should use synth or vocal
+    // FIX #3 & #4: Force synth in fretboard mode
+    if (this.isFretboardMode) {
+      const shortDuration = note.duration * 0.75;
+      this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
+      return;
+    }
+    
+    // HYBRID LOGIC for other modes: Check if we should use synth or vocal
     const isOutsideVocalRange = midi < MIN_VOCAL_MIDI || midi > MAX_VOCAL_MIDI;
     const shouldUseSynth = useSynth || isOutsideVocalRange;
     
     if (shouldUseSynth) {
       // Use synth for notes outside vocal range OR when explicitly requested
-      const shortDuration = note.duration * 0.75; // 75% of 2 beats = 1.5 beats
+      const shortDuration = note.duration * 0.75;
       this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
     } else {
       // Try to use vocal sample
@@ -154,7 +163,7 @@ export class AudioEngine {
       } else {
         // Sample missing - fall back to synth
         console.warn(`Sample not found for ${id}, falling back to synth`);
-        const shortDuration = note.duration * 0.75; // 75% of 2 beats = 1.5 beats
+        const shortDuration = note.duration * 0.75;
         this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
       }
     }
@@ -203,7 +212,8 @@ export class AudioEngine {
     onComplete: (nextStartTime: number) => void, 
     startTime?: number, 
     skipPrepare?: boolean,
-    quizMode: boolean = false
+    quizMode: boolean = false,
+    fretboardMode: boolean = false // FIX #3: Add fretboardMode parameter
   ) {
     if (!this.isInitialized) return;
     const beatSec = 60 / Tone.Transport.bpm.value;
@@ -231,7 +241,8 @@ export class AudioEngine {
       melodyDur, 
       safeStartTime, 
       skipPrepare,
-      quizMode
+      quizMode,
+      fretboardMode // FIX #3: Pass fretboardMode to Scheduler
     );
   }
 
@@ -295,9 +306,6 @@ export class AudioEngine {
   public setTrainingVol(v: number) { 
     this.trainingVol = v; 
     if (this.isInitialized && this.trainingGain) {
-      // Use gentler exponential scaling (1.5 power instead of 2)
-      // When slider is at 0.5, actual volume is ~0.35 (vs 0.25 with square)
-      // This gives louder overall volume while still having good control at low end
       const exponentialVol = Math.pow(v, 1.5);
       this.trainingGain.gain.rampTo(exponentialVol, 0.1); 
     }
@@ -308,6 +316,9 @@ export class AudioEngine {
    * Notes outside the range will automatically use synth, so we don't try to load them
    */
   public async preloadNotes(notes: NoteEvent[]) {
+    // FIX #3: Skip preloading in fretboard mode (synth-only)
+    if (this.isFretboardMode) return;
+    
     // Filter to only notes within vocal range
     const notesInVocalRange = notes.filter(
       n => n.noteInfo.midi >= MIN_VOCAL_MIDI && n.noteInfo.midi <= MAX_VOCAL_MIDI
@@ -328,8 +339,7 @@ export class AudioEngine {
         await buffer.load(url);
         this.noteBuffers.set(id, buffer); 
       } catch (e) { 
-        // Don't warn - this is expected for notes outside vocal range
-        // They'll automatically use synth
+        // Don't warn - notes outside vocal range use synth automatically
       }
     });
     await Promise.all(promises);

@@ -51,20 +51,32 @@ export default function App() {
     }
   }, [session.training.activeLevelId, session.activeTab]);
 
-  // Determine if we should hide visuals in the Visualizer (for Blind Mode in Random tab)
-  // In Random tab with inverse mode + blind mode: hide during Listen phases, show during Answer/Affirm
-  const shouldHideVisualizerNotes = session.activeTab === 'random' 
-    && session.inverseMode 
-    && session.hideFretboardVisuals
-    && session.status !== 'Answer' 
-    && session.status !== 'Affirm';
+  // FIX: Determine if we should hide visuals based on mode and status
+  const shouldHideVisualizerNotes = 
+    // Random tab with inverse + blind mode
+    (session.activeTab === 'random' 
+      && session.inverseMode 
+      && session.hideFretboardVisuals
+      && session.status !== 'Answer' 
+      && session.status !== 'Affirm')
+    ||
+    // Fretboard tab with blind mode ON: hide during Listen and Play Along, show during Your Turn
+    (session.activeTab === 'fretboard'
+      && session.hideFretboardVisuals
+      && session.status !== 'Your Turn');
 
-  // Determine if tape should stop moving (inverse blind mode fix)
-  const shouldHideMovement = session.activeTab === 'random' 
-    && session.inverseMode 
-    && session.hideFretboardVisuals
-    && session.status !== 'Answer' 
-    && session.status !== 'Affirm';
+  const shouldHideMovement = 
+    // Random tab with inverse + blind mode
+    (session.activeTab === 'random' 
+      && session.inverseMode 
+      && session.hideFretboardVisuals
+      && session.status !== 'Answer' 
+      && session.status !== 'Affirm')
+    ||
+    // Fretboard tab with blind mode ON: stop movement during Listen and Play Along
+    (session.activeTab === 'fretboard'
+      && session.hideFretboardVisuals
+      && session.status !== 'Your Turn');
 
   return (
     <div className="app-container">
@@ -100,7 +112,7 @@ export default function App() {
           stopSession={session.stopSession}
         />
 
-        {/* Status Text (Sing Along / Listen) */}
+        {/* Status Text (Sing Along / Listen / Play Along / Try It) */}
         <div className="status-text-container">
             {session.status}
         </div>
@@ -110,7 +122,7 @@ export default function App() {
             currentKey={session.currentKey}
             scaleType={session.scaleType}
             selectedShape={session.selectedShape}
-            activeMidi={session.activeMidi}
+            activeMidi={shouldHideVisualizerNotes ? null : session.activeMidi}
             hideVisuals={session.hideFretboardVisuals}
             status={session.status}
           />

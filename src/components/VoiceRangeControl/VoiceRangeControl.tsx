@@ -31,8 +31,9 @@ const MIDI_TO_NOTE: Record<number, string> = {
   68: 'G♯4', 69: 'A4', 70: 'B♭4', 71: 'B4', 72: 'C5'
 };
 
-const ABSOLUTE_MIN = 36; // C2
-const ABSOLUTE_MAX = 72; // C5
+// FIX #1: Limit range to available vocal samples (G2 to G4)
+const ABSOLUTE_MIN = 43; // G2 - lowest vocal sample
+const ABSOLUTE_MAX = 67; // G4 - highest vocal sample
 
 export default function VoiceRangeControl({ 
   minMidi, 
@@ -187,7 +188,7 @@ export default function VoiceRangeControl({
 
       {/* Help Text */}
       <div className="range-hint">
-        Drag sliders to set range • Click buttons to preview notes
+        Drag sliders to set range • Click buttons to preview notes • Range: G2-G4
       </div>
     </div>
   );

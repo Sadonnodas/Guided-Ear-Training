@@ -56,7 +56,8 @@ export class Scheduler {
       calculatedMelodyDur: number,
       atTime?: number,
       skipPrepare: boolean = false,
-      inverseMode: boolean = false // Rename parameter
+      inverseMode: boolean = false,
+      fretboardMode: boolean = false // FIX #3: New parameter for fretboard mode
   ) {
     this.clearMelody();
     this.ensureSystemEvents();
@@ -80,6 +81,7 @@ export class Scheduler {
 
     /**
      * Helper to schedule a pass
+     * FIX #4: Remove latency offset for fretboard mode (synth-only, no vocal samples)
      */
     const schedulePass = (start: number, playAudio: boolean, isSilentPass: boolean, label: string) => {
         schedule((time) => {
@@ -92,7 +94,8 @@ export class Scheduler {
             const noteTime = start + (note.startTime * beatSec);
             
             if (playAudio) {
-                const offset = isSilentPass ? 0 : (LATENCY_OFFSET[note.noteInfo.degree] || 0);
+                // FIX #4: No latency compensation in fretboard mode (synth-only)
+                const offset = (fretboardMode || isSilentPass) ? 0 : (LATENCY_OFFSET[note.noteInfo.degree] || 0);
                 const triggerTime = noteTime + offset;
                 schedule((time) => this.callbacks.playNoteAudio(note, time, isSilentPass), triggerTime);
             }
@@ -107,8 +110,27 @@ export class Scheduler {
 
     let cursor = melodyStart;
 
-    if (inverseMode) {
-        // INVERSE MODE: Synth -> Synth (Repeat) -> Vocal Answer -> Synth Affirmation
+    // FIX #3: Fretboard mode with different sequences based on hideFretboardVisuals
+    if (fretboardMode) {
+        // FRETBOARD MODE ALWAYS HAS 3 PASSES:
+        // 1. Listen (synth plays)
+        // 2. Play Along (synth plays, user tries to play along)
+        // 3. Your Turn (user plays alone, optionally with training wheels)
+        
+        // Pass 1: Listen
+        schedulePass(cursor, true, true, "Listen");  
+        cursor += calculatedMelodyDur;
+        
+        // Pass 2: Play Along (synth plays, visualizer hidden if blind mode)
+        schedulePass(cursor, true, true, "Play Along");  
+        cursor += calculatedMelodyDur;
+        
+        // Pass 3: Your Turn (user plays alone, visualizer shown)
+        schedulePass(cursor, trainingWheels, true, "Your Turn"); 
+        cursor += calculatedMelodyDur;
+    }
+    else if (inverseMode) {
+        // RANDOM/TRAINING INVERSE MODE: Synth -> Synth (Repeat) -> Vocal Answer -> Synth Affirmation
         schedulePass(cursor, true, true, "Listen");  
         cursor += calculatedMelodyDur;
 
@@ -123,7 +145,7 @@ export class Scheduler {
         cursor += calculatedMelodyDur;
     }
     else {
-        // NORMAL MODE: Listen -> Sing Along -> Your Turn (if enabled)
+        // RANDOM/TRAINING NORMAL MODE: Listen -> Sing Along -> Your Turn (if enabled)
         schedulePass(cursor, true, false, "Listen");  
         cursor += calculatedMelodyDur;
         

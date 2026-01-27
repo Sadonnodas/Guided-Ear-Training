@@ -16,7 +16,8 @@ export default function FretboardVisualizer({
   currentKey, scaleType, selectedShape, activeMidi, hideVisuals, status
 }: FretboardVisualizerProps) {
 
-  const isRevealStage = status === "Answer" || status === "Affirm";
+  // FIX: Check for "Your Turn" status in fretboard mode, or "Answer"/"Affirm" in other modes
+  const isRevealStage = status === "Your Turn" || status === "Answer" || status === "Affirm";
   const effectiveHide = hideVisuals && !isRevealStage;
   const config = getFretboardConfig(currentKey, scaleType, selectedShape);
   

@@ -175,14 +175,14 @@ export function useSessionLogic() {
     const cachedSettings = tabSettingsCache.current[newTab] || TAB_DEFAULTS[newTab];
     
     // Apply tab-specific settings
-    if (newTab === 'fretboard') {
-      // Fretboard always uses inverse mode and pentatonic
-      settings.setInverseMode(true);
-      const pentatonicType = scaleType === 'Minor' || scaleType === 'PentatonicMinor' 
-        ? 'PentatonicMinor' 
-        : 'PentatonicMajor';
-      handleScaleChange(pentatonicType);
-    } else {
+if (newTab === 'fretboard') {
+  // Fretboard uses pentatonic scales
+  const pentatonicType = scaleType === 'Minor' || scaleType === 'PentatonicMinor' 
+    ? 'PentatonicMinor' 
+    : 'PentatonicMajor';
+  handleScaleChange(pentatonicType);
+  // Don't force inverseMode - let user toggle it via hideFretboardVisuals
+} else {
       // Apply cached/default settings for random/training
       settings.setInverseMode(cachedSettings.inverseMode);
       settings.setTrainingWheels(cachedSettings.trainingWheels);
@@ -351,6 +351,8 @@ export function useSessionLogic() {
       audioEngine.setBpm(settings.bpm);
       audioEngine.setDrumPattern(settings.currentPattern);
       audioEngine.setReverbAmt(mixer.volReverb); 
+
+      audioEngine.setFretboardMode(activeTab === 'fretboard');
 
       if (activeTab === 'training') training.startTrainingTimer();
       
@@ -578,19 +580,20 @@ export function useSessionLogic() {
       if (!isPlayingRef.current) return;
 
       audioEngine.scheduleRoutine(
-        noteEvents,
-        playSilent, 
-        useTrainingWheels, 
-        isFirst, 
-        (nextStartTime) => {
-          if (isPlayingRef.current) {
-            runCycle(currentCycleKey, false, nextStartTime);
-          }
-        },
-        startTime,
-        skipPrepareMessage,
-        settings.refs.inverseMode.current
-      );
+  noteEvents,
+  playSilent, 
+  useTrainingWheels, 
+  isFirst, 
+  (nextStartTime) => {
+    if (isPlayingRef.current) {
+      runCycle(currentCycleKey, false, nextStartTime);
+    }
+  },
+  startTime,
+  skipPrepareMessage,
+  settings.refs.inverseMode.current,
+  activeTabRef.current === 'fretboard'  // FIX #3: Pass fretboard mode flag as 9th parameter
+);
       
       if (isFirst) audioEngine.startPlayback();
     }
