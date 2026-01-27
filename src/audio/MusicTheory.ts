@@ -33,13 +33,13 @@ const SCALE_DEGREES: Record<ScaleType, ScaleDegree[]> = {
  * - Vocal or fretboard range constraints
  * - Octave selection for smooth voice leading
  *
- * ENHANCED: Stricter difficulty enforcement - will never violate jump limits
- * even if it means using a less optimal octave choice
+ * CRITICAL FIX: Now returns the ACTUAL degree that corresponds to the final MIDI note
+ * This prevents the bug where vocal samples sing the wrong degree due to clamping
  */
 export function getNoteForDegree(
   key: MusicalKey,
   degree: ScaleDegree,
-  _scaleType: ScaleType, 
+  scaleType: ScaleType, 
   previousMidi: number | null = null,
   difficulty: MelodyDifficulty = "normal",
   hasLeaped: boolean = false,
@@ -119,14 +119,18 @@ export function getNoteForDegree(
   // CRITICAL: Final safety clamp to ensure we NEVER go outside range
   targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
 
+  // *** CRITICAL FIX: Calculate the ACTUAL degree for this MIDI note ***
+  // This prevents the bug where we play MIDI 60 but call it degree "3"
+  const actualDegree = getDegreeFromMidi(targetMidi, key, scaleType);
+  
   // Build the final frequency
   const freq = 440 * Math.pow(2, (targetMidi - 69) / 12);
 
   return {
-    degree: degree,  // Use original requested degree
+    degree: actualDegree,  // Use ACTUAL degree, not requested degree
     midi: targetMidi,
     frequency: freq,
-    label: `${degree} (${targetMidi})`
+    label: `${actualDegree} (${targetMidi})`
   };
 }
 
