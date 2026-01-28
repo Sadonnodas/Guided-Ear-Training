@@ -73,6 +73,9 @@ export default function Header({
 
   // NEW: Handle key change - stop if playing in fretboard mode, otherwise modulate gracefully
   const handleKeyChange = (newKey: MusicalKey) => {
+    // FIX: Ignore clicks during tutorial
+    if (document.body.dataset.tutorialActive === 'true') return;
+    
     if (activeTab === 'fretboard' && isPlaying && stopSession) {
       stopSession();
     }

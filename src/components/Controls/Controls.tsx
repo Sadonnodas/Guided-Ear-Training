@@ -131,6 +131,17 @@ export default function Controls(props: ControlsProps) {
     window.location.reload();
   };
 
+  // FIX: Wrap handlers to prevent actions during tutorial
+  const handlePlayToggle = () => {
+    if (document.body.dataset.tutorialActive === 'true') return;
+    props.onPlayToggle();
+  };
+
+  const handleStop = () => {
+    if (document.body.dataset.tutorialActive === 'true') return;
+    props.onStop();
+  };
+
   const isFretboardTab = props.activeTab === 'fretboard';
   const isRandomTab = props.activeTab === 'random';
   const showBlindMode = isFretboardTab || props.inverseMode;
@@ -142,7 +153,7 @@ export default function Controls(props: ControlsProps) {
       <div className="play-btn-container">
         <button 
           className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
-          onClick={props.onPlayToggle}
+          onClick={handlePlayToggle}
           style={{ "--beat-dur": `${beatDuration}s` } as React.CSSProperties}
           title={props.isPlaying ? "Pause session" : "Start practice session"}
         >
@@ -151,7 +162,7 @@ export default function Controls(props: ControlsProps) {
 
         <div 
           className={`stop-mini-btn ${props.isPlaying || props.isPaused ? 'visible' : ''}`} 
-          onClick={props.onStop}
+          onClick={handleStop}
           title="Stop and restart session"
         >
           <StopIcon />

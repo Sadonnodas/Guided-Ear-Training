@@ -9,17 +9,20 @@ interface TutorialStep {
   target: string;
   title: string;
   description: string;
+  fallbackTitle?: string; // NEW: Title to show when target not found
+  fallbackDescription?: string; // NEW: Description when target not found
   points?: string[];
   position?: 'top' | 'bottom' | 'left' | 'right';
   highlightPadding?: number;
   customPadding?: { top: number; right: number; bottom: number; left: number };
-  combinedTarget?: boolean; // NEW: Calculate bounding box of ALL matched elements
+  combinedTarget?: boolean;
   smartPosition?: boolean;
   action?: {
     hint: string;
     check?: () => boolean;
   };
   switchToTab?: string;
+  controlsTab?: 'melody' | 'rhythm' | 'mixer' | 'more'; // NEW: Which controls tab to open
   waitForLayout?: boolean;
   hasSubsteps?: boolean;
   openControls?: boolean;
@@ -31,8 +34,11 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: '1',
     target: '.tabs',
     title: '🎵 Welcome to Guided Ear Training!',
-    description: 'Three practice modes to choose from. Each mode has a different learning approach.',
+    description: 
+    'This is a Call and Response ear training designed to help you internalize scale degrees.',
+    
     points: [
+      'Three practice modes to choose from. Each mode has a different learning approach.',
       '💡 Hover over each tab to see what it does',
       'Want to learn more about each mode? Click "Learn More"'
     ],
@@ -52,7 +58,11 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: '1.2',
     target: '.tabs button:nth-child(2)',
     title: '📚 Training Mode',
-    description: 'Structured curriculum that introduces one scale degree at a time. Four progressive stages per level automatically increase the difficulty. After 10 minutes of practice, the next level unlocks.',
+    description: 'Structured curriculum with progressive levels. Each level introduces ONE new scale degree. Spend 10 minutes in a level to unlock the next one.',
+    points: [
+      'Four stages per level, increasing in difficulty',
+      'Perfect for systematic ear training development'
+    ],
     position: 'bottom',
     highlightPadding: 8
   },
@@ -60,7 +70,12 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: '1.3',
     target: '.tabs button:nth-child(3)',
     title: '🎸 Fretboard Mode',
-    description: 'Guitar-specific practice using the CAGED system. Associates scale degrees with fretboard positions in each shape (C, A, G, E, D).',
+    description: 'Guitar-specific practice using CAGED system. Practice scale shapes across the fretboard. Switch between shapes (C, A, G, E, D).',
+    points: [
+      'Visual fretboard shows note positions as melodies play',
+      'Inverse mode enabled by default: Listen first, then play along and see answer',
+      'Quick tip: Use Blind Mode (in the controls) to hide visuals during listen phase for extra challenge!'
+    ],
     position: 'bottom',
     highlightPadding: 8
   },
@@ -113,7 +128,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     title: '👁️ Visual Feedback & Scale Degrees',
     description: 'Watch notes scroll/light up as melodies play.',
     points: [
-      '🎯 Try it: Click on a degree to enable or disable it',
+      '🎯 Try it: Click on a degree to exclude/include it',
       '⏱️ Try it: Long-press (600ms) a degree to FOCUS on it'
     ],
     position: 'bottom',
@@ -188,43 +203,10 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     smartPosition: true
   },
   
-  // STEP 5: Training Mode
+  // STEP 5: Controls (with substeps)
   {
     id: '5',
-    target: '.tabs button:nth-child(2)',
-    title: '📚 Training Mode Explained',
-    description: 'Structured curriculum with progressive levels. Each level introduces ONE new scale degree. Spend 10 minutes in a level to unlock the next one.',
-    points: [
-      'Four stages per level, increasing in difficulty',
-      'Perfect for systematic ear training development'
-    ],
-    position: 'bottom',
-    highlightPadding: 20,
-    switchToTab: 'training',
-    waitForLayout: true
-  },
-  
-  // STEP 6: Fretboard Mode
-  {
-    id: '6',
-    target: '.tabs button:nth-child(3)',
-    title: '🎸 Fretboard Mode Explained',
-    description: 'Guitar-specific practice using CAGED system. Practice scale shapes across the fretboard. Switch between shapes (C, A, G, E, D).',
-    points: [
-      'Visual fretboard shows note positions as melodies play',
-      'Inverse mode enabled by default: Listen first, then play along and see answer',
-      'Quick tip: Use Blind Mode (in the controls) to hide visuals during listen phase for extra challenge!',
-    ],
-    position: 'bottom',
-    highlightPadding: 15,
-    switchToTab: 'fretboard',
-    waitForLayout: true
-  },
-  
-  // STEP 7: Controls (with substeps)
-  {
-    id: '7',
-    target: '.settings-trigger',
+    target: '.settings-trigger, .controls-accordion',
     title: '⚙️ Customize Everything',
     description: 'Click here to open the control settings. Four tabs with different options.',
     points: [
@@ -232,66 +214,88 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     ],
     position: 'top',
     highlightPadding: 15,
+    combinedTarget: true,
     switchToTab: 'random',
+    openControls: true,
+    controlsTab: 'melody',
     waitForLayout: true,
     hasSubsteps: true
   },
   {
-    id: '7.1',
-    target: '.settings-trigger',
+    id: '5.1',
+    target: '.control-tabs, .controls-content',
     title: '🎼 Melody Controls',
     description: 'Difficulty (easiest to hard), tempo, root note constraints, and vocal range calibration. Control how melodies are generated.',
     position: 'top',
-    highlightPadding: 15
+    highlightPadding: 15,
+    combinedTarget: true,
+    openControls: true,
+    controlsTab: 'melody'
   },
   {
-    id: '7.2',
-    target: '.settings-trigger',
+    id: '5.2',
+    target: '.control-tabs, .controls-content',
     title: '🥁 Rhythm Controls',
     description: 'Choose from 9 drum patterns across 3 styles: Classic, Lofi Chill, Bossa Vibe, and Percussion Only. Find a groove that works for you.',
     position: 'top',
-    highlightPadding: 15
+    highlightPadding: 15,
+    combinedTarget: true,
+    openControls: true,
+    controlsTab: 'rhythm'
   },
   {
-    id: '7.3',
-    target: '.settings-trigger',
+    id: '5.3',
+    target: '.control-tabs, .controls-content',
     title: '🎚️ Mixer Controls',
     description: 'Adjust volume for vocals, drums, drone, metronome, training synth, and master output. Add reverb for space. Create your perfect mix.',
     position: 'top',
-    highlightPadding: 15
+    highlightPadding: 15,
+    combinedTarget: true,
+    openControls: true,
+    controlsTab: 'mixer'
   },
   {
-    id: '7.4',
-    target: '.settings-trigger',
+    id: '5.4',
+    target: '.control-tabs, .controls-content',
     title: '🔧 Advanced Modes',
     description: 'Pitch Guide, Inverse Mode (hear then sing), Blind Mode (hide visuals during listen). Experiment with these!',
     position: 'top',
-    highlightPadding: 15
+    highlightPadding: 15,
+    combinedTarget: true,
+    openControls: true,
+    controlsTab: 'more'
   },
-  // NEW: Step 7.5 - Pro Tip for Inverse + Blind Mode
+  // NEW: Step 5.5 - Pro Tip for Inverse + Blind Mode  
   {
-    id: '7.5',
-    target: '[title*="Inverse Mode"], [title*="Blind Mode"]',
+    id: '5.5',
+    target: '.control-tabs, .controls-content',
     title: '💡 Pro Tip: Test Yourself!',
-    description: 'Use Inverse Mode together with Blind Mode to challenge yourself. You will hear the melody played twice by synth, then on the third time the scale degrees appear. Try to identify them before they are shown!',
+    description: 'In the Melody tab, you will find Inverse Mode and Blind Mode buttons. Use them together to challenge yourself: You will hear the melody played twice by synth, then on the third time the scale degrees appear. Try to identify them before they are shown!',
+    fallbackTitle: '⚠️ Please Open Controls First',
+    combinedTarget: true,
+    fallbackDescription: 'To see this pro tip, please open the Controls panel. The buttons are in the Melody tab. Then click "Next" to continue the tutorial.',
     position: 'top',
-    highlightPadding: 10,
-    combinedTarget: true, // Calculate bounding box of both buttons
-    openControls: true // Signal that controls should be open for this step
+    highlightPadding: 15,
+    openControls: true,
+    controlsTab: 'melody'
   }
 ];
 
 interface GuidedTutorialProps {
   onComplete?: () => void;
   onTabChange?: (tab: string) => void;
+  onControlsOpen?: (shouldOpen: boolean) => void; // NEW: Signal to open/close controls
+  onControlsTabChange?: (tab: 'melody' | 'rhythm' | 'mixer' | 'more') => void; // NEW: Signal which tab
 }
 
-export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutorialProps) {
+export default function GuidedTutorial({ onComplete, onTabChange, onControlsOpen, onControlsTabChange }: GuidedTutorialProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom' | 'left' | 'right'>('bottom');
+  const [showFallback, setShowFallback] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const controlsOpenedRef = useRef(false); // NEW: Track if we've already opened controls
 
   useEffect(() => {
     const completed = localStorage.getItem('tutorial-completed');
@@ -300,10 +304,82 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
     }
   }, []);
 
+  // FIX: Set tutorial mode flag AND lock scroll to prevent layout issues
+  // EXCEPT during controls steps where we need to scroll to see everything
+  useEffect(() => {
+    if (isActive) {
+      document.body.dataset.tutorialActive = 'true';
+      
+      // Check if current step is a controls step (5.x)
+      const step = TUTORIAL_STEPS[currentStepIndex];
+      const isControlsStep = step && step.id.startsWith('5.') && step.id !== '5';
+      
+      if (isControlsStep) {
+        // Allow scrolling for controls steps since they're tall
+        document.body.style.overflow = '';
+      } else {
+        // Lock body scroll for other steps
+        document.body.style.overflow = 'hidden';
+      }
+    } else {
+      delete document.body.dataset.tutorialActive;
+      // Restore body scroll
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      delete document.body.dataset.tutorialActive;
+      document.body.style.overflow = '';
+    };
+  }, [isActive, currentStepIndex]);
+
   useEffect(() => {
     if (!isActive) return;
 
     const step = TUTORIAL_STEPS[currentStepIndex];
+    
+    // Handle controls panel opening (only once!)
+    if (step.openControls && !controlsOpenedRef.current) {
+      if (onControlsOpen) {
+        // Use callback if provided
+        onControlsOpen(true);
+        controlsOpenedRef.current = true;
+      } else {
+        // Fallback: Programmatically click the controls button
+        const controlsButton = document.querySelector('.settings-trigger') as HTMLElement;
+        if (controlsButton) {
+          // Check if controls are already open by looking for expanded class or visibility
+          const controlsPanel = document.querySelector('.controls-panel');
+          const isOpen = controlsPanel && controlsPanel.clientHeight > 0;
+          
+          if (!isOpen) {
+            controlsButton.click();
+            controlsOpenedRef.current = true; // Mark as opened
+          }
+        }
+      }
+    }
+    
+    // Handle controls tab switching
+    if (step.controlsTab && onControlsTabChange) {
+      onControlsTabChange(step.controlsTab);
+    } else if (step.controlsTab) {
+      // Fallback: Programmatically click the tab button
+      setTimeout(() => {
+        const tabSelectors = {
+          melody: 'button[aria-label*="Melody"], button:has(svg):nth-child(1)',
+          rhythm: 'button[aria-label*="Rhythm"], button:has(svg):nth-child(2)',
+          mixer: 'button[aria-label*="Mixer"], button:has(svg):nth-child(3)',
+          more: 'button[aria-label*="More"], button:has(svg):nth-child(4)'
+        };
+        
+        const selector = tabSelectors[step.controlsTab!];
+        const tabButton = document.querySelector(selector) as HTMLElement;
+        if (tabButton) {
+          tabButton.click();
+        }
+      }, 100);
+    }
     
     if (step.switchToTab && onTabChange) {
       onTabChange(step.switchToTab);
@@ -318,7 +394,17 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
         setTimeout(() => updateHighlight(), 100);
       }
     } else {
-      updateHighlight();
+      // Also wait for layout if controls need to open
+      if (step.openControls || step.controlsTab) {
+        // Controls have animation - need multiple retries with longer delays
+        setTimeout(() => updateHighlight(), 300); // Increased from 200
+        const checks = [400, 500, 600, 700, 800, 900, 1000]; // More retries, longer delays
+        checks.forEach(delay => {
+          setTimeout(() => updateHighlight(), delay);
+        });
+      } else {
+        updateHighlight();
+      }
     }
     
     const handleResize = () => updateHighlight();
@@ -342,6 +428,8 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
       }
       
       if (elements.length > 0) {
+        setShowFallback(false); // Reset fallback state when elements found
+        
         // Calculate combined bounding box of all elements
         const rects = elements.map(el => el.getBoundingClientRect());
         const minTop = Math.min(...rects.map(r => r.top));
@@ -381,7 +469,7 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
           overlayRef.current.style.setProperty('--target-height', `${combinedRect.height + padding.top + padding.bottom}px`);
         }
 
-        // Position tooltip and scroll handling (same as below)
+        // Position tooltip and scroll handling
         let finalPosition = step.position || 'bottom';
         
         if (!isMobile()) {
@@ -404,22 +492,57 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
         
         setTooltipPosition(finalPosition);
         
+        // IMPROVED: Better scrolling that ensures element is visible
         if (isMobile()) {
-          elements[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+          elements[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else {
-          if (finalPosition === 'top') {
+          // Check if element is in viewport
+          const isInViewport = combinedRect.top >= 0 && 
+                               combinedRect.bottom <= window.innerHeight &&
+                               combinedRect.left >= 0 && 
+                               combinedRect.right <= window.innerWidth;
+          
+          if (!isInViewport) {
+            // Position element in upper-third of viewport (not dead center)
+            // This prevents scrolling too far down
+            const targetPosition = finalPosition === 'top' 
+              ? combinedRect.top + window.scrollY - (window.innerHeight * 0.6) // If tooltip below, show more space above
+              : combinedRect.top + window.scrollY - (window.innerHeight * 0.25); // If tooltip above, show element near top
+            
             window.scrollTo({
-              top: combinedRect.top + window.scrollY - window.innerHeight * 0.6,
-              behavior: 'smooth'
-            });
-          } else {
-            window.scrollTo({
-              top: combinedRect.top + window.scrollY - window.innerHeight * 0.2,
+              top: Math.max(0, targetPosition), // Don't scroll above page top
               behavior: 'smooth'
             });
           }
         }
         return; // Exit early after handling combined target
+      } else {
+        // FALLBACK: Elements not found (e.g., controls not open)
+        console.warn(`Tutorial step ${step.id}: No elements found for combined target "${step.target}"`);
+        
+        // Check if this is step 5.5 and suggest opening controls
+        if (step.id === '5.5' && step.openControls) {
+          setShowFallback(true); // NEW: Signal to show fallback text
+          
+          // Show fallback tooltip prompting user to open controls
+          const fallbackPosition = {
+            top: window.scrollY + (window.innerHeight / 2) - 100,
+            left: (window.innerWidth / 2) - 200,
+            width: 400,
+            height: 80
+          };
+          
+          setPosition(fallbackPosition);
+          setTooltipPosition('bottom');
+          
+          if (overlayRef.current) {
+            overlayRef.current.style.setProperty('--target-top', `${fallbackPosition.top}px`);
+            overlayRef.current.style.setProperty('--target-left', `${fallbackPosition.left}px`);
+            overlayRef.current.style.setProperty('--target-width', `${fallbackPosition.width}px`);
+            overlayRef.current.style.setProperty('--target-height', `${fallbackPosition.height}px`);
+          }
+          return;
+        }
       }
     }
     
@@ -479,20 +602,24 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
       
       setTooltipPosition(finalPosition);
       
+      // Check if element is in viewport, scroll if not (especially for controls panel)
+      const isInViewport = rect.top >= 0 && 
+                           rect.bottom <= window.innerHeight &&
+                           rect.left >= 0 && 
+                           rect.right <= window.innerWidth;
+      
       if (isMobile()) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        if (finalPosition === 'top') {
-          window.scrollTo({
-            top: rect.top + window.scrollY - window.innerHeight * 0.6,
-            behavior: 'smooth'
-          });
-        } else {
-          window.scrollTo({
-            top: rect.top + window.scrollY - window.innerHeight * 0.2,
-            behavior: 'smooth'
-          });
-        }
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (!isInViewport || step.controlsTab) {
+        // Always scroll for controls tabs OR if element is out of viewport
+        const targetPosition = finalPosition === 'top' 
+          ? rect.top + window.scrollY - (window.innerHeight * 0.6)
+          : rect.top + window.scrollY - (window.innerHeight * 0.25);
+        
+        window.scrollTo({
+          top: Math.max(0, targetPosition),
+          behavior: 'smooth'
+        });
       }
     } else {
       // FALLBACK: Element not found - position tooltip in center of screen
@@ -522,6 +649,7 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
   };
 
   const handleNext = () => {
+    setShowFallback(false); // Reset fallback when moving to next step
     if (currentStepIndex < TUTORIAL_STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
@@ -530,6 +658,7 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
   };
 
   const handlePrev = () => {
+    setShowFallback(false); // Reset fallback when going back
     if (currentStepIndex > 0) {
       setCurrentStepIndex(currentStepIndex - 1);
     }
@@ -602,13 +731,17 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
       >
         <div className="tooltip-header">
           <div className="tooltip-title-row">
-            <h3 className="tooltip-title">{step.title}</h3>
+            <h3 className="tooltip-title">
+              {showFallback && step.fallbackTitle ? step.fallbackTitle : step.title}
+            </h3>
             {isSubstep && <span className="substep-badge">Detail</span>}
           </div>
           {/* FIX #2: Removed redundant close button (X) - only keep Skip Tutorial */}
         </div>
 
-        <div className="tooltip-description">{step.description}</div>
+        <div className="tooltip-description">
+          {showFallback && step.fallbackDescription ? step.fallbackDescription : step.description}
+        </div>
 
         {step.points && step.points.length > 0 && (
           <ul className="tooltip-points">
@@ -632,23 +765,23 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
         <div className="tooltip-nav">
           {/* FIX #3: Skip button ALWAYS shown on main steps, allowing users to skip details */}
           {!isSubstep && step.hasSubsteps && (
-            <button className="nav-btn nav-skip-tutorial" onClick={handleSkip}>
+            <button className="nav-btn nav-skip-tutorial" onClick={(e) => { e.stopPropagation(); handleSkip(); }}>
               Skip Tutorial
             </button>
           )}
           {isSubstep && (
-            <button className="nav-btn nav-skip-substeps" onClick={handleSkipSubsteps}>
+            <button className="nav-btn nav-skip-substeps" onClick={(e) => { e.stopPropagation(); handleSkipSubsteps(); }}>
               Skip Details
             </button>
           )}
           {!step.hasSubsteps && !isSubstep && (
-            <button className="nav-btn nav-skip-tutorial" onClick={handleSkip}>
+            <button className="nav-btn nav-skip-tutorial" onClick={(e) => { e.stopPropagation(); handleSkip(); }}>
               Skip Tutorial
             </button>
           )}
 
           <div className="nav-controls">
-            <button className="nav-btn nav-prev" onClick={handlePrev} disabled={currentStepIndex === 0}>
+            <button className="nav-btn nav-prev" onClick={(e) => { e.stopPropagation(); handlePrev(); }} disabled={currentStepIndex === 0}>
               ← Back
             </button>
 
@@ -659,12 +792,12 @@ export default function GuidedTutorial({ onComplete, onTabChange }: GuidedTutori
             {/* Show different buttons based on context */}
             {step.hasSubsteps && !isSubstep ? (
               // Main step with substeps - show "Learn More"
-              <button className="nav-btn nav-learn-more" onClick={handleLearnMore}>
+              <button className="nav-btn nav-learn-more" onClick={(e) => { e.stopPropagation(); handleLearnMore(); }}>
                 💡 Learn More
               </button>
             ) : (
               // Default - show "Next" or "Finish"
-              <button className="nav-btn nav-next" onClick={handleNext}>
+              <button className="nav-btn nav-next" onClick={(e) => { e.stopPropagation(); handleNext(); }}>
                 {currentStepIndex === TUTORIAL_STEPS.length - 1 ? '✓ Finish' : 'Next →'}
               </button>
             )}
