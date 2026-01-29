@@ -3,12 +3,12 @@ import * as Tone from "tone";
 /**
  * KeepAlive.ts - Background Audio & Media Controls
  * 
- * ENHANCED VERSION - Fixed iOS Screen Lock Audio Persistence
+ * ENHANCED VERSION v2 - iOS Screen Lock Audio Persistence
  * 
  * Keeps the audio context alive when:
- * - Screen is off (Pocket Mode) ✓ FIXED
- * - iOS Silent Mode switch is on
- * - App is in background
+ * - Screen is locked
+ * - App is backgrounded
+ * - iOS Silent Mode is on
  * 
  * Also handles Lock Screen / Bluetooth controls via MediaSession API.
  */
@@ -18,7 +18,8 @@ let mediaSource: MediaElementAudioSourceNode | null = null;
 let bridgeGain: GainNode | null = null;
 let isInitialized = false;
 let isBridgeConnected = false;
-let keepAliveInterval: number | null = null; // NEW: Periodic wake-up timer
+let keepAliveInterval: number | null = null;
+let visibilityWakeLock: any = null; // For Screen Wake Lock API
 
 type PlaybackHandlers = {
   onPlay: () => void;
@@ -42,8 +43,9 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
   audioEl = document.createElement("audio");
   audioEl.id = "keep-alive-audio";
   
-  // Use a longer silent audio for better iOS compatibility
-  const silentAudioData = createSilentAudioBlob();
+  // CRITICAL: Use a very short but real audio file
+  // iOS treats looping short audio differently than long silent files
+  const silentAudioData = createShortSilentAudio();
   audioEl.src = URL.createObjectURL(silentAudioData);
   
   audioEl.loop = true;
@@ -55,35 +57,85 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
   audioEl.setAttribute("webkit-playsinline", "true");
   audioEl.setAttribute("x-webkit-airplay", "allow");
   
-  // For iOS Silent Mode - treat as media, not sound effect
-  (audioEl as any).mozAudioChannelType = "content";
+  // Mark as "music" content, not effects
+  audioEl.setAttribute("x5-audio-mode", "music"); // For some browsers
   
   // Hide from view
   audioEl.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
   document.body.appendChild(audioEl);
 
-  // NEW: Prevent iOS from auto-pausing by monitoring playback state
-  audioEl.addEventListener('pause', () => {
-    // If we didn't intentionally pause, restart immediately
-    if (keepAliveInterval !== null && audioEl) {
-      console.log('[KeepAlive] Auto-restart detected');
-      audioEl.play().catch(() => {});
-    }
-  });
+  // CRITICAL: Listen for system pause and restart aggressively
+  audioEl.addEventListener('pause', handleAudioPause);
+  audioEl.addEventListener('ended', handleAudioEnded);
+  
+  // Handle visibility changes
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   // Setup MediaSession for lock screen controls
   setupMediaSession();
+
+  // Request wake lock if available
+  requestWakeLock();
 
   isInitialized = true;
 }
 
 /**
- * Creates a proper silent WAV audio blob
+ * Handle when iOS tries to pause our audio
  */
-function createSilentAudioBlob(): Blob {
+function handleAudioPause() {
+  // If we're supposed to be playing (watchdog is active), restart immediately
+  if (keepAliveInterval !== null && audioEl) {
+    console.log('[KeepAlive] System paused audio - restarting');
+    // Small delay to avoid iOS blocking the restart
+    setTimeout(() => {
+      if (audioEl && audioEl.paused) {
+        audioEl.play().catch(err => console.warn('[KeepAlive] Restart failed:', err));
+      }
+    }, 100);
+  }
+}
+
+/**
+ * Handle when audio ends (shouldn't happen with loop=true, but be safe)
+ */
+function handleAudioEnded() {
+  if (keepAliveInterval !== null && audioEl) {
+    console.log('[KeepAlive] Audio ended - restarting');
+    audioEl.play().catch(() => {});
+  }
+}
+
+/**
+ * Handle visibility changes (screen lock, app background)
+ */
+function handleVisibilityChange() {
+  if (document.hidden) {
+    console.log('[KeepAlive] App backgrounded');
+    // Ensure audio keeps playing
+    if (keepAliveInterval !== null && audioEl && audioEl.paused) {
+      audioEl.play().catch(() => {});
+    }
+  } else {
+    console.log('[KeepAlive] App foregrounded');
+    // Resume if needed
+    if (keepAliveInterval !== null) {
+      const ctx = Tone.context.rawContext as AudioContext;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    }
+  }
+}
+
+/**
+ * Creates a SHORT silent WAV audio blob (100ms)
+ * iOS handles short looping audio better than long files
+ */
+function createShortSilentAudio(): Blob {
   const sampleRate = 44100;
-  const seconds = 1;
-  const numSamples = sampleRate * seconds;
+  const seconds = 0.1; // 100ms - short and sweet
+  const numSamples = Math.floor(sampleRate * seconds);
   const numChannels = 1;
   const bitsPerSample = 16;
   
@@ -102,8 +154,8 @@ function createSilentAudioBlob(): Blob {
   
   // fmt chunk
   writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); // chunk size
-  view.setUint16(20, 1, true); // PCM format
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
@@ -113,7 +165,6 @@ function createSilentAudioBlob(): Blob {
   // data chunk
   writeString(view, 36, 'data');
   view.setUint32(40, dataSize, true);
-  // Audio data is all zeros (silence) - already initialized by ArrayBuffer
   
   return new Blob([buffer], { type: 'audio/wav' });
 }
@@ -121,6 +172,31 @@ function createSilentAudioBlob(): Blob {
 function writeString(view: DataView, offset: number, str: string) {
   for (let i = 0; i < str.length; i++) {
     view.setUint8(offset + i, str.charCodeAt(i));
+  }
+}
+
+/**
+ * Request screen wake lock if available
+ */
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      visibilityWakeLock = await (navigator as any).wakeLock.request('screen');
+      console.log('[KeepAlive] Wake lock acquired');
+      
+      // Reacquire on visibility change
+      document.addEventListener('visibilitychange', async () => {
+        if (visibilityWakeLock !== null && document.visibilityState === 'visible') {
+          try {
+            visibilityWakeLock = await (navigator as any).wakeLock.request('screen');
+          } catch (err) {
+            console.warn('[KeepAlive] Wake lock reacquisition failed');
+          }
+        }
+      });
+    } catch (err) {
+      console.log('[KeepAlive] Wake lock not available');
+    }
   }
 }
 
@@ -135,9 +211,9 @@ function setupMediaSession() {
     : '/';
 
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: "Guided Ear Training",
-    artist: "Active Session",
-    album: "Ear Training Practice",
+    title: "Ear Training Session",
+    artist: "Guided Ear Training",
+    album: "Active Practice",
     artwork: [
       { src: `${baseUrl}icon.png`, sizes: '96x96', type: 'image/png' },
       { src: `${baseUrl}icon.png`, sizes: '128x128', type: 'image/png' },
@@ -148,12 +224,25 @@ function setupMediaSession() {
     ]
   });
 
+  // CRITICAL: Set position state to trick iOS into thinking this is real media
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: 3600, // 1 hour "duration"
+      playbackRate: 1,
+      position: 0
+    });
+  } catch (err) {
+    // Not all browsers support this
+  }
+
   // Handle lock screen/bluetooth controls
   navigator.mediaSession.setActionHandler('play', () => { 
+    console.log('[KeepAlive] MediaSession play');
     if (activeHandlers) activeHandlers.onPlay(); 
   });
   
   navigator.mediaSession.setActionHandler('pause', () => { 
+    console.log('[KeepAlive] MediaSession pause');
     if (activeHandlers) activeHandlers.onPause(); 
   });
   
@@ -161,13 +250,14 @@ function setupMediaSession() {
     if (activeHandlers?.onNext) activeHandlers.onNext(); 
   });
 
-  // Disable seeking (not applicable for this app)
-  navigator.mediaSession.setActionHandler('seekbackward', null);
-  navigator.mediaSession.setActionHandler('seekforward', null);
-  navigator.mediaSession.setActionHandler('seekto', null);
   navigator.mediaSession.setActionHandler('stop', () => {
     if (activeHandlers) activeHandlers.onPause();
   });
+  
+  // Disable seeking
+  navigator.mediaSession.setActionHandler('seekbackward', null);
+  navigator.mediaSession.setActionHandler('seekforward', null);
+  navigator.mediaSession.setActionHandler('seekto', null);
 }
 
 /**
@@ -176,6 +266,20 @@ function setupMediaSession() {
 export function updateMediaSessionState(isPlaying: boolean) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+    
+    // Update position to show progression (tricks iOS)
+    if (isPlaying) {
+      try {
+        const elapsed = Math.floor(Date.now() / 1000) % 3600;
+        navigator.mediaSession.setPositionState({
+          duration: 3600,
+          playbackRate: 1,
+          position: elapsed
+        });
+      } catch (err) {
+        // Ignore
+      }
+    }
   }
 }
 
@@ -202,10 +306,10 @@ export async function startKeepAlive(): Promise<void> {
       // Create source from the silent audio element
       mediaSource = ctx.createMediaElementSource(audioEl);
       
-      // Use a tiny but non-zero gain to keep iOS happy
-      // iOS suspends audio contexts with completely silent graphs
+      // CRITICAL: Use audible but very quiet gain
+      // Completely silent = iOS may suspend
       bridgeGain = ctx.createGain();
-      bridgeGain.gain.value = 0.001; // Inaudible but non-zero
+      bridgeGain.gain.value = 0.001; // Inaudible on most devices
       
       // Connect: silentAudio -> bridgeGain -> destination
       mediaSource.connect(bridgeGain);
@@ -228,31 +332,34 @@ export async function startKeepAlive(): Promise<void> {
     }
   }
   
-  // NEW: Set up watchdog timer to prevent iOS from killing audio
-  // This periodically "pokes" the audio context to keep it alive
+  // Start aggressive watchdog timer
   if (keepAliveInterval === null) {
     keepAliveInterval = window.setInterval(() => {
-      // 1. Ensure audio element is still playing
+      // 1. Ensure audio element is playing
       if (audioEl && audioEl.paused) {
+        console.log('[KeepAlive] Watchdog restarting audio');
         audioEl.play().catch(() => {});
       }
       
-      // 2. Ensure audio context is still running
+      // 2. Ensure audio context is running
       const ctx = Tone.context.rawContext as AudioContext;
       if (ctx.state === 'suspended') {
+        console.log('[KeepAlive] Watchdog resuming context');
         ctx.resume().catch(() => {});
       }
       
-      // 3. Tiny oscillation to prevent iOS from thinking audio is "idle"
-      // This is inaudible but keeps the system active
+      // 3. Tiny gain oscillation (keeps iOS active)
       if (bridgeGain) {
-        const currentGain = bridgeGain.gain.value;
-        bridgeGain.gain.setValueAtTime(currentGain * 0.999, ctx.currentTime);
-        bridgeGain.gain.setValueAtTime(currentGain, ctx.currentTime + 0.01);
+        const current = bridgeGain.gain.value;
+        bridgeGain.gain.setValueAtTime(current * 0.999, ctx.currentTime);
+        bridgeGain.gain.setValueAtTime(current, ctx.currentTime + 0.01);
       }
-    }, 2000); // Check every 2 seconds
+      
+      // 4. Update MediaSession position
+      updateMediaSessionState(true);
+    }, 1000); // Check every second (more aggressive)
     
-    console.log('[KeepAlive] Watchdog timer started');
+    console.log('[KeepAlive] Watchdog started (1s interval)');
   }
   
   updateMediaSessionState(true);
@@ -266,11 +373,21 @@ export function stopKeepAlive() {
   if (keepAliveInterval !== null) {
     window.clearInterval(keepAliveInterval);
     keepAliveInterval = null;
-    console.log('[KeepAlive] Watchdog timer stopped');
+    console.log('[KeepAlive] Watchdog stopped');
   }
 
   if (audioEl && !audioEl.paused) {
     audioEl.pause();
+  }
+  
+  // Release wake lock
+  if (visibilityWakeLock !== null) {
+    try {
+      visibilityWakeLock.release();
+      visibilityWakeLock = null;
+    } catch (err) {
+      // Ignore
+    }
   }
   
   updateMediaSessionState(false);
@@ -288,6 +405,14 @@ export function isKeepAliveActive(): boolean {
  */
 export function resetKeepAlive() {
   stopKeepAlive();
+  
+  // Clean up event listeners
+  if (audioEl) {
+    audioEl.removeEventListener('pause', handleAudioPause);
+    audioEl.removeEventListener('ended', handleAudioEnded);
+  }
+  
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
   
   if (mediaSource) {
     try {
