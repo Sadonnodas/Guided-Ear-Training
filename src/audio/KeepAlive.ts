@@ -3,18 +3,18 @@ import * as Tone from "tone";
 /**
  * KeepAlive.ts - Background Audio & Media Controls
  * 
- * iOS Screen Lock Audio Persistence + Lock Screen Controls
+ * VIDEO-BASED VERSION for better iOS persistence
  * 
- * Keeps audio alive when screen locks while maintaining lock screen controls.
+ * iOS treats <video> elements with audio tracks differently than <audio> elements.
+ * This might allow audio to persist through screen lock.
  */
 
-let audioEl: HTMLAudioElement | null = null;
+let videoEl: HTMLVideoElement | null = null;
 let mediaSource: MediaElementAudioSourceNode | null = null;
 let bridgeGain: GainNode | null = null;
 let isInitialized = false;
 let isBridgeConnected = false;
 let keepAliveInterval: number | null = null;
-let userIntendedPause = false; // Track if user deliberately paused
 
 type PlaybackHandlers = {
   onPlay: () => void;
@@ -25,127 +25,93 @@ type PlaybackHandlers = {
 let activeHandlers: PlaybackHandlers | null = null;
 
 /**
- * Initialize the background audio system.
+ * Initialize using VIDEO element instead of audio
+ * iOS gives video elements more privileges for background playback
  */
 export function initKeepAlive(handlers: PlaybackHandlers) {
   activeHandlers = handlers;
   
   if (isInitialized) return;
 
-  // Create the silent audio element
-  audioEl = document.createElement("audio");
-  audioEl.id = "keep-alive-audio";
+  // Create VIDEO element instead of audio (KEY DIFFERENCE)
+  videoEl = document.createElement("video");
+  videoEl.id = "keep-alive-video";
   
-  // Shorter silent audio for better iOS loop handling
-  const silentAudioData = createShortSilentAudio();
-  audioEl.src = URL.createObjectURL(silentAudioData);
+  // Create a silent video file (1x1 black pixel with audio track)
+  const silentVideoData = createSilentVideoBlob();
+  videoEl.src = URL.createObjectURL(silentVideoData);
   
-  audioEl.loop = true;
-  audioEl.preload = "auto";
-  audioEl.volume = 1.0; // Must be non-zero for iOS
+  videoEl.loop = true;
+  videoEl.preload = "auto";
+  videoEl.volume = 1.0;
+  videoEl.muted = false; // Important: NOT muted
   
-  // Critical iOS attributes
-  audioEl.setAttribute("playsinline", "true");
-  audioEl.setAttribute("webkit-playsinline", "true");
-  audioEl.setAttribute("x-webkit-airplay", "allow");
+  // CRITICAL iOS video attributes for background playback
+  videoEl.setAttribute("playsinline", "true");
+  videoEl.setAttribute("webkit-playsinline", "true");
   
-  // Hide from view
-  audioEl.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
-  document.body.appendChild(audioEl);
+  // Make it tiny and hidden
+  videoEl.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;opacity:0;";
+  videoEl.width = 1;
+  videoEl.height = 1;
+  
+  document.body.appendChild(videoEl);
 
-  // Handle system pauses (but respect user intent)
-  audioEl.addEventListener('pause', handleAudioPause);
+  // Auto-restart if paused
+  videoEl.addEventListener('pause', () => {
+    if (keepAliveInterval !== null && videoEl) {
+      console.log('[KeepAlive] Video paused - restarting');
+      videoEl.play().catch(() => {});
+    }
+  });
   
-  // Handle visibility changes
-  document.addEventListener('visibilitychange', handleVisibilityChange);
+  // Handle ended (shouldn't happen with loop, but be safe)
+  videoEl.addEventListener('ended', () => {
+    if (keepAliveInterval !== null && videoEl) {
+      console.log('[KeepAlive] Video ended - restarting');
+      videoEl.play().catch(() => {});
+    }
+  });
 
-  // Setup MediaSession for lock screen controls
+  // Setup MediaSession
   setupMediaSession();
 
   isInitialized = true;
 }
 
 /**
- * Handle when audio element pauses
+ * Creates a minimal WebM video file with silent audio track
+ * iOS handles video + audio better than audio alone
  */
-function handleAudioPause() {
-  // Only restart if:
-  // 1. Watchdog is active (session is playing)
-  // 2. User didn't deliberately pause
-  if (keepAliveInterval !== null && !userIntendedPause && audioEl) {
-    console.log('[KeepAlive] System paused audio - restarting');
-    setTimeout(() => {
-      if (audioEl && audioEl.paused && !userIntendedPause) {
-        audioEl.play().catch(() => {});
-      }
-    }, 100);
-  }
+function createSilentVideoBlob(): Blob {
+  // This is a minimal valid WebM file (1 frame, 1 second, with silent audio)
+  // Generated using ffmpeg: ffmpeg -f lavfi -i color=black:s=1x1:d=1 -f lavfi -i anullsrc=r=44100:cl=mono -shortest -c:v libvpx -c:a libvorbis output.webm
+  
+  // For now, use a data URL approach (WebM is complex to generate in JS)
+  // Alternative: Base64 embed a tiny pre-generated WebM file
+  
+  // Fallback to MP4 data URL (more universally supported)
+  // This is a 1-second silent video (1x1 pixel black)
+  const mp4Data = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAuBtZGF0AAACrQYF//+p3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1MiByMjg1NCBlOWE1OTAzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNyAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTMgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAD2WIhAAV/78dAAAAwEGaAQAV/78dAAAAwEGaIQAV/78dAAAAwEGaYQAV/78dAAAAwEGagQAV/78dAAAAwEGaoQAV/78dAAAAwEGawQAV/78dAAAAwEGa4QAV/78dAAAAwEGbAQAThAAAAMABmyEAE4QAAAAlm1RYXQAAAThtb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAAZAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAABFHRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAAZAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAQAAAABAAAAAAAkkZHRzAAAAEHN0c2MAAAAAAAAAAwAAAAEAAAABAAAAAQAAABRzdGNvAAAAAAAAAAEAAAAsAAAAYnN0c2MAAAAAAAAAAQAAAAEAAAABAAAAASRzdHN6AAAAAAAAAAAAAAABAAAAHAAAABRzdHRzAAAAAAAAAAEAAAABAAAAZAAAABxzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAUc3RjbwAAAAAAAAABAAAALAAAAGJzdHN6AAAAAAAAAAAAAAABAAAAHAAAABRzdHRzAAAAAAAAAAEAAAABAAAAZAAAABhzdHNkAAAAAAAAAAEAAAABAAAAACgAAAAAAAAAHHVybCAAAABydWRhdGEAAAABAAAAG21ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNTcuODMuMTAw";
+  
+  return dataURLToBlob(mp4Data);
 }
 
 /**
- * Handle visibility changes
+ * Convert data URL to Blob
  */
-function handleVisibilityChange() {
-  if (document.hidden) {
-    // App backgrounded - keep audio alive if session is active
-    if (keepAliveInterval !== null && !userIntendedPause && audioEl && audioEl.paused) {
-      audioEl.play().catch(() => {});
-    }
-  } else {
-    // App foregrounded - resume context if needed
-    if (keepAliveInterval !== null && !userIntendedPause) {
-      const ctx = Tone.context.rawContext as AudioContext;
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-    }
+function dataURLToBlob(dataURL: string): Blob {
+  const parts = dataURL.split(',');
+  const mime = parts[0].match(/:(.*?);/)?.[1] || 'video/mp4';
+  const bstr = atob(parts[1]);
+  const n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  
+  for (let i = 0; i < n; i++) {
+    u8arr[i] = bstr.charCodeAt(i);
   }
-}
-
-/**
- * Creates a SHORT silent WAV (200ms for better iOS compatibility)
- */
-function createShortSilentAudio(): Blob {
-  const sampleRate = 44100;
-  const seconds = 0.2; // 200ms
-  const numSamples = Math.floor(sampleRate * seconds);
-  const numChannels = 1;
-  const bitsPerSample = 16;
   
-  const blockAlign = numChannels * (bitsPerSample / 8);
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = numSamples * blockAlign;
-  const headerSize = 44;
-  
-  const buffer = new ArrayBuffer(headerSize + dataSize);
-  const view = new DataView(buffer);
-  
-  // RIFF header
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(view, 8, 'WAVE');
-  
-  // fmt chunk
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  
-  // data chunk
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataSize, true);
-  
-  return new Blob([buffer], { type: 'audio/wav' });
-}
-
-function writeString(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
-  }
+  return new Blob([u8arr], { type: mime });
 }
 
 /**
@@ -172,27 +138,12 @@ function setupMediaSession() {
     ]
   });
 
-  // Set position state to make iOS treat this as real media
-  try {
-    navigator.mediaSession.setPositionState({
-      duration: 3600,
-      playbackRate: 1,
-      position: 0
-    });
-  } catch (err) {
-    // Not all browsers support this
-  }
-
-  // Lock screen controls
+  // Handle lock screen controls
   navigator.mediaSession.setActionHandler('play', () => { 
-    console.log('[KeepAlive] Lock screen PLAY');
-    userIntendedPause = false; // User wants to play
     if (activeHandlers) activeHandlers.onPlay(); 
   });
   
   navigator.mediaSession.setActionHandler('pause', () => { 
-    console.log('[KeepAlive] Lock screen PAUSE');
-    userIntendedPause = true; // User wants to pause
     if (activeHandlers) activeHandlers.onPause(); 
   });
   
@@ -201,8 +152,6 @@ function setupMediaSession() {
   });
 
   navigator.mediaSession.setActionHandler('stop', () => {
-    console.log('[KeepAlive] Lock screen STOP');
-    userIntendedPause = true;
     if (activeHandlers) activeHandlers.onPause();
   });
   
@@ -213,56 +162,35 @@ function setupMediaSession() {
 }
 
 /**
- * Update the lock screen playback state
+ * Update lock screen state
  */
 export function updateMediaSessionState(isPlaying: boolean) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-    
-    // Update position for iOS
-    if (isPlaying) {
-      try {
-        const elapsed = Math.floor(Date.now() / 1000) % 3600;
-        navigator.mediaSession.setPositionState({
-          duration: 3600,
-          playbackRate: 1,
-          position: elapsed
-        });
-      } catch (err) {
-        // Ignore
-      }
-    }
   }
 }
 
 /**
- * Start the background audio bridge.
- * MUST be called from a user gesture.
+ * Start the video-based keep alive
  */
 export async function startKeepAlive(): Promise<void> {
-  console.log('[KeepAlive] Starting...');
-  
-  // Clear user pause flag when explicitly starting
-  userIntendedPause = false;
-  
-  // Ensure Tone.js context is running
   if (Tone.context.state !== 'running') {
     await Tone.context.resume();
   }
 
-  if (!audioEl) {
+  if (!videoEl) {
     console.warn("KeepAlive: Not initialized");
     return;
   }
 
-  // Connect audio bridge (only once)
+  // Connect video audio to Web Audio graph
   if (!isBridgeConnected) {
     try {
       const ctx = Tone.context.rawContext as AudioContext;
       
-      mediaSource = ctx.createMediaElementSource(audioEl);
+      mediaSource = ctx.createMediaElementSource(videoEl);
       bridgeGain = ctx.createGain();
-      bridgeGain.gain.value = 0.001; // Inaudible but non-zero
+      bridgeGain.gain.value = 0.001;
       
       mediaSource.connect(bridgeGain);
       bridgeGain.connect(ctx.destination);
@@ -274,43 +202,34 @@ export async function startKeepAlive(): Promise<void> {
     }
   }
 
-  // Start silent audio
-  if (audioEl.paused) {
+  // Start video playback
+  if (videoEl.paused) {
     try {
-      await audioEl.play();
-      console.log('[KeepAlive] Silent audio started');
+      await videoEl.play();
+      console.log('[KeepAlive] Silent video started');
     } catch (e) {
-      console.warn("KeepAlive: Failed to play", e);
+      console.warn("KeepAlive: Failed to play video", e);
     }
   }
   
-  // Start watchdog
+  // Watchdog
   if (keepAliveInterval === null) {
     keepAliveInterval = window.setInterval(() => {
-      // Only keep alive if user hasn't paused
-      if (!userIntendedPause) {
-        // 1. Restart audio if needed
-        if (audioEl && audioEl.paused) {
-          audioEl.play().catch(() => {});
-        }
-        
-        // 2. Resume context if needed
-        const ctx = Tone.context.rawContext as AudioContext;
-        if (ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
-        }
-        
-        // 3. Tiny gain oscillation
-        if (bridgeGain) {
-          const current = bridgeGain.gain.value;
-          bridgeGain.gain.setValueAtTime(current * 0.999, ctx.currentTime);
-          bridgeGain.gain.setValueAtTime(current, ctx.currentTime + 0.01);
-        }
-        
-        // 4. Update MediaSession
-        updateMediaSessionState(true);
+      if (videoEl && videoEl.paused) {
+        videoEl.play().catch(() => {});
       }
-    }, 1500); // Every 1.5 seconds
+      
+      const ctx = Tone.context.rawContext as AudioContext;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      
+      if (bridgeGain) {
+        const current = bridgeGain.gain.value;
+        bridgeGain.gain.setValueAtTime(current * 0.999, ctx.currentTime);
+        bridgeGain.gain.setValueAtTime(current, ctx.currentTime + 0.01);
+      }
+    }, 2000);
     
     console.log('[KeepAlive] Watchdog started');
   }
@@ -319,22 +238,16 @@ export async function startKeepAlive(): Promise<void> {
 }
 
 /**
- * Stop the background audio
+ * Stop keep alive
  */
 export function stopKeepAlive() {
-  console.log('[KeepAlive] Stopping...');
-  
-  // Set user pause flag
-  userIntendedPause = true;
-  
-  // Clear watchdog
   if (keepAliveInterval !== null) {
     window.clearInterval(keepAliveInterval);
     keepAliveInterval = null;
   }
 
-  if (audioEl && !audioEl.paused) {
-    audioEl.pause();
+  if (videoEl && !videoEl.paused) {
+    videoEl.pause();
   }
   
   updateMediaSessionState(false);
@@ -344,20 +257,14 @@ export function stopKeepAlive() {
  * Check if active
  */
 export function isKeepAliveActive(): boolean {
-  return audioEl ? !audioEl.paused : false;
+  return videoEl ? !videoEl.paused : false;
 }
 
 /**
- * Reset everything
+ * Reset
  */
 export function resetKeepAlive() {
   stopKeepAlive();
-  
-  // Clean up listeners
-  if (audioEl) {
-    audioEl.removeEventListener('pause', handleAudioPause);
-  }
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
   
   if (mediaSource) {
     try {
@@ -373,13 +280,12 @@ export function resetKeepAlive() {
     bridgeGain = null;
   }
   
-  if (audioEl) {
-    audioEl.remove();
-    audioEl = null;
+  if (videoEl) {
+    videoEl.remove();
+    videoEl = null;
   }
   
   isInitialized = false;
   isBridgeConnected = false;
   activeHandlers = null;
-  userIntendedPause = false;
 }
