@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
+import * as Tone from 'tone';
 import './VoiceRangeControl.css';
 
 const PlayIcon = () => (
@@ -31,9 +32,8 @@ const MIDI_TO_NOTE: Record<number, string> = {
   68: 'G♯4', 69: 'A4', 70: 'B♭4', 71: 'B4', 72: 'C5'
 };
 
-// FIX #1: Limit range to available vocal samples (G2 to G4)
-const ABSOLUTE_MIN = 43; // G2 - lowest vocal sample
-const ABSOLUTE_MAX = 67; // G4 - highest vocal sample
+const ABSOLUTE_MIN = 36; // C2
+const ABSOLUTE_MAX = 72; // C5
 
 export default function VoiceRangeControl({ 
   minMidi, 
@@ -44,17 +44,18 @@ export default function VoiceRangeControl({
   
   const [isPlaying, setIsPlaying] = useState<'low' | 'high' | null>(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
 
   const midiToFreq = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
   const playPreview = async (midi: number, type: 'low' | 'high') => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
+    // FIX: Use Tone.js context instead of a separate AudioContext.
+    // On iOS, a standalone AudioContext created on-demand stays suspended
+    // until Tone.start() has been called. Tone.js handles the unlock properly.
+    if (Tone.context.state !== 'running') {
+      await Tone.start();
     }
 
-    const ctx = audioContextRef.current;
-    if (ctx.state === 'suspended') await ctx.resume();
+    const ctx = Tone.context.rawContext as AudioContext;
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -62,9 +63,8 @@ export default function VoiceRangeControl({
     osc.type = 'sine';
     osc.frequency.value = midiToFreq(midi);
     
-    // FIXED: Increased volume from 0.25 to 0.6 for much better audibility
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.05); // Was 0.25, now 0.6
+    gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.05);
     gain.gain.setValueAtTime(0.6, ctx.currentTime + 0.5);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.0);
 
@@ -188,7 +188,7 @@ export default function VoiceRangeControl({
 
       {/* Help Text */}
       <div className="range-hint">
-        Drag sliders to set range • Click buttons to preview notes • Range: G2-G4
+        Drag sliders to set range • Click buttons to preview notes
       </div>
     </div>
   );
