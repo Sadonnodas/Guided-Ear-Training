@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import * as Tone from 'tone';
+import { useState, useRef } from 'react';
 import './VoiceRangeControl.css';
 
 const PlayIcon = () => (
@@ -32,8 +31,9 @@ const MIDI_TO_NOTE: Record<number, string> = {
   68: 'G♯4', 69: 'A4', 70: 'B♭4', 71: 'B4', 72: 'C5'
 };
 
-const ABSOLUTE_MIN = 36; // C2
-const ABSOLUTE_MAX = 72; // C5
+// FIX #1: Limit range to available vocal samples (G2 to G4)
+const ABSOLUTE_MIN = 43; // G2 - lowest vocal sample
+const ABSOLUTE_MAX = 67; // G4 - highest vocal sample
 
 export default function VoiceRangeControl({ 
   minMidi, 
@@ -44,49 +44,38 @@ export default function VoiceRangeControl({
   
   const [isPlaying, setIsPlaying] = useState<'low' | 'high' | null>(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const midiToFreq = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
-  /**
-   * FIXED: Use Tone.js instead of separate AudioContext
-   * This ensures audio works immediately on iOS
-   */
   const playPreview = async (midi: number, type: 'low' | 'high') => {
-    try {
-      // Ensure Tone.js is started (required for iOS)
-      if (Tone.context.state !== 'running') {
-        await Tone.start();
-      }
-
-      // Use Tone.js synth for preview
-      const synth = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: {
-          attack: 0.05,
-          decay: 0.2,
-          sustain: 0.3,
-          release: 0.5
-        }
-      }).toDestination();
-
-      const freq = midiToFreq(midi);
-      const now = Tone.now();
-      
-      setIsPlaying(type);
-      
-      // Play note for 1 second
-      synth.triggerAttackRelease(freq, 1, now);
-      
-      // Clean up synth after playing
-      setTimeout(() => {
-        synth.dispose();
-        setIsPlaying(null);
-      }, 1100);
-
-    } catch (error) {
-      console.error('Preview playback failed:', error);
-      setIsPlaying(null);
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
     }
+
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') await ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.value = midiToFreq(midi);
+    
+    // FIXED: Increased volume from 0.25 to 0.6 for much better audibility
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.05); // Was 0.25, now 0.6
+    gain.gain.setValueAtTime(0.6, ctx.currentTime + 0.5);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.0);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    setIsPlaying(type);
+    osc.start();
+    osc.stop(ctx.currentTime + 1.0);
+
+    setTimeout(() => setIsPlaying(null), 1000);
   };
 
   const handleCalibrate = async () => {
@@ -118,75 +107,88 @@ export default function VoiceRangeControl({
   };
 
   return (
-    <div className="voice-range-control">
-      <div className="control-section">
-        <label className="control-label">Vocal Range</label>
-        
-        <div className="range-group">
-          {/* LOW RANGE */}
-          <div className="range-item">
-            <div className="range-header">
-              <span className="range-label">Low</span>
-              <button 
-                className={`preview-btn ${isPlaying === 'low' ? 'playing' : ''}`}
-                onClick={() => playPreview(minMidi, 'low')}
-                disabled={isPlaying !== null}
-                title="Preview lowest note"
-              >
-                <PlayIcon />
-              </button>
-            </div>
-            <input 
-              type="range" 
-              min={ABSOLUTE_MIN} 
-              max={ABSOLUTE_MAX} 
-              value={minMidi}
-              onChange={handleMinChange}
-              className="range-slider"
-            />
-            <div className="range-value">{MIDI_TO_NOTE[minMidi]}</div>
-          </div>
+    <div className="vocal-range-section">
+      {/* Header */}
+      <div className="vocal-range-header">
+        <span className="vocal-range-title">Vocal Range</span>
+        <button 
+          className="auto-calibrate-btn" 
+          onClick={handleCalibrate}
+          disabled={isCalibrating}
+          title="Auto-detect your range by singing your lowest and highest notes"
+        >
+          <MicIcon />
+          <span>{isCalibrating ? 'Listening...' : 'Auto-Calibrate'}</span>
+        </button>
+      </div>
 
-          {/* HIGH RANGE */}
-          <div className="range-item">
-            <div className="range-header">
-              <span className="range-label">High</span>
-              <button 
-                className={`preview-btn ${isPlaying === 'high' ? 'playing' : ''}`}
-                onClick={() => playPreview(maxMidi, 'high')}
-                disabled={isPlaying !== null}
-                title="Preview highest note"
-              >
-                <PlayIcon />
-              </button>
-            </div>
-            <input 
-              type="range" 
-              min={ABSOLUTE_MIN} 
-              max={ABSOLUTE_MAX} 
-              value={maxMidi}
-              onChange={handleMaxChange}
-              className="range-slider"
-            />
-            <div className="range-value">{MIDI_TO_NOTE[maxMidi]}</div>
-          </div>
+      {/* Range Display and Controls */}
+      <div className="range-display-row">
+        {/* Low Note */}
+        <div className="note-control">
+          <button 
+            className={`note-preview-btn ${isPlaying === 'low' ? 'playing' : ''}`}
+            onClick={() => playPreview(minMidi, 'low')}
+            title={`Play lowest note (${MIDI_TO_NOTE[minMidi]})`}
+          >
+            <PlayIcon />
+          </button>
+          <span className="note-label">{MIDI_TO_NOTE[minMidi] || minMidi}</span>
         </div>
 
-        {onAutoCalibrate && (
+        {/* Slider Container */}
+        <div className="dual-slider-wrapper">
+          {/* Background track */}
+          <div className="slider-track-bg" />
+          
+          {/* Active range fill */}
+          <div 
+            className="slider-range-fill"
+            style={{
+              left: `${((minMidi - ABSOLUTE_MIN) / (ABSOLUTE_MAX - ABSOLUTE_MIN)) * 100}%`,
+              width: `${((maxMidi - minMidi) / (ABSOLUTE_MAX - ABSOLUTE_MIN)) * 100}%`
+            }}
+          />
+
+          {/* Min slider */}
+          <input
+            type="range"
+            className="range-slider min-slider"
+            min={ABSOLUTE_MIN}
+            max={ABSOLUTE_MAX}
+            value={minMidi}
+            onChange={handleMinChange}
+            title="Drag to set lowest comfortable note"
+          />
+
+          {/* Max slider */}
+          <input
+            type="range"
+            className="range-slider max-slider"
+            min={ABSOLUTE_MIN}
+            max={ABSOLUTE_MAX}
+            value={maxMidi}
+            onChange={handleMaxChange}
+            title="Drag to set highest comfortable note"
+          />
+        </div>
+
+        {/* High Note */}
+        <div className="note-control">
+          <span className="note-label">{MIDI_TO_NOTE[maxMidi] || maxMidi}</span>
           <button 
-            className={`calibrate-btn ${isCalibrating ? 'calibrating' : ''}`}
-            onClick={handleCalibrate}
-            disabled={isCalibrating}
+            className={`note-preview-btn ${isPlaying === 'high' ? 'playing' : ''}`}
+            onClick={() => playPreview(maxMidi, 'high')}
+            title={`Play highest note (${MIDI_TO_NOTE[maxMidi]})`}
           >
-            <MicIcon />
-            <span>{isCalibrating ? 'Listening...' : 'Auto-Calibrate'}</span>
+            <PlayIcon />
           </button>
-        )}
-        
-        <p className="range-hint">
-          Adjust these sliders to match your comfortable singing range. 
-          Click the play buttons to preview each note.
-        </p>
+        </div>
+      </div>
+
+      {/* Help Text */}
+      <div className="range-hint">
+        Drag sliders to set range • Click buttons to preview notes • Range: G2-G4
       </div>
     </div>
   );
