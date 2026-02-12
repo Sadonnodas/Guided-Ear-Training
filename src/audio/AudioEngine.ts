@@ -1,3 +1,5 @@
+console.log('🔄 AudioEngine loaded - Timing Version 3.0');
+
 import * as Tone from "tone";
 import type { NoteEvent, MusicalKey } from "../types";
 import { Metronome } from "./Metronome";
@@ -25,6 +27,18 @@ export class AudioEngine {
   private drumMachine!: DrumMachine;
   private scheduler!: Scheduler;
   private noteBuffers: Map<string, Tone.ToneAudioBuffer> = new Map();
+  private bassBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // NEW: Bass samples B_23 to B_67
+  private pianoBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // NEW: Piano samples P_23 to P_67
+  
+  // NEW: Separate gain nodes for bass and piano
+  private bassGain!: Tone.Gain;
+  private pianoGain!: Tone.Gain;
+  
+  // NEW: Timing offset adjustments (in seconds) - ADJUST THESE TO FIX TIMING
+  // Use small values: -0.05 = 50ms earlier, 0.03 = 30ms later
+  private readonly BASS_TIMING_OFFSET = -0.05;  // Positive = later, Negative = earlier
+  private readonly PIANO_TIMING_OFFSET = -0.05; // Positive = later, Negative = earlier
+  
   private currentTonic: string = "C"; 
   private isInitialized = false;
   
@@ -41,6 +55,11 @@ export class AudioEngine {
   public async init(vols: { groove: number, voice: number, click: number, master: number, drone: number }) {
     if (this.isInitialized) return;
     
+    console.log('🎛️ AudioEngine initializing with timing offsets:', {
+      bass: this.BASS_TIMING_OFFSET,
+      piano: this.PIANO_TIMING_OFFSET
+    });
+    
     await Tone.start();
 
     // --- SETUP NODES ---
@@ -53,6 +72,10 @@ export class AudioEngine {
 
     // Vocal Path (Voice -> Reverb -> Master)
     this.vocalGain = new Tone.Gain(vols.voice).connect(this.reverb);
+    
+    // NEW: Bass and Piano paths (for chord progressions)
+    this.bassGain = new Tone.Gain(0.7).connect(this.reverb); // Default 0.7
+    this.pianoGain = new Tone.Gain(0.6).connect(this.reverb); // Default 0.6
 
     // Drone Path (Drone -> Master) *Bypasses Reverb to stay clean*
     this.droneGain = new Tone.Gain(vols.drone).connect(this.masterGain);
@@ -343,6 +366,88 @@ export class AudioEngine {
       }
     });
     await Promise.all(promises);
+  }
+
+  /**
+   * NEW: Preload bass and piano samples for chord progressions
+   * Range: MIDI 23 to 67 for both instruments
+   */
+  public async preloadChordSamples(midiNotes: number[]) {
+    const uniqueMidi = Array.from(new Set(midiNotes));
+    
+    const promises = uniqueMidi.map(async (midi) => {
+      // Load bass sample if not already loaded
+      if (!this.bassBuffers.has(midi)) {
+        const bassUrl = `${import.meta.env.BASE_URL}samples/bass/B_${midi}.mp3`;
+        try {
+          const buffer = new Tone.ToneAudioBuffer();
+          await buffer.load(bassUrl);
+          this.bassBuffers.set(midi, buffer);
+        } catch (e) {
+          console.warn(`Failed to load bass sample B_${midi}.mp3`);
+        }
+      }
+      
+      // Load piano sample if not already loaded
+      if (!this.pianoBuffers.has(midi)) {
+        const pianoUrl = `${import.meta.env.BASE_URL}samples/piano/P_${midi}.mp3`;
+        try {
+          const buffer = new Tone.ToneAudioBuffer();
+          await buffer.load(pianoUrl);
+          this.pianoBuffers.set(midi, buffer);
+        } catch (e) {
+          console.warn(`Failed to load piano sample P_${midi}.mp3`);
+        }
+      }
+    });
+    
+    await Promise.all(promises);
+  }
+
+  /**
+   * NEW: Play a chord (bass + triad) using loaded samples
+   * Uses BASS_TIMING_OFFSET and PIANO_TIMING_OFFSET for timing adjustments
+   */
+  public playChord(bassNote: number, triadNotes: number[], time: number) {
+    if (!this.isInitialized) return;
+    
+    // DIAGNOSTIC: Log timing info
+    console.log(`🎵 Chord trigger at Transport time: ${time.toFixed(3)}s`);
+    console.log(`   Bass offset: ${this.BASS_TIMING_OFFSET}s → Actual: ${(time + this.BASS_TIMING_OFFSET).toFixed(3)}s`);
+    console.log(`   Piano offset: ${this.PIANO_TIMING_OFFSET}s → Actual: ${(time + this.PIANO_TIMING_OFFSET).toFixed(3)}s`);
+    
+    // Play bass note with timing offset
+    const bassBuffer = this.bassBuffers.get(bassNote);
+    if (bassBuffer) {
+      const bassSource = new Tone.ToneBufferSource(bassBuffer).connect(this.bassGain);
+      const bassTime = time + this.BASS_TIMING_OFFSET;
+      bassSource.start(bassTime);
+      console.log(`   🔊 Bass ${bassNote} starting at ${bassTime.toFixed(3)}s`);
+    } else {
+      console.warn(`Bass sample not found for MIDI ${bassNote}`);
+    }
+    
+    // Play triad notes with timing offset
+    triadNotes.forEach((midi, i) => {
+      const pianoBuffer = this.pianoBuffers.get(midi);
+      if (pianoBuffer) {
+        const pianoSource = new Tone.ToneBufferSource(pianoBuffer).connect(this.pianoGain);
+        const pianoTime = time + this.PIANO_TIMING_OFFSET;
+        pianoSource.start(pianoTime);
+        if (i === 0) console.log(`   🎹 Piano ${midi} starting at ${pianoTime.toFixed(3)}s`);
+      } else {
+        console.warn(`Piano sample not found for MIDI ${midi}`);
+      }
+    });
+  }
+  
+  // NEW: Volume control methods
+  public setBassVolume(vol: number) {
+    if (this.bassGain) this.bassGain.gain.rampTo(vol, 0.1);
+  }
+  
+  public setPianoVolume(vol: number) {
+    if (this.pianoGain) this.pianoGain.gain.rampTo(vol, 0.1);
   }
 
   private playTransitionSound(time: number) {

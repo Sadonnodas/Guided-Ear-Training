@@ -9,6 +9,8 @@ export function useMixerLogic() {
   const [volMetronome, setVolMetronome] = useState(0.8);
   const [volTraining, setVolTraining] = useState(0.4);
   const [volReverb, setVolReverb] = useState(0.3);
+  const [volBass, setVolBass] = useState(0.7);    // NEW
+  const [volPiano, setVolPiano] = useState(0.6);  // NEW
 
   // Sync to AudioEngine
   useEffect(() => { audioEngine.setMasterVol(volMaster); }, [volMaster]);
@@ -18,6 +20,8 @@ export function useMixerLogic() {
   useEffect(() => { audioEngine.setClickVol(volMetronome); }, [volMetronome]);
   useEffect(() => { audioEngine.setTrainingVol(volTraining); }, [volTraining]);
   useEffect(() => { audioEngine.setReverbAmt(volReverb); }, [volReverb]);
+  useEffect(() => { audioEngine.setBassVolume(volBass); }, [volBass]);      // NEW
+  useEffect(() => { audioEngine.setPianoVolume(volPiano); }, [volPiano]);    // NEW
 
   return {
     volMaster, setVolMaster,
@@ -27,5 +31,7 @@ export function useMixerLogic() {
     volMetronome, setVolMetronome,
     volTraining, setVolTraining,
     volReverb, setVolReverb,
+    volBass, setVolBass,        // NEW
+    volPiano, setVolPiano,      // NEW
   };
 }

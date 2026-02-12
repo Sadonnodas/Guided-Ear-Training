@@ -1,14 +1,25 @@
 import { useEffect, useState, useRef } from "react";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
 import { useSessionLogic } from "./hooks/useSessionLogic";
+import type { MusicalKey } from "./types";
 import "./App.css";
 
 // Components
 import Header from "./components/Header/Header";
 import Visualizer from "./components/Visualizer/Visualizer";
 import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer"; 
+import ProgressionsVisualizer from "./components/Visualizer/ProgressionsVisualizer";
 import Controls from "./components/Controls/Controls";
 import GuidedTutorial from "./components/GuidedTutorial/GuidedTutorial";
+
+// Helper: Convert musical key to MIDI note (using middle C = 60 as reference)
+const getKeyRootMidi = (key: MusicalKey): number => {
+  const keyToMidi: Record<MusicalKey, number> = {
+    "C": 60, "Cs": 61, "D": 62, "Ds": 63, "E": 64, "F": 65,
+    "Fs": 66, "G": 67, "Gs": 68, "A": 69, "As": 70, "B": 71
+  };
+  return keyToMidi[key];
+};
 
 export default function App() {
   const session = useSessionLogic();
@@ -117,7 +128,23 @@ export default function App() {
             {session.status}
         </div>
 
-        {session.activeTab === 'fretboard' ? (
+        {session.activeTab === 'progressions' ? (
+          <ProgressionsVisualizer 
+            chords={session.currentProgression?.current?.chords || []}
+            activeChordIndex={session.activeChordIndex}
+            activeRootMidi={session.activeRootMidi}
+            hideVisuals={session.hideFretboardVisuals}
+            status={session.status}
+            viewMode={viewMode}
+            scaleType={session.scaleType}
+            currentKey={session.currentKey}
+            keyRootMidi={getKeyRootMidi(session.currentKey)}
+            enabledDegrees={session.enabledDegrees}
+            toggleDegree={session.toggleDegree}
+            focusedDegrees={session.focusedDegrees}
+            toggleFocus={session.toggleFocus}
+          />
+        ) : session.activeTab === 'fretboard' ? (
           <FretboardVisualizer 
             currentKey={session.currentKey}
             scaleType={session.scaleType}
@@ -181,9 +208,15 @@ export default function App() {
             setVolTraining={session.setVolTraining}
             volReverb={session.volReverb} 
             setVolReverb={session.setVolReverb}
+            volBass={session.volBass}
+            setVolBass={session.setVolBass}
+            volPiano={session.volPiano}
+            setVolPiano={session.setVolPiano}
             toggleMute={toggleMute}
             hideFretboardVisuals={session.hideFretboardVisuals}
             setHideFretboardVisuals={session.setHideFretboardVisuals}
+            includeDiminished={session.includeDiminished}
+            setIncludeDiminished={session.setIncludeDiminished}
             activeTab={session.activeTab}
             minVocalMidi={session.minVocalMidi}
             maxVocalMidi={session.maxVocalMidi}

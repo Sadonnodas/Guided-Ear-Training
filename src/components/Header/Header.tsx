@@ -106,6 +106,13 @@ export default function Header({
         >
           Fretboard
         </button>
+        <button 
+          className={`tab-btn ${activeTab === 'progressions' ? 'active' : ''}`} 
+          onClick={() => handleTabChange("progressions")}
+          title="Progressions Mode: Chord progression recognition training"
+        >
+          Progressions
+        </button>
       </div>
 
       <div className="info-display">
@@ -124,7 +131,7 @@ export default function Header({
                 <option value="PentatonicMajor">Major Pentatonic</option>
                 <option value="PentatonicMinor">Minor Pentatonic</option>
               </>
-            ) : activeTab === 'training' ? (
+            ) : activeTab === 'training' || activeTab === 'progressions' ? (
               <>
                 <option value="Major">Major</option>
                 <option value="Minor">Minor</option>

@@ -3,11 +3,18 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { audioEngine } from "../audio/AudioEngine";
 import { initKeepAlive, updateMediaSessionState, startKeepAlive } from "../audio/KeepAlive";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator";
+import { 
+  generateChordProgression, 
+  generateModulationProgression,
+  getChordMidiNotes,
+  type ChordProgression
+} from "../core/ChordProgressionGenerator";
 import { useAudioSetup } from "./useAudioSetup";
 import { useTrainingMode } from "./useTrainingMode";
 import { useMixerLogic } from "./useMixerLogic";
 import { useSessionSettings } from "./useSessionSettings";
 import { getAvailableDegrees } from "../audio/MusicTheory"; 
+import { LATENCY_OFFSET } from "../config/AudioConfig"; // NEW: Import timing offsets
 import type { MusicalKey, ScaleDegree, MelodyConstraints, ScaleType } from "../types";
 import { getFretboardConfig } from "../config/FretboardData";
 
@@ -37,6 +44,11 @@ const TAB_DEFAULTS: Record<string, {
     inverseMode: true,
     trainingWheels: false,
     hideFretboardVisuals: false
+  },
+  progressions: {
+    inverseMode: false,
+    trainingWheels: false,
+    hideFretboardVisuals: false
   }
 };
 
@@ -50,6 +62,11 @@ export function useSessionLogic() {
   const [isPaused, setIsPaused] = useState(false);
   const [status, setStatus] = useState("Start Session");
   const [activeTab, setActiveTab] = useState("random");
+  
+  // NEW: Progressions mode state
+  const [activeChordIndex, setActiveChordIndex] = useState<number | null>(null);
+  const [activeRootMidi, setActiveRootMidi] = useState<number | null>(null); // Track root pitch for visualizer
+  const currentProgression = useRef<ChordProgression | null>(null);
   
   // Track if audio has ever been initialized (for first-play fix)
   const hasInitializedAudio = useRef(false);
@@ -542,6 +559,227 @@ if (newTab === 'fretboard') {
       }
       playSilent = settings.refs.silentPractice.current;
     }
+    else if (activeTabRef.current === 'progressions') {
+      // ===== PROGRESSIONS MODE =====
+      
+      // Clear visualizer at the start
+      if (isFirst) {
+        setActiveChordIndex(null);
+        setActiveRootMidi(null);
+      }
+      
+      let progression: ChordProgression;
+      
+      if (forceOneThreeFive) {
+        // Modulation: play I-III-V-I
+        progression = generateModulationProgression(currentCycleKey, scaleTypeRef.current);
+        setStatus("New Key: I-III-V-I");
+      } else {
+        // Normal progression
+        progression = generateChordProgression({
+          key: currentCycleKey,
+          scaleType: scaleTypeRef.current,
+          difficulty: settings.refs.difficulty.current,
+          startOnOne: settings.refs.startRoot.current,
+          endOnOne: settings.refs.endRoot.current,
+          includeDiminished: settings.refs.includeDiminished.current,
+          minMidi: settings.refs.minVocalMidi.current,
+          maxMidi: settings.refs.maxVocalMidi.current
+        });
+      }
+      
+      currentProgression.current = progression;
+      
+      // Collect all MIDI notes needed for preloading
+      const allMidiNotes: number[] = [];
+      progression.chords.forEach(chord => {
+        const { bass, triad } = getChordMidiNotes(
+          chord,
+          currentCycleKey,
+          settings.refs.minVocalMidi.current,
+          settings.refs.maxVocalMidi.current
+        );
+        allMidiNotes.push(bass, ...triad);
+      });
+      
+      // Preload chord samples (bass + piano)
+      if (!isPlayingRef.current) return;
+      await audioEngine.preloadChordSamples(allMidiNotes);
+      if (!isPlayingRef.current) return;
+      
+      // ALSO preload vocal samples for pass 3 (Sing Along)
+      // Create NoteEvents for each chord's root to preload vocal samples
+      const vocalNoteEvents = progression.chords.map(chord => {
+        const { triad } = getChordMidiNotes(
+          chord,
+          currentCycleKey,
+          settings.refs.minVocalMidi.current,
+          settings.refs.maxVocalMidi.current
+        );
+        const pianoRoot = triad[0];
+        return {
+          noteInfo: {
+            degree: chord.degree,
+            midi: pianoRoot,
+            frequency: 440 * Math.pow(2, (pianoRoot - 69) / 12),
+            label: `${chord.degree} (${pianoRoot})`
+          },
+          startTime: 0,
+          duration: 2
+        };
+      });
+      await audioEngine.preloadNotes(vocalNoteEvents);
+      if (!isPlayingRef.current) return;
+      
+      // Schedule 4-pass chord progression
+      const beatSec = 60 / settings.refs.bpm.current;
+      const measureSec = 4 * beatSec; // NEW: For quantization
+      const chordDuration = 2; // beats per chord
+      const progressionDuration = progression.chords.length * chordDuration * beatSec;
+      
+      const schedulePass = (
+        passStartTime: number, 
+        playVocals: boolean, 
+        statusLabel: string
+      ) => {
+        // Set status
+        Tone.Transport.schedule((time) => {
+          Tone.Draw.schedule(() => {
+            if (!document.hidden) setStatus(statusLabel);
+          }, time);
+        }, passStartTime);
+        
+        // Schedule each chord
+        let currentBeat = 0;
+        progression.chords.forEach((chord, index) => {
+          const chordTime = passStartTime + (currentBeat * beatSec);
+          
+          const { bass, triad } = getChordMidiNotes(
+            chord,
+            currentCycleKey,
+            settings.refs.minVocalMidi.current,
+            settings.refs.maxVocalMidi.current
+          );
+          
+          Tone.Transport.schedule((time) => {
+            // Play chord (bass + triad)
+            audioEngine.playChord(bass, triad, time);
+            
+            // If vocal pass, play vocal sample singing the CHORD DEGREE at piano root pitch
+            if (playVocals) {
+              const pianoRoot = triad[0]; // Root note of piano triad
+              
+              // Apply timing offset for this degree (same as Random/Training modes)
+              const latencyOffset = LATENCY_OFFSET[chord.degree] || 0;
+              const adjustedTime = time + latencyOffset;
+              
+              const rootNoteEvent = {
+                noteInfo: {
+                  degree: chord.degree, // Use the CHORD's degree (1, 2, 3, 4, 5, 6, 7)
+                  midi: pianoRoot,      // At the piano root pitch
+                  frequency: 440 * Math.pow(2, (pianoRoot - 69) / 12),
+                  label: `${chord.degree} (${pianoRoot})`
+                },
+                startTime: currentBeat,
+                duration: chordDuration
+              };
+              // Play vocal sample with timing adjustment
+              (audioEngine as any).playMelodyNote(rootNoteEvent, adjustedTime, false);
+            }
+            
+            // Update visualizer with chord index AND root MIDI pitch
+            Tone.Draw.schedule(() => {
+              if (!document.hidden) {
+                setActiveChordIndex(index);
+                setActiveRootMidi(triad[0]); // Piano root = visualizer position
+              }
+            }, time);
+          }, chordTime);
+          
+          currentBeat += chordDuration;
+        });
+        
+        // Clear visualizer after last chord
+        const endTime = passStartTime + (currentBeat * beatSec);
+        Tone.Transport.schedule((time) => {
+          Tone.Draw.schedule(() => {
+            if (!document.hidden) {
+              setActiveChordIndex(null);
+              setActiveRootMidi(null);
+            }
+          }, time);
+        }, endTime);
+      };
+      
+      // Add settling in period for first cycle (like Random mode)
+      // CRITICAL FIX: Quantize to measure boundaries like Random mode does
+      let anchorTime;
+      if (isFirst) {
+        // First cycle: start at next measure boundary
+        const now = Tone.Transport.seconds;
+        if (now < 0.1) {
+          anchorTime = 0;
+        } else {
+          anchorTime = Math.ceil(now / measureSec) * measureSec;
+        }
+      } else {
+        // Subsequent cycles: use provided start time (already quantized)
+        anchorTime = startTime || Tone.Transport.seconds;
+      }
+      
+      const settlingDuration = isFirst ? measureSec : 0; // 1 measure settling
+      const safeStartTime = anchorTime + settlingDuration;
+      
+      // Show "Settling In" during the intro
+      if (isFirst && settlingDuration > 0) {
+        Tone.Transport.schedule((time) => {
+          Tone.Draw.schedule(() => {
+            if (!document.hidden) {
+              setStatus("Settling In...");
+              setActiveChordIndex(null); // Don't highlight any chord during settling
+              setActiveRootMidi(null);
+            }
+          }, time);
+        }, anchorTime);
+      }
+      
+      // Schedule all 4 passes
+      schedulePass(safeStartTime, false, "Listen");
+      schedulePass(safeStartTime + progressionDuration, false, "Listen (Again)");
+      schedulePass(safeStartTime + (progressionDuration * 2), true, "Sing Along");
+      schedulePass(safeStartTime + (progressionDuration * 3), false, "Affirm");
+      
+      // Add 2-beat break after the 4th pass before next cycle
+      const breakDuration = 2 * beatSec; // 2-beat pause
+      const cycleEndTime = safeStartTime + (progressionDuration * 4);
+      
+      // Quantize next cycle to nearest measure boundary for drum alignment
+      const nextCycleStart = Math.ceil((cycleEndTime + breakDuration) / measureSec) * measureSec;
+      
+      // Show "Next..." during the break
+      Tone.Transport.schedule((time) => {
+        Tone.Draw.schedule(() => {
+          if (!document.hidden) {
+            setStatus("Next...");
+            setActiveChordIndex(null);
+            setActiveRootMidi(null);
+          }
+        }, time);
+      }, safeStartTime + (progressionDuration * 4));
+      
+      Tone.Transport.schedule(() => {
+        if (!isPlayingRef.current) return;
+        questionCount.current++;
+        runCycle(currentCycleKey, false, nextCycleStart);
+      }, nextCycleStart - 0.05);
+      
+      // CRITICAL: Start playback if this is the first cycle
+      if (isFirst) {
+        audioEngine.startPlayback();
+      }
+      
+      return; // Exit early - progressions don't use the normal melody scheduling
+    }
     else {
   // Random Mode
   if (forceOneThreeFive) {
@@ -611,6 +849,7 @@ if (newTab === 'fretboard') {
     setFocusedDegrees, 
     triggerPulse,
     debugClick, setDebugClick,
+    activeChordIndex, activeRootMidi, currentProgression, // NEW: For progressions mode
     
     // Spread the hooks to maintain API compatibility
     ...mixer,

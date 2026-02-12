@@ -53,12 +53,16 @@ interface ControlsProps {
   volMetronome: number; setVolMetronome: (v: number) => void;
   volTraining: number; setVolTraining: (v: number) => void;
   volReverb: number; setVolReverb: (v: number) => void;
+  volBass: number; setVolBass: (v: number) => void;      // NEW
+  volPiano: number; setVolPiano: (v: number) => void;    // NEW
   
   toggleMute: (type: string, val: number, setter: (v: number) => void) => void;
   currentPattern: string;
   setPattern: (name: string) => void;
   hideFretboardVisuals: boolean;
   setHideFretboardVisuals: (v: boolean) => void;
+  includeDiminished: boolean;  // ADD THIS LINE
+  setIncludeDiminished: (v: boolean) => void;
   activeTab: string;
   
   minVocalMidi: number;
@@ -144,7 +148,7 @@ export default function Controls(props: ControlsProps) {
 
   const isFretboardTab = props.activeTab === 'fretboard';
   const isRandomTab = props.activeTab === 'random';
-  const showBlindMode = isFretboardTab || props.inverseMode;
+  const showBlindMode = isFretboardTab || props.inverseMode || props.activeTab === 'progressions';
   const showPitchGuideAndInverse = isRandomTab;
   const showGuideVolume = props.trainingWheels || props.inverseMode || isFretboardTab;
 
@@ -354,6 +358,17 @@ export default function Controls(props: ControlsProps) {
                       <EyeOffIcon />
                     </div>
                   )}
+                  
+                  {/* Include Diminished - Only for Progressions Mode */}
+                  {props.activeTab === 'progressions' && (
+                    <div 
+                      className={`icon-toggle-btn ${props.includeDiminished ? 'active' : ''}`} 
+                      onClick={() => props.setIncludeDiminished(!props.includeDiminished)}
+                      title="Include Diminished: Add viiº (Major) or iiº (Minor) chords to progressions"
+                    >
+                      {props.includeDiminished ? '✓' : '✕'}
+                    </div>
+                  )}
                 </div>
               </div>
                 
@@ -539,6 +554,49 @@ export default function Controls(props: ControlsProps) {
                     title="Adjust vocal sample volume"
                   />
                 </div>
+                
+                {/* Bass & Piano - Only show in Progressions mode */}
+                {props.activeTab === 'progressions' && (
+                  <>
+                    <div className="slider-row">
+                      <span 
+                        onClick={() => props.toggleMute('bass', props.volBass, props.setVolBass)} 
+                        className={props.volBass === 0 ? 'muted-label' : 'active-label'}
+                        title="Click to mute/unmute bass samples"
+                      >
+                        Bass
+                      </span>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1.5" 
+                        step="0.1" 
+                        value={props.volBass} 
+                        onChange={e => props.setVolBass(parseFloat(e.target.value))}
+                        title="Adjust bass sample volume"
+                      />
+                    </div>
+                    <div className="slider-row">
+                      <span 
+                        onClick={() => props.toggleMute('piano', props.volPiano, props.setVolPiano)} 
+                        className={props.volPiano === 0 ? 'muted-label' : 'active-label'}
+                        title="Click to mute/unmute piano samples"
+                      >
+                        Piano
+                      </span>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1.5" 
+                        step="0.1" 
+                        value={props.volPiano} 
+                        onChange={e => props.setVolPiano(parseFloat(e.target.value))}
+                        title="Adjust piano sample volume"
+                      />
+                    </div>
+                  </>
+                )}
+                
                 <div className="slider-row">
                   <span title="Reverb amount">Reverb</span>
                   <input 

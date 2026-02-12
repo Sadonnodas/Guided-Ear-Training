@@ -1,0 +1,84 @@
+.progressions-visualizer {
+  position: relative;
+  width: 100%;
+  min-height: 140px;
+  margin: 30px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.chord-strip {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+}
+
+.chord-cell {
+  flex: 1;
+  min-width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  transition: all 0.2s ease-out;
+  position: relative;
+}
+
+.chord-cell.hidden .roman-numeral {
+  opacity: 0.3;
+  filter: blur(8px);
+}
+
+.chord-cell.active {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: var(--btn-play);
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.4);
+  transform: scale(1.05);
+}
+
+.roman-numeral {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-main);
+  transition: all 0.2s;
+}
+
+.chord-cell.active .roman-numeral {
+  color: var(--btn-play);
+  text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .chord-strip {
+    gap: 10px;
+  }
+  
+  .chord-cell {
+    min-width: 70px;
+    height: 70px;
+  }
+  
+  .roman-numeral {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .chord-cell {
+    min-width: 60px;
+    height: 60px;
+  }
+  
+  .roman-numeral {
+    font-size: 1.2rem;
+  }
+}
