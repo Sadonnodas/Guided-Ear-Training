@@ -235,7 +235,8 @@ if (newTab === 'fretboard') {
   };
 
   const toggleDegree = (d: ScaleDegree) => {
-    if (activeTab !== 'random') return;
+    // Allow in both random and progressions modes
+    if (activeTab !== 'random' && activeTab !== 'progressions') return;
 
     if (enabledDegrees.includes(d)) {
       if (enabledDegrees.length > 1) {
@@ -250,7 +251,8 @@ if (newTab === 'fretboard') {
   };
 
   const toggleFocus = (d: ScaleDegree) => {
-    if (activeTab !== 'random') return;
+    // Allow in both random and progressions modes
+    if (activeTab !== 'random' && activeTab !== 'progressions') return;
 
     if (focusedDegrees.includes(d)) {
       setFocusedDegrees(prev => prev.filter(x => x !== d));
@@ -584,7 +586,9 @@ if (newTab === 'fretboard') {
           endOnOne: settings.refs.endRoot.current,
           includeDiminished: settings.refs.includeDiminished.current,
           minMidi: settings.refs.minVocalMidi.current,
-          maxMidi: settings.refs.maxVocalMidi.current
+          maxMidi: settings.refs.maxVocalMidi.current,
+          enabledDegrees: enabledDegreesRef.current,  // NEW: Filter to enabled degrees
+          focusedDegrees: focusedDegreesRef.current   // NEW: Guarantee focused degrees
         });
       }
       
@@ -604,6 +608,8 @@ if (newTab === 'fretboard') {
       
       // Preload chord samples (bass + piano)
       if (!isPlayingRef.current) return;
+      console.log('🔄 Preloading chord samples...');
+      const preloadStart = performance.now();
       await audioEngine.preloadChordSamples(allMidiNotes);
       if (!isPlayingRef.current) return;
       
@@ -629,6 +635,8 @@ if (newTab === 'fretboard') {
         };
       });
       await audioEngine.preloadNotes(vocalNoteEvents);
+      const preloadTime = performance.now() - preloadStart;
+      console.log(`✅ Samples preloaded in ${preloadTime.toFixed(0)}ms`);
       if (!isPlayingRef.current) return;
       
       // Schedule 4-pass chord progression
@@ -715,12 +723,18 @@ if (newTab === 'fretboard') {
       // CRITICAL FIX: Quantize to measure boundaries like Random mode does
       let anchorTime;
       if (isFirst) {
-        // First cycle: start at next measure boundary
+        // First cycle: start at next measure boundary AFTER preloading completes
+        // Add buffer time to ensure samples are fully loaded
         const now = Tone.Transport.seconds;
+        const minBufferAfterPreload = 0.5; // 500ms buffer after preloading
+        const earliestStart = now + minBufferAfterPreload;
+        
         if (now < 0.1) {
           anchorTime = 0;
         } else {
-          anchorTime = Math.ceil(now / measureSec) * measureSec;
+          // Round up to next measure boundary, but ensure it's after our buffer
+          const nextMeasure = Math.ceil(now / measureSec) * measureSec;
+          anchorTime = Math.max(nextMeasure, Math.ceil(earliestStart / measureSec) * measureSec);
         }
       } else {
         // Subsequent cycles: use provided start time (already quantized)

@@ -62,6 +62,8 @@ interface GeneratorOptions {
   includeDiminished: boolean;
   minMidi: number;
   maxMidi: number;
+  enabledDegrees?: ScaleDegree[]; // NEW: Only use these degrees
+  focusedDegrees?: ScaleDegree[];  // NEW: Always include these degrees
 }
 
 /**
@@ -94,7 +96,10 @@ export function generateModulationProgression(
  * Generate a chord progression based on constraints
  */
 export function generateChordProgression(options: GeneratorOptions): ChordProgression {
-  const { key, scaleType, difficulty, startOnOne, endOnOne, includeDiminished, minMidi, maxMidi } = options;
+  const { 
+    key, scaleType, difficulty, startOnOne, endOnOne, includeDiminished, 
+    minMidi, maxMidi, enabledDegrees, focusedDegrees 
+  } = options;
   
   const chordSet = scaleType === 'Minor' ? MINOR_CHORDS : MAJOR_CHORDS;
   
@@ -105,6 +110,11 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
       const chord = chordSet[d];
       return chord && chord.quality !== 'diminished';
     });
+  }
+  
+  // NEW: Apply enabled degrees filter (if provided)
+  if (enabledDegrees && enabledDegrees.length > 0) {
+    availableDegrees = availableDegrees.filter(d => enabledDegrees.includes(d));
   }
   
   // Filter by vocal range - check if root note can be sung
@@ -123,9 +133,9 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
     return false;
   });
   
-  // Ensure we have the tonic chord available
+  // Ensure we have the tonic chord available (if startOnOne or endOnOne)
   const tonicDegree: ScaleDegree = "1";
-  if (!availableDegrees.includes(tonicDegree)) {
+  if ((startOnOne || endOnOne) && !availableDegrees.includes(tonicDegree)) {
     availableDegrees.push(tonicDegree);
   }
   
@@ -138,31 +148,60 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
     return { ...chord };
   };
   
+  // NEW: Track which focused degrees we've included
+  const focusedIncluded = new Set<ScaleDegree>();
+  
   // Set start chord
   if (startOnOne) {
     progression.push(getChord(tonicDegree));
+    if (focusedDegrees?.includes(tonicDegree)) {
+      focusedIncluded.add(tonicDegree);
+    }
   } else {
     const randomDegree = availableDegrees[Math.floor(Math.random() * availableDegrees.length)];
     progression.push(getChord(randomDegree));
+    if (focusedDegrees?.includes(randomDegree)) {
+      focusedIncluded.add(randomDegree);
+    }
   }
   
   // Generate middle chords (2 chords)
+  // NEW: Prioritize including focused degrees
   for (let i = 0; i < 2; i++) {
-    // Avoid immediate repetition
-    let candidatePool = [...availableDegrees];
-    if (progression.length > 0) {
-      const lastDegree = progression[progression.length - 1].degree;
-      candidatePool = candidatePool.filter(d => d !== lastDegree);
-      if (candidatePool.length === 0) candidatePool = [...availableDegrees];
+    let selectedDegree: ScaleDegree;
+    
+    // Check if we need to include a focused degree
+    const remainingFocused = focusedDegrees?.filter((d: ScaleDegree) => 
+      !focusedIncluded.has(d) && availableDegrees.includes(d)
+    ) || [];
+    
+    if (remainingFocused.length > 0) {
+      // Pick a focused degree we haven't included yet
+      selectedDegree = remainingFocused[Math.floor(Math.random() * remainingFocused.length)];
+      focusedIncluded.add(selectedDegree);
+    } else {
+      // Normal random selection
+      let candidatePool = [...availableDegrees];
+      if (progression.length > 0) {
+        const lastDegree = progression[progression.length - 1].degree;
+        candidatePool = candidatePool.filter(d => d !== lastDegree);
+        if (candidatePool.length === 0) candidatePool = [...availableDegrees];
+      }
+      selectedDegree = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+      if (focusedDegrees?.includes(selectedDegree)) {
+        focusedIncluded.add(selectedDegree);
+      }
     }
     
-    const randomDegree = candidatePool[Math.floor(Math.random() * candidatePool.length)];
-    progression.push(getChord(randomDegree));
+    progression.push(getChord(selectedDegree));
   }
   
   // Set end chord
   if (endOnOne) {
     progression.push(getChord(tonicDegree));
+    if (focusedDegrees?.includes(tonicDegree)) {
+      focusedIncluded.add(tonicDegree);
+    }
   } else {
     // Avoid immediate repetition
     let candidatePool = [...availableDegrees];
@@ -176,7 +215,7 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
   
   // Apply 7th chords based on difficulty
   if (difficulty === 'hard') {
-    progression.forEach(chord => {
+    progression.forEach((chord: ChordInfo) => {
       // Add 7ths to some chords (50% chance for variety)
       if (Math.random() > 0.5 && chord.quality !== 'diminished') {
         chord.seventh = true;

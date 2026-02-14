@@ -1,10 +1,66 @@
 import { getAvailableDegrees } from '../../audio/MusicTheory';
+import { useLongPress } from '../../hooks/useLongPress';
 import type { ScaleDegree, ScaleType } from '../../types';
 import type { ChordInfo } from '../../core/ChordProgressionGenerator';
 import './Visualizer.css';
 
 const CELL_WIDTH = 60;
 const TAPE_RANGE = 24; // How many cells extend in each direction
+
+// Chord cell component with long-press support (same as Random tab)
+interface ChordCellProps {
+  degree: ScaleDegree;
+  romanNumeral: string;
+  isActive: boolean;
+  isEnabled: boolean;
+  isFocused: boolean;
+  onToggle: (d: ScaleDegree) => void;
+  onFocus: (d: ScaleDegree) => void;
+  chord?: ChordInfo;
+  cellKey: string | number;
+}
+
+const ChordCell = ({
+  degree,
+  romanNumeral,
+  isActive,
+  isEnabled,
+  isFocused,
+  onToggle,
+  onFocus,
+  chord,
+  cellKey
+}: ChordCellProps) => {
+  const { isLongPressing, ...handlers } = useLongPress({
+    onClick: () => onToggle(degree),
+    onLongPress: () => onFocus(degree),
+    ms: 600,
+    debug: false
+  });
+
+  let classes = `tape-cell d-${degree}`;
+  if (isActive) classes += ' active';
+  if (isFocused) classes += ' focused';
+  if (!isEnabled && !isFocused) classes += ' disabled';
+  if (isLongPressing) classes += ' pressing';
+
+  return (
+    <div 
+      key={cellKey}
+      className={classes}
+      {...handlers}
+      title={chord 
+        ? `${chord.roman} chord - ${chord.quality}${chord.seventh ? ' 7th' : ''}\nClick to ${isEnabled ? 'disable' : 'enable'} | Long-press (600ms) to focus` 
+        : `${romanNumeral}\nClick to ${isEnabled ? 'disable' : 'enable'} | Long-press (600ms) to focus`
+      }
+      style={{ cursor: 'pointer' }}
+    >
+      <span style={{ pointerEvents: 'none' }}>
+        {romanNumeral}
+      </span>
+    </div>
+  );
+};
 
 // Map degrees to roman numerals for each scale type
 const MAJOR_DEGREE_TO_ROMAN: Record<ScaleDegree, string> = {
@@ -139,30 +195,19 @@ export default function ProgressionsVisualizer({
           // Always show roman numeral (never show question marks)
           const romanNumeral = chord?.roman || degreeToRomanMap[degree] || degree;
           
-          let classes = `tape-cell d-${degree}`;
-          if (isActive) classes += ' active';
-          if (isFocused) classes += ' focused';
-          if (!isEnabled && !isFocused) classes += ' disabled';
-          
           return (
-            <div 
+            <ChordCell
               key={scaleStep}
-              className={classes}
-              onClick={() => toggleDegree(degree)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                toggleFocus(degree);
-              }}
-              title={chord 
-                ? `${chord.roman} chord - ${chord.quality}${chord.seventh ? ' 7th' : ''}\nClick to ${isEnabled ? 'disable' : 'enable'} | Right-click to focus` 
-                : `${romanNumeral}\nClick to ${isEnabled ? 'disable' : 'enable'} | Right-click to focus`
-              }
-              style={{ cursor: 'pointer' }}
-            >
-              <span style={{ pointerEvents: 'none' }}>
-                {romanNumeral}
-              </span>
-            </div>
+              degree={degree}
+              romanNumeral={romanNumeral}
+              isActive={isActive}
+              isEnabled={isEnabled}
+              isFocused={isFocused}
+              onToggle={toggleDegree}
+              onFocus={toggleFocus}
+              chord={chord}
+              cellKey={scaleStep}
+            />
           );
         })}
       </div>
@@ -183,30 +228,19 @@ export default function ProgressionsVisualizer({
           // Always show roman numeral (never show question marks)
           const romanNumeral = chord?.roman || degreeToRomanMap[degree] || degree;
           
-          let classes = `tape-cell d-${degree}`;
-          if (isActive) classes += ' active';
-          if (isFocused) classes += ' focused';
-          if (!isEnabled && !isFocused) classes += ' disabled';
-          
           return (
-            <div 
+            <ChordCell
               key={degree}
-              className={classes}
-              onClick={() => toggleDegree(degree)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                toggleFocus(degree);
-              }}
-              title={chord 
-                ? `${chord.roman} chord - ${chord.quality}${chord.seventh ? ' 7th' : ''}\nClick to ${isEnabled ? 'disable' : 'enable'} | Right-click to focus` 
-                : `${romanNumeral}\nClick to ${isEnabled ? 'disable' : 'enable'} | Right-click to focus`
-              }
-              style={{ cursor: 'pointer' }}
-            >
-              <span style={{ pointerEvents: 'none' }}>
-                {romanNumeral}
-              </span>
-            </div>
+              degree={degree}
+              romanNumeral={romanNumeral}
+              isActive={isActive}
+              isEnabled={isEnabled}
+              isFocused={isFocused}
+              onToggle={toggleDegree}
+              onFocus={toggleFocus}
+              chord={chord}
+              cellKey={degree}
+            />
           );
         })}
       </div>

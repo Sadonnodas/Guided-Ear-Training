@@ -4,16 +4,16 @@ import * as Tone from "tone";
  * VOCAL SAMPLE LATENCY OFFSETS
  */
 export const LATENCY_OFFSET: Record<string, number> = {
-  "1":  -0.070, 
+  "1":  -0.080, 
   "b2": -0.085, // New
   "2":  -0.100, 
   "b3": -0.200, // New
-  "3":  -0.120, 
+  "3":  -0.140, 
   "4":  -0.100, 
   "#4": -0.130, // New
-  "5":  -0.180, 
+  "5":  -0.210, 
   "b6": -0.200, // New
-  "6":  -0.160, 
+  "6":  -0.200, 
   "b7": -0.200, // New
   "7":  -0.170, 
 };
