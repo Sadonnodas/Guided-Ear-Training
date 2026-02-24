@@ -30,6 +30,11 @@ interface NoteCellProps {
   isTrainingMode?: boolean; // NEW: Disable interactions in training mode
 }
 
+// Map raw ScaleDegree values to display labels with proper symbols
+const DEGREE_DISPLAY: Partial<Record<ScaleDegree, string>> = {
+  "b2": "♭2", "b3": "♭3", "b6": "♭6", "b7": "♭7", "#4": "♯4"
+};
+
 const NoteCell = ({ 
   label, 
   isActive, 
@@ -72,7 +77,7 @@ const NoteCell = ({
         : `Scale degree ${label} - Click to ${isEnabled ? 'disable' : 'enable'} | Long-press (600ms) to focus`
       }
     >
-      <span style={{ pointerEvents: 'none' }}>{label}</span>
+      <span style={{ pointerEvents: 'none' }}>{DEGREE_DISPLAY[label] ?? label}</span>
     </div>
   );
 };
