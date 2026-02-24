@@ -23,7 +23,7 @@ import { useMixerLogic } from "./useMixerLogic.ts";
 import { useSessionSettings } from "./useSessionSettings.ts";
 import { getAvailableDegrees } from "../audio/MusicTheory.ts";
 import { useGameLoop } from "./useGameLoop.ts";
-import { KEY_DISPLAY_MAP, TAB_DEFAULTS } from "./sessionConstants.ts";
+import { KEYS, KEY_DISPLAY_MAP, TAB_DEFAULTS } from "./sessionConstants.ts";
 import type { ChordProgression } from "../core/ChordProgressionGenerator.ts";
 import type { MusicalKey, ScaleDegree, ScaleType } from "../types.ts";
 
@@ -187,6 +187,17 @@ export function useSessionLogic() {
 
   // ── Scale & degree handlers ──────────────────────────────────────────────────
   const handleScaleChange = (type: ScaleType) => {
+    // Compute relative key: Major↔Minor shifts root by 3 semitones
+    const isFromMinor = scaleType === 'Minor' || scaleType === 'PentatonicMinor';
+    const isToMinor   = type     === 'Minor' || type     === 'PentatonicMinor';
+    let newKey = currentKey;
+    if (isFromMinor !== isToMinor) {
+      const idx = KEYS.indexOf(currentKey);
+      // Major→Minor: relative minor is 3 semitones down (+9 mod 12 ≡ -3)
+      // Minor→Major: relative major is 3 semitones up
+      newKey = isToMinor ? KEYS[(idx + 9) % 12] : KEYS[(idx + 3) % 12];
+    }
+
     setScaleType(type);
     const defaults = getAvailableDegrees(type);
     setEnabledDegrees(defaults);
@@ -194,9 +205,20 @@ export function useSessionLogic() {
     setFocusedDegrees([]);
     focusedDegreesRef.current = [];
     training.resetTraining();
+
+    if (newKey !== currentKey) {
+      setCurrentKey(newKey);
+      currentKeyRef.current = newKey;
+      setVisualizerKey(newKey);
+      setStatus(`Key: ${KEY_DISPLAY_MAP[newKey]}`);
+      if (!isPlaying && hasInitializedAudio.current) {
+        audioEngine.loadBackingTracks(newKey, "");
+      }
+    }
+
     if (isPlaying) {
       audioEngine.softReset();
-      runCycle(currentKey, true);
+      runCycle(newKey, true);
     }
   };
 

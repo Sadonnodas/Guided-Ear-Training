@@ -65,13 +65,13 @@ const ChordCell = ({
 // Map degrees to roman numerals for each scale type
 const MAJOR_DEGREE_TO_ROMAN: Record<ScaleDegree, string> = {
   "1": "I", "2": "ii", "3": "iii", "4": "IV", 
-  "5": "V", "6": "vi", "7": "viiº",
+  "5": "V", "6": "vi", "7": "vii°",
   "b2": "♭II", "b3": "♭III", "#4": "♯IV", "b6": "♭VI", "b7": "♭VII"
 };
 
 const MINOR_DEGREE_TO_ROMAN: Record<ScaleDegree, string> = {
-  "1": "i", "2": "iiº", "b3": "III", "4": "iv",
-  "5": "v", "b6": "VI", "b7": "VII",
+  "1": "i", "2": "ii°", "b3": "♭III", "4": "iv",
+  "5": "v", "b6": "♭VI", "b7": "♭VII",
   "b2": "♭II", "3": "III", "#4": "♯IV", "6": "VI", "7": "VII"
 };
 

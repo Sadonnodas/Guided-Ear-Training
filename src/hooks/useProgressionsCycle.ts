@@ -4,7 +4,6 @@ import {
   generateChordProgression,
   generateModulationProgression,
   getChordMidiNotes,
-  pickProgressionOctaveBase,
   type ChordProgression,
 } from "../core/ChordProgressionGenerator.ts";
 import { LATENCY_OFFSET } from "../config/AudioConfig.ts";
@@ -121,20 +120,13 @@ export async function runProgressionsCycle(
 
   currentProgression.current = progression;
 
-  // Pick ONE octave anchor for the whole progression (varies each round)
-  const octaveBase = pickProgressionOctaveBase(
-    settings.refs.minVocalMidi.current,
-    settings.refs.maxVocalMidi.current
-  );
-
   // ── Preload samples ─────────────────────────────────────────────────────────
   const allMidiNotes: number[] = [];
   progression.chords.forEach(chord => {
     const { bass, triad } = getChordMidiNotes(
       chord, cycleKey,
       settings.refs.minVocalMidi.current,
-      settings.refs.maxVocalMidi.current,
-      octaveBase
+      settings.refs.maxVocalMidi.current
     );
     allMidiNotes.push(bass, ...triad);
   });
@@ -149,8 +141,7 @@ export async function runProgressionsCycle(
     const { triad } = getChordMidiNotes(
       chord, cycleKey,
       settings.refs.minVocalMidi.current,
-      settings.refs.maxVocalMidi.current,
-      octaveBase
+      settings.refs.maxVocalMidi.current
     );
     const pianoRoot = triad[0];
     return {
@@ -186,8 +177,7 @@ export async function runProgressionsCycle(
       const { bass, triad } = getChordMidiNotes(
         chord, cycleKey,
         settings.refs.minVocalMidi.current,
-        settings.refs.maxVocalMidi.current,
-        octaveBase
+        settings.refs.maxVocalMidi.current
       );
 
       Tone.Transport.schedule((time) => {

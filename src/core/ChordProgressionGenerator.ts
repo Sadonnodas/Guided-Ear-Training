@@ -38,12 +38,12 @@ const MAJOR_CHORDS: Partial<Record<ScaleDegree, ChordInfo>> = {
 
 const MINOR_CHORDS: Partial<Record<ScaleDegree, ChordInfo>> = {
   "1": { roman: "i", degree: "1", quality: 'minor', intervals: [0, 3, 7] },
-  "2": { roman: "iiº", degree: "2", quality: 'diminished', intervals: [0, 3, 6] },
-  "b3": { roman: "III", degree: "b3", quality: 'major', intervals: [0, 4, 7] },
+  "2": { roman: "ii°", degree: "2", quality: 'diminished', intervals: [0, 3, 6] },
+  "b3": { roman: "♭III", degree: "b3", quality: 'major', intervals: [0, 4, 7] },
   "4": { roman: "iv", degree: "4", quality: 'minor', intervals: [0, 3, 7] },
   "5": { roman: "v", degree: "5", quality: 'minor', intervals: [0, 3, 7] },
-  "b6": { roman: "VI", degree: "b6", quality: 'major', intervals: [0, 4, 7] },
-  "b7": { roman: "VII", degree: "b7", quality: 'major', intervals: [0, 4, 7] }
+  "b6": { roman: "♭VI", degree: "b6", quality: 'major', intervals: [0, 4, 7] },
+  "b7": { roman: "♭VII", degree: "b7", quality: 'major', intervals: [0, 4, 7] }
 };
 
 // 7th chord intervals
@@ -232,28 +232,21 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
 }
 
 /**
- * Calculate MIDI notes for a chord, respecting vocal range for piano root.
+ * Calculate MIDI notes for a chord, respecting vocal range for piano root
  * Returns { bass: number (one octave below piano root), triad: number[] }
- *
- * FIX #4: Accepts an optional `preferredOctaveBase` so callers can pin all
- * chords in a progression to the same octave region, preventing the root
- * from always snapping to the mathematically-middle candidate.
- * When `preferredOctaveBase` is supplied we pick the valid candidate that is
- * closest to it, giving variety across progressions while keeping one
- * progression internally consistent.
  */
 export function getChordMidiNotes(
   chord: ChordInfo,
   key: MusicalKey,
   minMidi: number,
-  maxMidi: number,
-  preferredOctaveBase?: number   // FIX #4: optional anchor for octave selection
+  maxMidi: number
 ): { bass: number; triad: number[] } {
   const rootMidi = ROOT_MIDI[key];
   const degreeInterval = DEGREE_TO_SEMITONE[chord.degree];
   const baseRoot = rootMidi + degreeInterval;
   
-  // Build all octave candidates
+  // Find best octave for piano root note within vocal range
+  let pianoRoot = baseRoot;
   const candidates: number[] = [];
   for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
     candidates.push(baseRoot + octaveOffset);
@@ -262,22 +255,15 @@ export function getChordMidiNotes(
   // Filter to vocal range
   const validCandidates = candidates.filter(n => n >= minMidi && n <= maxMidi);
   
-  let pianoRoot: number;
   if (validCandidates.length > 0) {
-    if (preferredOctaveBase !== undefined) {
-      // FIX #4: Pick the valid candidate closest to the preferred base pitch
-      validCandidates.sort((a, b) =>
-        Math.abs(a - preferredOctaveBase) - Math.abs(b - preferredOctaveBase)
-      );
-    } else {
-      // Default: prefer middle of vocal range (original behaviour as fallback)
-      validCandidates.sort((a, b) => {
-        const midRange = (minMidi + maxMidi) / 2;
-        return Math.abs(a - midRange) - Math.abs(b - midRange);
-      });
-    }
+    // Choose middle of range
+    validCandidates.sort((a, b) => {
+      const midRange = (minMidi + maxMidi) / 2;
+      return Math.abs(a - midRange) - Math.abs(b - midRange);
+    });
     pianoRoot = validCandidates[0];
   } else {
+    // Fallback: clamp to range
     pianoRoot = Math.max(minMidi, Math.min(maxMidi, baseRoot));
   }
   
@@ -288,17 +274,4 @@ export function getChordMidiNotes(
   const triad = chord.intervals.map(interval => pianoRoot + interval);
   
   return { bass: bassNote, triad };
-}
-
-/**
- * FIX #4: Pick a random "preferred octave base" within the vocal range.
- * Call this ONCE per new progression and pass the result to every
- * getChordMidiNotes() call in that progression so all chords use a
- * consistent register while still varying across different progressions.
- */
-export function pickProgressionOctaveBase(minMidi: number, maxMidi: number): number {
-  // Divide the usable range into thirds and pick randomly from lower 2/3
-  // (avoids placing roots too high so triad notes stay comfortable)
-  const usableMax = minMidi + Math.floor((maxMidi - minMidi) * 0.75);
-  return minMidi + Math.floor(Math.random() * (usableMax - minMidi + 1));
 }
