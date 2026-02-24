@@ -14,63 +14,6 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
   "Fs": "F♯", "G": "G", "Gs": "A♭", "A": "A", "As": "B♭", "B": "B"
 };
 
-/**
- * FIX #2: Build an ordered key list centred on the "natural" key for each
- * scale type.  Above centre = increasing sharps; below centre = increasing flats.
- *
- * Major scale:  C (0 acc)  → G D A E B F♯ (↑sharps) | F B♭ E♭ A♭ D♭ G♭ (↓flats)
- * Minor scale:  A (0 acc)  → E B F♯ C♯ G♯ D♯  (↑sharps) | D G C F B♭ E♭ (↓flats)
- *
- * The <select> renders top-to-bottom, so we put the *most-sharps* key first
- * and the *most-flats* key last, with the natural key in the exact middle.
- */
-function getOrderedKeys(scaleType: string): { key: MusicalKey; label: string }[] {
-  // Circle of fifths order starting from C:  C G D A E B F♯/G♭ D♭ A♭ E♭ B♭ F
-  // Sharps above centre (going up the circle), flats below (going down)
-
-  // For Major: C = 0 accidentals
-  //   Sharps: G(1) D(2) A(3) E(4) B(5) F♯(6)
-  //   Flats:  F(1) B♭(2) E♭(3) A♭(4) D♭(5) G♭(6)
-  const majorSharps: MusicalKey[] = ["G", "D", "A", "E", "B", "Fs"];
-  const majorFlats: MusicalKey[]  = ["F", "As", "Ds", "Gs", "Cs", "Fs"]; // Fs = G♭ enharmonic
-
-  // For Minor: A = 0 accidentals
-  //   Sharps: E(1) B(2) F♯(3) C♯(4) G♯(5) D♯(6)
-  //   Flats:  D(1) G(2) C(3) F(4) B♭(5) E♭(6)
-  const minorSharps: MusicalKey[] = ["E", "B", "Fs", "Cs", "Gs", "Ds"];
-  const minorFlats: MusicalKey[]  = ["D", "G", "C", "F", "As", "Ds"]; // Ds = E♭ enharmonic
-
-  const isMinor = scaleType === 'Minor' || scaleType === 'PentatonicMinor';
-  const centre: MusicalKey   = isMinor ? "A" : "C";
-  const sharps: MusicalKey[] = isMinor ? minorSharps : majorSharps;
-  const flats: MusicalKey[]  = isMinor ? minorFlats  : majorFlats;
-
-  // Build list: most-sharps first → centre → most-flats last
-  // We deduplicate so the enharmonic overlap (F♯/G♭, D♯/E♭) only appears once.
-  const seen = new Set<MusicalKey>();
-  const ordered: MusicalKey[] = [];
-
-  // Sharps in descending order (most sharps → fewest)
-  for (let i = sharps.length - 1; i >= 0; i--) {
-    if (!seen.has(sharps[i])) { seen.add(sharps[i]); ordered.push(sharps[i]); }
-  }
-
-  // Centre
-  if (!seen.has(centre)) { seen.add(centre); ordered.push(centre); }
-
-  // Flats in ascending order (fewest flats → most)
-  for (let i = 0; i < flats.length; i++) {
-    if (!seen.has(flats[i])) { seen.add(flats[i]); ordered.push(flats[i]); }
-  }
-
-  // Any remaining chromatic keys not yet covered (safety net)
-  KEYS.forEach(k => {
-    if (!seen.has(k)) { seen.add(k); ordered.push(k); }
-  });
-
-  return ordered.map(k => ({ key: k, label: KEY_DISPLAY_MAP[k] }));
-}
-
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -80,7 +23,7 @@ interface HeaderProps {
   setViewMode: (mode: 'tape' | 'static') => void;
   
   scaleType: ScaleType;
-  setScaleType: (s: ScaleType) => void;
+  handleScaleChange: (s: ScaleType) => void;
   
   activeLevelId?: number;
   setActiveLevelId?: (id: number) => void;
@@ -96,7 +39,7 @@ interface HeaderProps {
 
 export default function Header({ 
   activeTab, setActiveTab, currentKey, setKeyManually, 
-  viewMode, setViewMode, scaleType, setScaleType,
+  viewMode, setViewMode, scaleType, handleScaleChange,
   activeLevelId, setActiveLevelId, levels,
   selectedShape, setSelectedShape,
   isLevelUnlocked,
@@ -106,7 +49,7 @@ export default function Header({
   const handleTabChange = (tab: string) => {
       setActiveTab(tab);
       if (tab === 'training' && scaleType === 'Chromatic') {
-          setScaleType('Major');
+          handleScaleChange('Major');
       }
   };
 
@@ -115,7 +58,7 @@ export default function Header({
     if (activeTab === 'fretboard' && isPlaying && stopSession) {
       stopSession();
     }
-    setScaleType(newScaleType);
+    handleScaleChange(newScaleType);
   };
 
   // NEW: Handle shape change - stop if playing in fretboard mode
@@ -177,9 +120,10 @@ export default function Header({
           
           {/* SCALE TYPE */}
           <select 
-            className="key-select scale-type-select" 
+            className="key-select" 
             value={scaleType} 
             onChange={(e) => handleScaleTypeChange(e.target.value as ScaleType)}
+            style={{ marginRight: '5px' }}
             title="Select the scale type for practice"
           >
             {activeTab === 'fretboard' ? (
@@ -206,14 +150,12 @@ export default function Header({
 
           {/* KEY SELECTOR */}
           <select 
-            className="key-select key-pitch-select" 
+            className="key-select" 
             value={currentKey} 
             onChange={(e) => handleKeyChange(e.target.value as MusicalKey)}
-            title="Select the musical key - arranged by circle of fifths (sharps above, flats below)"
+            title="Select the musical key - all melodies will be in this key"
           >
-            {getOrderedKeys(scaleType).map(({ key, label }) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
+            {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]}</option>))}
           </select>
           
           <button 
@@ -258,7 +200,7 @@ export default function Header({
           {/* DYNAMIC TOGGLE: View Mode or Shape Selector */}
           {activeTab === 'fretboard' && setSelectedShape ? (
             <select 
-              className="key-select shape-select" 
+              className="key-select" 
               value={selectedShape} 
               onChange={(e) => handleShapeChange(e.target.value as CagedShape)}
               title="Select CAGED shape position on the fretboard"

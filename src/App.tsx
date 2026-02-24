@@ -106,7 +106,7 @@ export default function App() {
           viewMode={viewMode} 
           setViewMode={setViewMode}
           scaleType={session.scaleType}
-          setScaleType={session.handleScaleChange}
+          handleScaleChange={session.handleScaleChange}
           
           // Training Mode Props
           activeLevelId={session.training.activeLevelId}
