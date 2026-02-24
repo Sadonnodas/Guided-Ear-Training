@@ -10,16 +10,11 @@ import { LATENCY_OFFSET } from "../config/AudioConfig.ts";
 import type { MusicalKey, ScaleDegree, ScaleType, MelodyDifficulty } from "../types.ts";
 import { KEYS, KEY_DISPLAY_MAP } from "./sessionConstants.ts";
 
-// The shape of everything the progressions cycle needs from outside.
-// All plain values or refs — no React state setters are passed as objects;
-// each setter is a discrete callback so the call-sites stay readable.
 export interface ProgressionsCycleDeps {
-  // Refs
   isPlayingRef: React.MutableRefObject<boolean>;
   questionCount: React.MutableRefObject<number>;
   currentProgression: React.MutableRefObject<ChordProgression | null>;
 
-  // Settings refs (read-only snapshot accessors)
   settings: {
     refs: {
       bpm: React.MutableRefObject<number>;
@@ -33,32 +28,19 @@ export interface ProgressionsCycleDeps {
     };
   };
 
-  // Current musical context
   scaleTypeRef: React.MutableRefObject<ScaleType>;
   enabledDegreesRef: React.MutableRefObject<ScaleDegree[]>;
   focusedDegreesRef: React.MutableRefObject<ScaleDegree[]>;
 
-  // State setters
   setStatus: (s: string) => void;
   setCurrentKey: (k: MusicalKey) => void;
   setVisualizerKey: (k: MusicalKey) => void;
   setActiveChordIndex: (i: number | null) => void;
   setActiveRootMidi: (m: number | null) => void;
 
-  // Callback to kick off the next cycle
   runCycle: (key: MusicalKey, isFirst: boolean, startTime?: number) => void;
 }
 
-/**
- * Runs one full progressions "round":
- *   - optional auto-modulation
- *   - progression generation
- *   - sample preloading
- *   - 4-pass Tone.Transport scheduling (Listen → Listen Again → Sing Along → Affirm)
- *   - schedules the next runCycle call
- *
- * Returns early (without scheduling) if playback was stopped during async work.
- */
 export async function runProgressionsCycle(
   currentCycleKey: MusicalKey,
   isFirst: boolean,
@@ -74,13 +56,12 @@ export async function runProgressionsCycle(
     runCycle,
   } = deps;
 
-  // Clear visualizer on first cycle
   if (isFirst) {
     setActiveChordIndex(null);
     setActiveRootMidi(null);
   }
 
-  // ── Auto-modulation ─────────────────────────────────────────────────────────
+  // Auto-modulation
   let cycleKey = currentCycleKey;
   let forceSettle = forceOneThreeFive;
 
@@ -97,7 +78,7 @@ export async function runProgressionsCycle(
     forceSettle = true;
   }
 
-  // ── Generate progression ────────────────────────────────────────────────────
+  // Generate progression
   let progression: ChordProgression;
 
   if (forceSettle) {
@@ -120,7 +101,7 @@ export async function runProgressionsCycle(
 
   currentProgression.current = progression;
 
-  // ── Preload samples ─────────────────────────────────────────────────────────
+  // Preload samples
   const allMidiNotes: number[] = [];
   progression.chords.forEach(chord => {
     const { bass, triad } = getChordMidiNotes(
@@ -136,7 +117,7 @@ export async function runProgressionsCycle(
   await audioEngine.preloadChordSamples(allMidiNotes);
   if (!isPlayingRef.current) return;
 
-  // Preload vocal samples for the Sing Along pass
+  // Preload vocal samples for Sing Along pass
   const vocalNoteEvents = progression.chords.map(chord => {
     const { triad } = getChordMidiNotes(
       chord, cycleKey,
@@ -156,16 +137,16 @@ export async function runProgressionsCycle(
     };
   });
   await audioEngine.preloadNotes(vocalNoteEvents);
-  console.log(`✅ Chord samples preloaded in ${(performance.now() - t0).toFixed(0)}ms`);
+  console.log(`Chord samples preloaded in ${(performance.now() - t0).toFixed(0)}ms`);
   if (!isPlayingRef.current) return;
 
-  // ── Timing constants ────────────────────────────────────────────────────────
+  // Timing constants
   const beatSec = 60 / settings.refs.bpm.current;
   const measureSec = 4 * beatSec;
-  const chordDuration = 2; // beats per chord
+  const chordDuration = 2;
   const progressionDuration = progression.chords.length * chordDuration * beatSec;
 
-  // ── schedulePass helper ─────────────────────────────────────────────────────
+  // schedulePass helper
   const schedulePass = (passStartTime: number, playVocals: boolean, label: string) => {
     Tone.Transport.schedule((time) => {
       Tone.Draw.schedule(() => { if (!document.hidden) setStatus(label); }, time);
@@ -213,7 +194,6 @@ export async function runProgressionsCycle(
       beat += chordDuration;
     });
 
-    // Clear visualizer after last chord
     Tone.Transport.schedule((time) => {
       Tone.Draw.schedule(() => {
         if (!document.hidden) {
@@ -224,7 +204,7 @@ export async function runProgressionsCycle(
     }, passStartTime + beat * beatSec);
   };
 
-  // ── Anchor time (always include one settling measure) ───────────────────────
+  // Anchor time
   let anchorTime: number;
   if (isFirst) {
     const now = Tone.Transport.seconds;
@@ -237,9 +217,8 @@ export async function runProgressionsCycle(
       : provided;
   }
 
-  const safeStartTime = anchorTime + measureSec; // always 1 full settling measure
+  const safeStartTime = anchorTime + measureSec;
 
-  // Show "Settling In..." during buffer measure
   Tone.Transport.schedule((time) => {
     Tone.Draw.schedule(() => {
       if (!document.hidden) {
@@ -250,16 +229,18 @@ export async function runProgressionsCycle(
     }, time);
   }, anchorTime);
 
-  // ── Schedule 4 passes ───────────────────────────────────────────────────────
-  schedulePass(safeStartTime,                          false, "Listen");
-  schedulePass(safeStartTime + progressionDuration,    false, "Listen (Again)");
-  schedulePass(safeStartTime + progressionDuration * 2, true, "Sing Along");
+  // 4 passes
+  schedulePass(safeStartTime,                           false, "Listen");
+  schedulePass(safeStartTime + progressionDuration,     false, "Listen (Again)");
+  schedulePass(safeStartTime + progressionDuration * 2, true,  "Sing Along");
   schedulePass(safeStartTime + progressionDuration * 3, false, "Affirm");
 
   const cycleEndTime = safeStartTime + progressionDuration * 4;
-  const nextCycleStart = Math.ceil((cycleEndTime + beatSec * 2) / measureSec) * measureSec;
 
-  // "Next..." status between cycles
+  // Snap to next measure boundary — next cycle adds its own settling bar,
+  // giving exactly 1 bar between cycles instead of the previous 3.
+  const nextCycleStart = Math.ceil(cycleEndTime / measureSec) * measureSec;
+
   Tone.Transport.schedule((time) => {
     Tone.Draw.schedule(() => {
       if (!document.hidden) {
@@ -270,7 +251,6 @@ export async function runProgressionsCycle(
     }, time);
   }, cycleEndTime);
 
-  // Schedule next cycle
   Tone.Transport.schedule(() => {
     if (!isPlayingRef.current) return;
     questionCount.current++;
