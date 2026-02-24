@@ -7,6 +7,7 @@ import {
   generateChordProgression, 
   generateModulationProgression,
   getChordMidiNotes,
+  pickProgressionOctaveBase,
   type ChordProgression
 } from "../core/ChordProgressionGenerator";
 import { useAudioSetup } from "./useAudioSetup";
@@ -569,6 +570,21 @@ if (newTab === 'fretboard') {
         setActiveChordIndex(null);
         setActiveRootMidi(null);
       }
+
+      // FIX #1: Auto-modulation for progressions mode (mirrors random mode logic)
+      if (!forceOneThreeFive && questionCount.current > settings.refs.questionsPerKey.current) {
+        questionCount.current = 1;
+        const otherKeys = KEYS.filter(k => k !== currentCycleKey);
+        const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+        setCurrentKey(newKey);
+        setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
+        skipPrepareMessage = true;
+        await audioEngine.loadBackingTracks(newKey, "");
+        if (!isPlayingRef.current) return;
+        currentCycleKey = newKey;
+        setVisualizerKey(newKey);
+        forceOneThreeFive = true;
+      }
       
       let progression: ChordProgression;
       
@@ -587,40 +603,47 @@ if (newTab === 'fretboard') {
           includeDiminished: settings.refs.includeDiminished.current,
           minMidi: settings.refs.minVocalMidi.current,
           maxMidi: settings.refs.maxVocalMidi.current,
-          enabledDegrees: enabledDegreesRef.current,  // NEW: Filter to enabled degrees
-          focusedDegrees: focusedDegreesRef.current   // NEW: Guarantee focused degrees
+          enabledDegrees: enabledDegreesRef.current,
+          focusedDegrees: focusedDegreesRef.current
         });
       }
       
       currentProgression.current = progression;
+
+      // FIX #4: Pick ONE random octave anchor for the whole progression so chord
+      // roots vary between progressions but stay consistent within one.
+      const progressionOctaveBase = pickProgressionOctaveBase(
+        settings.refs.minVocalMidi.current,
+        settings.refs.maxVocalMidi.current
+      );
       
-      // Collect all MIDI notes needed for preloading
+      // Collect all MIDI notes needed for preloading (using the chosen octave base)
       const allMidiNotes: number[] = [];
       progression.chords.forEach(chord => {
         const { bass, triad } = getChordMidiNotes(
           chord,
           currentCycleKey,
           settings.refs.minVocalMidi.current,
-          settings.refs.maxVocalMidi.current
+          settings.refs.maxVocalMidi.current,
+          progressionOctaveBase  // FIX #4
         );
         allMidiNotes.push(bass, ...triad);
       });
       
       // Preload chord samples (bass + piano)
       if (!isPlayingRef.current) return;
-      console.log('🔄 Preloading chord samples...');
       const preloadStart = performance.now();
       await audioEngine.preloadChordSamples(allMidiNotes);
       if (!isPlayingRef.current) return;
       
-      // ALSO preload vocal samples for pass 3 (Sing Along)
-      // Create NoteEvents for each chord's root to preload vocal samples
+      // Also preload vocal samples for pass 3 (Sing Along)
       const vocalNoteEvents = progression.chords.map(chord => {
         const { triad } = getChordMidiNotes(
           chord,
           currentCycleKey,
           settings.refs.minVocalMidi.current,
-          settings.refs.maxVocalMidi.current
+          settings.refs.maxVocalMidi.current,
+          progressionOctaveBase  // FIX #4
         );
         const pianoRoot = triad[0];
         return {
@@ -636,12 +659,12 @@ if (newTab === 'fretboard') {
       });
       await audioEngine.preloadNotes(vocalNoteEvents);
       const preloadTime = performance.now() - preloadStart;
-      console.log(`✅ Samples preloaded in ${preloadTime.toFixed(0)}ms`);
+      console.log(`✅ Chord samples preloaded in ${preloadTime.toFixed(0)}ms`);
       if (!isPlayingRef.current) return;
       
       // Schedule 4-pass chord progression
       const beatSec = 60 / settings.refs.bpm.current;
-      const measureSec = 4 * beatSec; // NEW: For quantization
+      const measureSec = 4 * beatSec;
       const chordDuration = 2; // beats per chord
       const progressionDuration = progression.chords.length * chordDuration * beatSec;
       
@@ -650,56 +673,50 @@ if (newTab === 'fretboard') {
         playVocals: boolean, 
         statusLabel: string
       ) => {
-        // Set status
         Tone.Transport.schedule((time) => {
           Tone.Draw.schedule(() => {
             if (!document.hidden) setStatus(statusLabel);
           }, time);
         }, passStartTime);
         
-        // Schedule each chord
         let currentBeat = 0;
         progression.chords.forEach((chord, index) => {
           const chordTime = passStartTime + (currentBeat * beatSec);
           
+          // FIX #4: use the same octave base for every scheduled chord
           const { bass, triad } = getChordMidiNotes(
             chord,
             currentCycleKey,
             settings.refs.minVocalMidi.current,
-            settings.refs.maxVocalMidi.current
+            settings.refs.maxVocalMidi.current,
+            progressionOctaveBase
           );
           
           Tone.Transport.schedule((time) => {
-            // Play chord (bass + triad)
             audioEngine.playChord(bass, triad, time);
             
-            // If vocal pass, play vocal sample singing the CHORD DEGREE at piano root pitch
             if (playVocals) {
-              const pianoRoot = triad[0]; // Root note of piano triad
-              
-              // Apply timing offset for this degree (same as Random/Training modes)
+              const pianoRoot = triad[0];
               const latencyOffset = LATENCY_OFFSET[chord.degree] || 0;
               const adjustedTime = time + latencyOffset;
               
               const rootNoteEvent = {
                 noteInfo: {
-                  degree: chord.degree, // Use the CHORD's degree (1, 2, 3, 4, 5, 6, 7)
-                  midi: pianoRoot,      // At the piano root pitch
+                  degree: chord.degree,
+                  midi: pianoRoot,
                   frequency: 440 * Math.pow(2, (pianoRoot - 69) / 12),
                   label: `${chord.degree} (${pianoRoot})`
                 },
                 startTime: currentBeat,
                 duration: chordDuration
               };
-              // Play vocal sample with timing adjustment
               (audioEngine as any).playMelodyNote(rootNoteEvent, adjustedTime, false);
             }
             
-            // Update visualizer with chord index AND root MIDI pitch
             Tone.Draw.schedule(() => {
               if (!document.hidden) {
                 setActiveChordIndex(index);
-                setActiveRootMidi(triad[0]); // Piano root = visualizer position
+                setActiveRootMidi(triad[0]);
               }
             }, time);
           }, chordTime);
@@ -707,7 +724,6 @@ if (newTab === 'fretboard') {
           currentBeat += chordDuration;
         });
         
-        // Clear visualizer after last chord
         const endTime = passStartTime + (currentBeat * beatSec);
         Tone.Transport.schedule((time) => {
           Tone.Draw.schedule(() => {
@@ -719,43 +735,46 @@ if (newTab === 'fretboard') {
         }, endTime);
       };
       
-      // Add settling in period for first cycle (like Random mode)
-      // CRITICAL FIX: Quantize to measure boundaries like Random mode does
-      let anchorTime;
+      // FIX #3: Always add a full measure buffer before the first pass so that
+      // on mobile (where preloading can be slow) the first chord is never missed.
+      // For subsequent cycles we still honour the provided startTime from the
+      // previous cycle's scheduler, but add a half-measure padding if we are
+      // dangerously close to "now".
+      let anchorTime: number;
       if (isFirst) {
-        // First cycle: start at next measure boundary AFTER preloading completes
-        // Add buffer time to ensure samples are fully loaded
         const now = Tone.Transport.seconds;
-        const minBufferAfterPreload = 0.5; // 500ms buffer after preloading
-        const earliestStart = now + minBufferAfterPreload;
-        
         if (now < 0.1) {
           anchorTime = 0;
         } else {
-          // Round up to next measure boundary, but ensure it's after our buffer
-          const nextMeasure = Math.ceil(now / measureSec) * measureSec;
-          anchorTime = Math.max(nextMeasure, Math.ceil(earliestStart / measureSec) * measureSec);
+          // Always round up to at least the NEXT measure boundary
+          anchorTime = Math.ceil(now / measureSec) * measureSec;
         }
       } else {
-        // Subsequent cycles: use provided start time (already quantized)
-        anchorTime = startTime || Tone.Transport.seconds;
+        // Subsequent cycles: use the provided start time
+        const now = Tone.Transport.seconds;
+        const provided = startTime ?? now;
+        // Safety: if the provided time is too close (or in the past), snap forward
+        anchorTime = provided < now + 0.1
+          ? Math.ceil((now + 0.1) / measureSec) * measureSec
+          : provided;
       }
-      
-      const settlingDuration = isFirst ? measureSec : 0; // 1 measure settling
+
+      // FIX #3: Always add one full settling measure (was conditional on isFirst before)
+      // This guarantees the transport has enough time to schedule all chord events
+      // before the first beat fires – critical on slower/older mobile devices.
+      const settlingDuration = measureSec;
       const safeStartTime = anchorTime + settlingDuration;
       
-      // Show "Settling In" during the intro
-      if (isFirst && settlingDuration > 0) {
-        Tone.Transport.schedule((time) => {
-          Tone.Draw.schedule(() => {
-            if (!document.hidden) {
-              setStatus("Settling In...");
-              setActiveChordIndex(null); // Don't highlight any chord during settling
-              setActiveRootMidi(null);
-            }
-          }, time);
-        }, anchorTime);
-      }
+      // Show "Settling In..." during the buffer measure
+      Tone.Transport.schedule((time) => {
+        Tone.Draw.schedule(() => {
+          if (!document.hidden) {
+            setStatus("Settling In...");
+            setActiveChordIndex(null);
+            setActiveRootMidi(null);
+          }
+        }, time);
+      }, anchorTime);
       
       // Schedule all 4 passes
       schedulePass(safeStartTime, false, "Listen");
@@ -763,14 +782,10 @@ if (newTab === 'fretboard') {
       schedulePass(safeStartTime + (progressionDuration * 2), true, "Sing Along");
       schedulePass(safeStartTime + (progressionDuration * 3), false, "Affirm");
       
-      // Add 2-beat break after the 4th pass before next cycle
-      const breakDuration = 2 * beatSec; // 2-beat pause
       const cycleEndTime = safeStartTime + (progressionDuration * 4);
-      
       // Quantize next cycle to nearest measure boundary for drum alignment
-      const nextCycleStart = Math.ceil((cycleEndTime + breakDuration) / measureSec) * measureSec;
+      const nextCycleStart = Math.ceil((cycleEndTime + beatSec * 2) / measureSec) * measureSec;
       
-      // Show "Next..." during the break
       Tone.Transport.schedule((time) => {
         Tone.Draw.schedule(() => {
           if (!document.hidden) {
@@ -779,20 +794,20 @@ if (newTab === 'fretboard') {
             setActiveRootMidi(null);
           }
         }, time);
-      }, safeStartTime + (progressionDuration * 4));
+      }, cycleEndTime);
       
       Tone.Transport.schedule(() => {
         if (!isPlayingRef.current) return;
+        // FIX #1: increment BEFORE calling runCycle so the count is correct
         questionCount.current++;
         runCycle(currentCycleKey, false, nextCycleStart);
       }, nextCycleStart - 0.05);
       
-      // CRITICAL: Start playback if this is the first cycle
       if (isFirst) {
         audioEngine.startPlayback();
       }
       
-      return; // Exit early - progressions don't use the normal melody scheduling
+      return; // Exit early – progressions don't use the normal melody scheduling
     }
     else {
   // Random Mode
