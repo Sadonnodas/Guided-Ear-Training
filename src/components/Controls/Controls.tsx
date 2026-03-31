@@ -174,6 +174,44 @@ export default function Controls(props: ControlsProps) {
         </div>
       </div>
 
+      <div className="practice-controls">
+        {showPitchGuideAndInverse && (
+          <div 
+            className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
+            onClick={() => !isTrainingMode && props.setTrainingWheels(!props.trainingWheels)}
+            style={{ 
+              opacity: isTrainingMode ? 0.5 : 1,
+              cursor: isTrainingMode ? 'not-allowed' : 'pointer'
+            }}
+            title={isTrainingMode 
+              ? "Training mode controls pitch guide (enabled in Stages 1-2)" 
+              : "Pitch Guide: Synth plays along with your singing for reference"}
+          >
+            <TrainingWheelsIcon />
+          </div>
+        )}
+
+        {showPitchGuideAndInverse && (
+          <div 
+            className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
+            onClick={() => props.setInverseMode(!props.inverseMode)} 
+            title="Inverse Mode: Listen first, then sing the melody back"
+          >
+            <InverseIcon />
+          </div>
+        )}
+
+        {showBlindMode && (
+          <div 
+            className={`icon-toggle-btn ${props.hideFretboardVisuals ? 'active' : ''}`} 
+            onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
+            title="Blind Mode: Hide visual indicators during practice"
+          >
+            <EyeOffIcon />
+          </div>
+        )}
+      </div>
+
       <div className="settings-trigger" onClick={() => setSettingsOpen(!settingsOpen)}>
         <span>Controls</span>
         <ChevronIcon open={settingsOpen} />
@@ -322,42 +360,6 @@ export default function Controls(props: ControlsProps) {
                   >
                     End on 1
                   </div>
-
-                  {showPitchGuideAndInverse && (
-                    <div 
-                      className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
-                      onClick={() => !isTrainingMode && props.setTrainingWheels(!props.trainingWheels)}
-                      style={{ 
-                        opacity: isTrainingMode ? 0.5 : 1,
-                        cursor: isTrainingMode ? 'not-allowed' : 'pointer'
-                      }}
-                      title={isTrainingMode 
-                        ? "Training mode controls pitch guide (enabled in Stages 1-2)" 
-                        : "Pitch Guide: Synth plays along with your singing for reference"}
-                    >
-                      <TrainingWheelsIcon />
-                    </div>
-                  )}
-
-                  {showPitchGuideAndInverse && (
-                    <div 
-                      className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
-                      onClick={() => props.setInverseMode(!props.inverseMode)} 
-                      title="Inverse Mode: Listen first, then sing the melody back"
-                    >
-                      <InverseIcon />
-                    </div>
-                  )}
-
-                  {showBlindMode && (
-                    <div 
-                      className={`icon-toggle-btn ${props.hideFretboardVisuals ? 'active' : ''}`} 
-                      onClick={() => props.setHideFretboardVisuals(!props.hideFretboardVisuals)}
-                      title="Blind Mode: Hide visual indicators during practice"
-                    >
-                      <EyeOffIcon />
-                    </div>
-                  )}
                   
                   {/* Include Diminished - Only for Progressions Mode */}
                   {props.activeTab === 'progressions' && (

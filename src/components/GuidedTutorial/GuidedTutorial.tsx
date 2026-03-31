@@ -49,7 +49,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: '1.1',
     target: '.tabs button:nth-child(1)',
-    title: '🎲 Random Mode',
+    title: '🎲 Melody Mode',
     description: 'Freeform practice with complete control over scale degrees, difficulty, and all settings. Perfect for focused practice on specific intervals or general practice on all degrees.',
     position: 'bottom',
     highlightPadding: 8
@@ -57,24 +57,12 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: '1.2',
     target: '.tabs button:nth-child(2)',
-    title: '📚 Training Mode',
-    description: 'Structured curriculum with progressive levels. Each level introduces ONE new scale degree. Spend 10 minutes in a level to unlock the next one.',
-    points: [
-      'Four stages per level, increasing in difficulty',
-      'Perfect for systematic ear training development'
-    ],
-    position: 'bottom',
-    highlightPadding: 8
-  },
-  {
-    id: '1.3',
-    target: '.tabs button:nth-child(3)',
     title: '🎸 Fretboard Mode',
     description: 'Guitar-specific practice using CAGED system. Practice scale shapes across the fretboard. Switch between shapes (C, A, G, E, D).',
     points: [
       'Visual fretboard shows note positions as melodies play',
       'Inverse mode enabled by default: Listen first, then play along and see answer',
-      'Quick tip: Use Blind Mode (in the controls) to hide visuals during listen phase for extra challenge!'
+      'Quick tip: Use Blind Mode (under the play button) to hide visuals during listen phase for extra challenge!'
     ],
     position: 'bottom',
     highlightPadding: 8
@@ -95,7 +83,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: '2.1',
     target: '.key-container select:first-of-type',
     title: '🎹 Scale Type',
-    description: 'Choose Major, Minor, or Pentatonic scales. Each has different scale degrees to learn. In the Training tab we only work on Major or Minor.',
+    description: 'Choose Major, Minor, or Pentatonic scales. Each has different scale degrees to learn.',
     position: 'bottom',
     highlightPadding: 8,
     waitForLayout: true
@@ -197,15 +185,31 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: '4.3',
     target: '.play-btn-container',
     title: '✨ Your Turn Phase',
-    description: 'Sing without the melody to internalize the scale degrees even more. Toggle on Pitch Guide in the controls to get a synth playing along in this phase.',
+    description: 'Sing without the melody to internalize the scale degrees even more. Toggle on Pitch Guide (under the play button) to get a synth playing along in this phase.',
     position: 'top',
     highlightPadding: 20,
     smartPosition: true
   },
-  
-  // STEP 5: Controls (with substeps)
   {
     id: '5',
+    target: '.practice-controls',
+    title: '🔧 Practice Controls',
+    description: 'These buttons give you extra control over your practice session. They are tab-specific, so they might not always be visible.',
+    points: [
+      'Pitch Guide: A synth plays along with your singing for reference.',
+      'Inverse Mode: Listen first, then sing the melody back.',
+      'Blind Mode: Hide visual indicators during practice.'
+    ],
+    position: 'top',
+    highlightPadding: 15,
+    combinedTarget: true,
+    switchToTab: 'random',
+    waitForLayout: true,
+  },
+  
+  // STEP 6: Controls (with substeps)
+  {
+    id: '6',
     target: '.settings-trigger, .controls-accordion',
     title: '⚙️ Customize Everything',
     description: 'Click here to open the control settings. Four tabs with different options.',
@@ -222,7 +226,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     hasSubsteps: true
   },
   {
-    id: '5.1',
+    id: '6.1',
     target: '.control-tabs, .controls-content',
     title: '🎼 Melody Controls',
     description: 'Difficulty (easiest to hard), tempo, root note constraints, and vocal range calibration. Control how melodies are generated.',
@@ -233,7 +237,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     controlsTab: 'melody'
   },
   {
-    id: '5.2',
+    id: '6.2',
     target: '.control-tabs, .controls-content',
     title: '🥁 Rhythm Controls',
     description: 'Choose from 9 drum patterns across 3 styles: Classic, Lofi Chill, Bossa Vibe, and Percussion Only. Find a groove that works for you.',
@@ -244,7 +248,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     controlsTab: 'rhythm'
   },
   {
-    id: '5.3',
+    id: '6.3',
     target: '.control-tabs, .controls-content',
     title: '🎚️ Mixer Controls',
     description: 'Adjust volume for vocals, drums, drone, metronome, training synth, and master output. Add reverb for space. Create your perfect mix.',
@@ -255,7 +259,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     controlsTab: 'mixer'
   },
   {
-    id: '5.4',
+    id: '6.4',
     target: '.control-tabs, .controls-content',
     title: '🔧 Advanced Modes',
     description: 'Pitch Guide, Inverse Mode (hear then sing), Blind Mode (hide visuals during listen). Experiment with these!',
@@ -265,12 +269,12 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     openControls: true,
     controlsTab: 'more'
   },
-  // NEW: Step 5.5 - Pro Tip for Inverse + Blind Mode  
+  // NEW: Step 6.5 - Pro Tip for Inverse + Blind Mode  
   {
-    id: '5.5',
-    target: '.control-tabs, .controls-content',
+    id: '6.5',
+    target: '.practice-controls',
     title: '💡 Pro Tip: Test Yourself!',
-    description: 'In the Melody tab, you will find Inverse Mode and Blind Mode buttons. Use them together to challenge yourself: You will hear the melody played twice by synth, then on the third time the scale degrees appear. Try to identify them before they are shown!',
+    description: 'In the Melody tab, you will find Inverse Mode and Blind Mode buttons under the play button. Use them together to challenge yourself: You will hear the melody played twice by synth, then on the third time the scale degrees appear. Try to identify them before they are shown!',
     fallbackTitle: '⚠️ Please Open Controls First',
     combinedTarget: true,
     fallbackDescription: 'To see this pro tip, please open the Controls panel. The buttons are in the Melody tab. Then click "Next" to continue the tutorial.',
@@ -300,7 +304,7 @@ export default function GuidedTutorial({ onComplete, onTabChange, onControlsOpen
   useEffect(() => {
     const completed = localStorage.getItem('tutorial-completed');
     if (!completed) {
-      setTimeout(() => setIsActive(true), 1000);
+      // setTimeout(() => setIsActive(true), 1000);
     }
   }, []);
 

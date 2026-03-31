@@ -90,15 +90,15 @@ export default function Header({
           onClick={() => handleTabChange("random")}
           title="Random Mode: Freeform practice with full control over scale degrees"
         >
-          Random
+          Melody
         </button>
-        <button 
+        {/* <button 
           className={`tab-btn ${activeTab === 'training' ? 'active' : ''}`} 
           onClick={() => handleTabChange("training")}
           title="Training Mode: Structured curriculum with progressive levels"
         >
           Training
-        </button>
+        </button> */}
         <button 
           className={`tab-btn ${activeTab === 'fretboard' ? 'active' : ''}`} 
           onClick={() => handleTabChange("fretboard")}
