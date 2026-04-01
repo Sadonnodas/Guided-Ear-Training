@@ -24,9 +24,35 @@ type PlaybackHandlers = {
   onPlay: () => void;
   onPause: () => void;
   onNext?: () => void;
+  onAudioInterrupted?: () => void;
 };
 
 let activeHandlers: PlaybackHandlers | null = null;
+
+/**
+ * Resumes the audio context after an interruption (e.g. phone call).
+ * Must be called from a user gesture to work on iOS.
+ */
+async function tryResumeAudio() {
+  if (!keepAliveInterval) return; // Only when session is active
+  const ctx = Tone.context.rawContext as AudioContext;
+  if (ctx.state !== 'running') {
+    try {
+      await ctx.resume();
+      if (audioEl && audioEl.paused) {
+        await audioEl.play();
+      }
+      // Notify session so it can pause cleanly — Transport time may have drifted
+      activeHandlers?.onAudioInterrupted?.();
+    } catch (e) { /* requires user gesture - will retry on next interaction */ }
+  }
+}
+
+function handleVisibilityChange() {
+  if (!document.hidden) {
+    tryResumeAudio();
+  }
+}
 
 /**
  * Initialize the background audio system.
@@ -35,7 +61,7 @@ let activeHandlers: PlaybackHandlers | null = null;
  */
 export function initKeepAlive(handlers: PlaybackHandlers) {
   activeHandlers = handlers;
-  
+
   if (isInitialized) return;
 
   // Create the silent audio element
@@ -73,6 +99,11 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
 
   // Setup MediaSession for lock screen controls
   setupMediaSession();
+
+  // Resume audio context after interruptions (e.g. phone calls) on mobile
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  document.addEventListener('touchstart', tryResumeAudio, { capture: true, passive: true });
+  document.addEventListener('click', tryResumeAudio, { capture: true });
 
   isInitialized = true;
 }
@@ -308,6 +339,10 @@ export function resetKeepAlive() {
     audioEl = null;
   }
   
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  document.removeEventListener('touchstart', tryResumeAudio, { capture: true });
+  document.removeEventListener('click', tryResumeAudio, { capture: true });
+
   isInitialized = false;
   isBridgeConnected = false;
   activeHandlers = null;

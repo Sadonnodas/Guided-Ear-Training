@@ -53,11 +53,8 @@ export default function Header({
       }
   };
 
-  // NEW: Handle scale type change - stop if playing in fretboard mode
+  // Handle scale type change - stop the session if playing
   const handleScaleTypeChange = (newScaleType: ScaleType) => {
-    if (activeTab === 'fretboard' && isPlaying && stopSession) {
-      stopSession();
-    }
     handleScaleChange(newScaleType);
   };
 

@@ -130,6 +130,7 @@ export function useSessionLogic() {
       onPlay:  () => resumeFromMediaSession(),
       onPause: () => pauseSession(),
       onNext:  () => { if (isPlayingRef.current) runCycle(currentKeyRef.current, false); },
+      onAudioInterrupted: () => { if (isPlayingRef.current) pauseSession(); },
     });
   }, [resumeFromMediaSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -217,8 +218,7 @@ export function useSessionLogic() {
     }
 
     if (isPlaying) {
-      audioEngine.softReset();
-      runCycle(newKey, true);
+      stopSession();
     }
   };
 
