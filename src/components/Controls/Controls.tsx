@@ -4,6 +4,8 @@ import type { MelodyDifficulty } from '../../types';
 import VoiceRangeControl from '../VoiceRangeControl/VoiceRangeControl';
 import { calibrateVocalRange } from '../VoiceRangeControl/PitchDetector';
 import './Controls.css';
+import Tooltip from '../Tooltip/Tooltip';
+import { useTooltip } from '../../hooks/useTooltip';
 
 // --- ICONS ---
 const PlayIcon = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
@@ -76,6 +78,22 @@ export default function Controls(props: ControlsProps) {
   const [activeControlTab, setActiveControlTab] = useState<ControlTab>('melody');
   const [animate, setAnimate] = useState(false);
   const [showTutorialButton, setShowTutorialButton] = useState(false);
+
+  const {
+    isTooltipVisible: isPlayButtonTooltipVisible,
+    tooltipContent: playButtonTooltipContent,
+    ...playButtonTooltipProps
+  } = useTooltip({
+    tooltipText: props.isPlaying ? "Pause session" : "Start practice session",
+  });
+
+  const {
+    isTooltipVisible: isStopButtonTooltipVisible,
+    tooltipContent: stopButtonTooltipContent,
+    ...stopButtonTooltipProps
+  } = useTooltip({
+    tooltipText: "Stop and restart session",
+  });
 
   const isTrainingMode = props.activeTab === 'training';
 
@@ -155,25 +173,27 @@ export default function Controls(props: ControlsProps) {
   return (
     <>
       <div className="play-btn-container">
-        <button 
-          className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
-          onClick={handlePlayToggle}
-          style={{ "--beat-dur": `${beatDuration}s` } as React.CSSProperties}
-          title={props.isPlaying ? "Pause session" : "Start practice session"}
-        >
-          {props.isPlaying ? <PauseIcon /> : <PlayIcon />}
-        </button>
+        <div {...playButtonTooltipProps} style={{position: 'relative'}}>
+          <button 
+            className={`play-btn ${props.isPlaying ? 'playing' : ''} ${animate ? 'pulse-beat' : ''}`} 
+            onClick={handlePlayToggle}
+            style={{ "--beat-dur": `${beatDuration}s` } as React.CSSProperties}
+          >
+            {props.isPlaying ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          {isPlayButtonTooltipVisible && <Tooltip text={playButtonTooltipContent} />}
+        </div>
 
         <div 
           className={`stop-mini-btn ${props.isPlaying || props.isPaused ? 'visible' : ''}`} 
           onClick={handleStop}
-          title="Stop and restart session"
+          {...stopButtonTooltipProps}
         >
           <StopIcon />
           <span className="mini-label">RESTART</span>
+          {isStopButtonTooltipVisible && <Tooltip text={stopButtonTooltipContent} />}
         </div>
       </div>
-
       <div className="practice-controls">
         {showPitchGuideAndInverse && (
           <div 
@@ -195,7 +215,7 @@ export default function Controls(props: ControlsProps) {
           <div 
             className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
             onClick={() => props.setInverseMode(!props.inverseMode)} 
-            title="Inverse Mode: Listen first, then sing the melody back"
+            title="Inverse Mode: Test your scale degree recognition by identifying the melody before the 3rd repetition."
           >
             <InverseIcon />
           </div>
