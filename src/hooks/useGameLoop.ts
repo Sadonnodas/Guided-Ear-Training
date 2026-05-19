@@ -36,7 +36,8 @@ export interface GameLoopDeps {
       difficulty: React.MutableRefObject<MelodyDifficulty>;
       startRoot: React.MutableRefObject<boolean>;
       endRoot: React.MutableRefObject<boolean>;
-      includeDiminished: React.MutableRefObject<boolean>;
+      includeSevenths: React.MutableRefObject<boolean>;
+      enabledInversions: React.MutableRefObject<number[]>;
       minVocalMidi: React.MutableRefObject<number>;
       maxVocalMidi: React.MutableRefObject<number>;
       silentPractice: React.MutableRefObject<boolean>;

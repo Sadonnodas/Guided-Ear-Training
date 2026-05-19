@@ -82,11 +82,24 @@ export function getNoteForDegree(
         return withinRange && jumpDist <= jumpLimit;
     });
 
-    // STEP 2: If we have valid candidates, prefer the closest one
+    // STEP 2: Choose among valid candidates, biased by difficulty.
+    // The candidates are sorted closest-first; easier difficulties favour the
+    // closest note (small steps), harder difficulties favour the larger leaps.
+    // Without this bias, every difficulty just picked the closest note and the
+    // higher jump limits were never actually exercised.
     if (valid.length > 0) {
-      // Sort by distance from previous note (closest first)
       valid.sort((a, b) => Math.abs(a - previousMidi) - Math.abs(b - previousMidi));
-      targetMidi = valid[0];
+
+      // Exponent < 1 skews the pick toward larger jumps, > 1 toward smaller.
+      const biasExp =
+        difficulty === "easiest" ? 4.0 :
+        difficulty === "easy"    ? 2.2 :
+        difficulty === "hard"    ? 0.45 :
+        1.0; // normal — roughly uniform across the valid range
+
+      const skewed = Math.pow(Math.random(), biasExp);
+      const idx = Math.min(valid.length - 1, Math.floor(skewed * valid.length));
+      targetMidi = valid[idx];
     } else {
       // STEP 3: NO VALID CANDIDATES
       // This means we cannot play this degree without violating difficulty rules

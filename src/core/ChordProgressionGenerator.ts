@@ -1,4 +1,4 @@
-import type { MusicalKey, ScaleType, ScaleDegree, MelodyDifficulty } from "../types";
+import type { MusicalKey, ScaleType, ScaleDegree } from "../types";
 
 export interface ChordInfo {
   roman: string; // Roman numeral (I, ii, V7, etc.)
@@ -6,6 +6,7 @@ export interface ChordInfo {
   quality: 'major' | 'minor' | 'diminished' | 'augmented';
   seventh?: boolean; // Include 7th?
   intervals: number[]; // Semitones from root [0, 4, 7] for major triad
+  inversion?: number; // 0 = root position, 1 = 1st inversion, 2 = 2nd inversion
 }
 
 export interface ChordProgression {
@@ -46,24 +47,35 @@ const MINOR_CHORDS: Partial<Record<ScaleDegree, ChordInfo>> = {
   "b7": { roman: "♭VII", degree: "b7", quality: 'major', intervals: [0, 4, 7] }
 };
 
-// 7th chord intervals
-const SEVENTH_INTERVALS: Record<string, number> = {
-  'major': 11,      // Major 7th
-  'minor': 10,      // Minor 7th (dominant 7th for major chords)
-  'diminished': 9,  // Diminished 7th
-};
+// Scale degree order used to compute diatonic 7ths
+const MAJOR_SCALE_ORDER: ScaleDegree[] = ["1", "2", "3", "4", "5", "6", "7"];
+const MINOR_SCALE_ORDER: ScaleDegree[] = ["1", "2", "b3", "4", "5", "b6", "b7"];
+
+/**
+ * Compute the diatonic 7th interval (semitones above the chord root) for a
+ * chord built on the given scale degree. This produces theoretically correct
+ * 7ths: IM7/IVM7 get a major 7th, V7 a dominant 7th, ii7/vi7 a minor 7th, etc.
+ */
+function getDiatonicSeventhInterval(degree: ScaleDegree, scaleOrder: ScaleDegree[]): number {
+  const i = scaleOrder.indexOf(degree);
+  if (i === -1) return 10; // Fallback: minor 7th
+  const seventhDegree = scaleOrder[(i + 6) % scaleOrder.length];
+  const rootSt = DEGREE_TO_SEMITONE[degree];
+  const seventhSt = DEGREE_TO_SEMITONE[seventhDegree];
+  return ((seventhSt - rootSt) % 12 + 12) % 12;
+}
 
 interface GeneratorOptions {
   key: MusicalKey;
   scaleType: ScaleType;
-  difficulty: MelodyDifficulty;
   startOnOne: boolean;
   endOnOne: boolean;
-  includeDiminished: boolean;
+  includeSevenths: boolean;       // Add diatonic 7ths to every chord
+  enabledInversions: number[];    // Allowed inversions (0 = root, 1 = 1st, 2 = 2nd)
   minMidi: number;
   maxMidi: number;
-  enabledDegrees?: ScaleDegree[]; // NEW: Only use these degrees
-  focusedDegrees?: ScaleDegree[];  // NEW: Always include these degrees
+  enabledDegrees?: ScaleDegree[]; // Only use these degrees
+  focusedDegrees?: ScaleDegree[]; // Always include these degrees
 }
 
 /**
@@ -96,23 +108,18 @@ export function generateModulationProgression(
  * Generate a chord progression based on constraints
  */
 export function generateChordProgression(options: GeneratorOptions): ChordProgression {
-  const { 
-    key, scaleType, difficulty, startOnOne, endOnOne, includeDiminished, 
-    minMidi, maxMidi, enabledDegrees, focusedDegrees 
+  const {
+    key, scaleType, startOnOne, endOnOne, includeSevenths, enabledInversions,
+    minMidi, maxMidi, enabledDegrees, focusedDegrees
   } = options;
-  
+
   const chordSet = scaleType === 'Minor' ? MINOR_CHORDS : MAJOR_CHORDS;
-  
-  // Get available chord degrees (filter out diminished if not included)
+
+  // Get all chord degrees for this scale. Which degrees are actually used
+  // (including the diminished chord) is controlled entirely by enabledDegrees.
   let availableDegrees = Object.keys(chordSet).filter(d => chordSet[d as ScaleDegree] !== undefined) as ScaleDegree[];
-  if (!includeDiminished) {
-    availableDegrees = availableDegrees.filter(d => {
-      const chord = chordSet[d];
-      return chord && chord.quality !== 'diminished';
-    });
-  }
-  
-  // NEW: Apply enabled degrees filter (if provided)
+
+  // Apply enabled degrees filter (if provided)
   if (enabledDegrees && enabledDegrees.length > 0) {
     availableDegrees = availableDegrees.filter(d => enabledDegrees.includes(d));
   }
@@ -213,34 +220,41 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
     progression.push(getChord(randomDegree));
   }
   
-  // Apply 7th chords based on difficulty
-  if (difficulty === 'hard') {
+  // Apply 7th chords when enabled — diatonic 7ths added to EVERY chord so the
+  // progression is consistent (no random per-chord variation).
+  if (includeSevenths) {
+    const scaleOrder = scaleType === 'Minor' ? MINOR_SCALE_ORDER : MAJOR_SCALE_ORDER;
     progression.forEach((chord: ChordInfo) => {
-      // Add 7ths to some chords (50% chance for variety)
-      if (Math.random() > 0.5 && chord.quality !== 'diminished') {
-        chord.seventh = true;
-        chord.roman = chord.roman + '7';
-        const seventhInterval = chord.quality === 'major' 
-          ? SEVENTH_INTERVALS['minor'] // Dominant 7th for major chords (V7)
-          : SEVENTH_INTERVALS['minor']; // Minor 7th for minor chords
-        chord.intervals = [...chord.intervals, seventhInterval];
-      }
+      chord.seventh = true;
+      const seventhInterval = getDiatonicSeventhInterval(chord.degree, scaleOrder);
+      chord.intervals = [...chord.intervals, seventhInterval];
     });
   }
-  
+
+  // Assign each chord a voicing (inversion) picked from the enabled set.
+  const inversions = (enabledInversions && enabledInversions.length > 0) ? enabledInversions : [0];
+  progression.forEach((chord: ChordInfo) => {
+    chord.inversion = inversions[Math.floor(Math.random() * inversions.length)];
+  });
+
   return { chords: progression, key };
 }
 
 /**
- * Calculate MIDI notes for a chord, respecting vocal range for piano root
- * Returns { bass: number (one octave below piano root), triad: number[] }
+ * Calculate MIDI notes for a chord.
+ * Returns:
+ *   bass  - the inversion's bass note (root / 3rd / 5th), placed in the bass
+ *           register — this is what makes an inversion an inversion
+ *   root  - the chord root in vocal range, for the vocal sample + visualizer
+ *           (unaffected by inversion or voicing)
+ *   triad - the piano voicing (rootless for 7th chords — see below)
  */
 export function getChordMidiNotes(
   chord: ChordInfo,
   key: MusicalKey,
   minMidi: number,
   maxMidi: number
-): { bass: number; triad: number[] } {
+): { bass: number; root: number; triad: number[] } {
   const rootMidi = ROOT_MIDI[key];
   const degreeInterval = DEGREE_TO_SEMITONE[chord.degree];
   const baseRoot = rootMidi + degreeInterval;
@@ -267,11 +281,36 @@ export function getChordMidiNotes(
     pianoRoot = Math.max(minMidi, Math.min(maxMidi, baseRoot));
   }
   
-  // Bass is one octave below piano root
-  const bassNote = pianoRoot - 12;
-  
-  // Build triad from piano root
-  const triad = chord.intervals.map(interval => pianoRoot + interval);
-  
-  return { bass: bassNote, triad };
+  const root = pianoRoot;
+
+  // Which chord tone is in the bass, decided by the inversion:
+  //   0 = root position, 1 = 3rd in the bass, 2 = 5th in the bass.
+  const inversion = chord.inversion ?? 0;
+  const bassInterval = chord.intervals[Math.min(inversion, chord.intervals.length - 1)] ?? 0;
+
+  // Piano voicing intervals (relative to the chord root):
+  //  - 7th chords are voiced ROOTLESS: the piano plays every chord tone
+  //    except the one the bass is covering. In root position that's the
+  //    classic 3-5-7 voicing; in an inversion the piano supplies the root
+  //    so the chord still sounds complete.
+  //  - triads keep the full root-3rd-5th (the bass just doubles one tone).
+  const pianoIntervals = chord.seventh
+    ? chord.intervals.filter(iv => iv !== bassInterval)
+    : [...chord.intervals];
+
+  // Place the piano voicing in a register that fits the sample range AND
+  // always leaves room for the bass note underneath it.
+  const PIANO_MIN = 48;
+  const PIANO_MAX = 67;
+  let voiced = pianoIntervals.map(iv => root + iv);
+  while (Math.max(...voiced) > PIANO_MAX) voiced = voiced.map(n => n - 12);
+  while (Math.min(...voiced) < PIANO_MIN) voiced = voiced.map(n => n + 12);
+
+  // Bass plays the inversion's bass note, kept clearly below the piano voicing.
+  const pianoMin = Math.min(...voiced);
+  let bassNote = root + bassInterval;
+  while (bassNote > pianoMin - 5) bassNote -= 12;
+  while (bassNote < 28) bassNote += 12;
+
+  return { bass: bassNote, root, triad: voiced };
 }

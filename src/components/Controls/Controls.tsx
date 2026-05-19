@@ -28,6 +28,12 @@ const MoreIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 
 const TEMPOS = [60, 80, 100, 120, 150];
 
+const INVERSION_OPTIONS: { value: number; label: string; title: string }[] = [
+  { value: 0, label: 'Root',     title: 'Root position: chord notes played in their natural order' },
+  { value: 1, label: '1st Inv.', title: '1st inversion: the chord 3rd becomes the lowest piano note' },
+  { value: 2, label: '2nd Inv.', title: '2nd inversion: the chord 5th becomes the lowest piano note' },
+];
+
 type ControlTab = 'melody' | 'rhythm' | 'mixer' | 'more';
 
 interface ControlsProps {
@@ -63,8 +69,10 @@ interface ControlsProps {
   setPattern: (name: string) => void;
   hideFretboardVisuals: boolean;
   setHideFretboardVisuals: (v: boolean) => void;
-  includeDiminished: boolean;  // ADD THIS LINE
-  setIncludeDiminished: (v: boolean) => void;
+  includeSevenths: boolean;
+  setIncludeSevenths: (v: boolean) => void;
+  enabledInversions: number[];
+  setEnabledInversions: (v: number[]) => void;
   activeTab: string;
   
   minVocalMidi: number;
@@ -134,6 +142,17 @@ export default function Controls(props: ControlsProps) {
   const adjustQuestions = (delta: number) => {
     const newVal = Math.max(1, Math.min(50, props.questionsPerKey + delta));
     props.setQuestionsPerKey(newVal);
+  };
+
+  // Toggle a chord inversion on/off — at least one must stay selected.
+  const toggleInversion = (inv: number) => {
+    if (props.enabledInversions.includes(inv)) {
+      if (props.enabledInversions.length > 1) {
+        props.setEnabledInversions(props.enabledInversions.filter(x => x !== inv));
+      }
+    } else {
+      props.setEnabledInversions([...props.enabledInversions, inv].sort((a, b) => a - b));
+    }
   };
 
   const handleAutoCalibrate = async () => {
@@ -381,20 +400,39 @@ export default function Controls(props: ControlsProps) {
                     End on 1
                   </div>
                   
-                  {/* Include Diminished - Only for Progressions Mode */}
-                  {props.activeTab === 'progressions' && (
-                    <div 
-                      className={`icon-toggle-btn ${props.includeDiminished ? 'active' : ''}`} 
-                      onClick={() => props.setIncludeDiminished(!props.includeDiminished)}
-                      title="Include Diminished: Add viiº (Major) or iiº (Minor) chords to progressions"
-                    >
-                      {props.includeDiminished ? '✓' : '✕'}
-                    </div>
-                  )}
                 </div>
               </div>
-                
-              
+
+              {/* Chord voicing options — Progressions Mode only */}
+              {props.activeTab === 'progressions' && (
+                <div className="control-section">
+                  <h3 className="section-title">Chords</h3>
+                  <div className="toggle-grid-sleek">
+                    <div
+                      className={`toggle-pill-btn ${props.includeSevenths ? 'active' : ''}`}
+                      onClick={() => props.setIncludeSevenths(!props.includeSevenths)}
+                      title="7th Chords: Add diatonic 7ths to every chord in the progression"
+                    >
+                      7th Chords
+                    </div>
+                  </div>
+                  <div className="section-subtitle">Inversions</div>
+                  <div className="toggle-grid-sleek">
+                    {INVERSION_OPTIONS.map(opt => (
+                      <div
+                        key={opt.value}
+                        className={`toggle-pill-btn ${props.enabledInversions.includes(opt.value) ? 'active' : ''}`}
+                        onClick={() => toggleInversion(opt.value)}
+                        title={opt.title}
+                      >
+                        {opt.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+
 
               <div className="control-section">
                 <h3 className="section-title">Repetition</h3>

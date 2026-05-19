@@ -27,6 +27,24 @@ import { KEYS, KEY_DISPLAY_MAP, TAB_DEFAULTS } from "./sessionConstants.ts";
 import type { ChordProgression } from "../core/ChordProgressionGenerator.ts";
 import type { MusicalKey, ScaleDegree, ScaleType } from "../types.ts";
 
+// The scale degree whose chord is diminished, by scale type.
+const DIMINISHED_DEGREE: Partial<Record<ScaleType, ScaleDegree>> = {
+  Major: "7",
+  Minor: "2",
+};
+
+// Default enabled degrees for a scale + tab. In progressions mode the
+// diminished chord starts disabled (grayed out in the visualizer) — the
+// player taps it on, just like degrees in the melody tab.
+function getDefaultEnabledDegrees(type: ScaleType, tab: string): ScaleDegree[] {
+  const all = getAvailableDegrees(type);
+  if (tab === 'progressions') {
+    const dim = DIMINISHED_DEGREE[type];
+    if (dim) return all.filter(d => d !== dim);
+  }
+  return all;
+}
+
 export function useSessionLogic() {
   // ── Sub-hooks ────────────────────────────────────────────────────────────────
   const mixer    = useMixerLogic();
@@ -175,6 +193,16 @@ export function useSessionLogic() {
       settings.setHideFretboardVisuals(cached.hideFretboardVisuals);
     }
 
+    // Reset degree selection to the per-tab default (progressions hides the
+    // diminished chord by default; random enables every degree).
+    if (newTab === 'progressions' || newTab === 'random') {
+      const defaults = getDefaultEnabledDegrees(scaleType, newTab);
+      setEnabledDegrees(defaults);
+      enabledDegreesRef.current = defaults;
+      setFocusedDegrees([]);
+      focusedDegreesRef.current = [];
+    }
+
     if (newTab === 'training') {
       training.resetTraining();
       lastPlayedStageIndex.current   = -1;
@@ -200,7 +228,7 @@ export function useSessionLogic() {
     }
 
     setScaleType(type);
-    const defaults = getAvailableDegrees(type);
+    const defaults = getDefaultEnabledDegrees(type, activeTab);
     setEnabledDegrees(defaults);
     enabledDegreesRef.current = defaults;
     setFocusedDegrees([]);

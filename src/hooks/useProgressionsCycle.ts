@@ -7,7 +7,7 @@ import {
   type ChordProgression,
 } from "../core/ChordProgressionGenerator.ts";
 import { LATENCY_OFFSET } from "../config/AudioConfig.ts";
-import type { MusicalKey, ScaleDegree, ScaleType, MelodyDifficulty } from "../types.ts";
+import type { MusicalKey, ScaleDegree, ScaleType } from "../types.ts";
 import { KEYS, KEY_DISPLAY_MAP } from "./sessionConstants.ts";
 
 export interface ProgressionsCycleDeps {
@@ -19,10 +19,10 @@ export interface ProgressionsCycleDeps {
     refs: {
       bpm: React.MutableRefObject<number>;
       questionsPerKey: React.MutableRefObject<number>;
-      difficulty: React.MutableRefObject<MelodyDifficulty>;
       startRoot: React.MutableRefObject<boolean>;
       endRoot: React.MutableRefObject<boolean>;
-      includeDiminished: React.MutableRefObject<boolean>;
+      includeSevenths: React.MutableRefObject<boolean>;
+      enabledInversions: React.MutableRefObject<number[]>;
       minVocalMidi: React.MutableRefObject<number>;
       maxVocalMidi: React.MutableRefObject<number>;
     };
@@ -88,10 +88,10 @@ export async function runProgressionsCycle(
     progression = generateChordProgression({
       key: cycleKey,
       scaleType: scaleTypeRef.current,
-      difficulty: settings.refs.difficulty.current,
       startOnOne: settings.refs.startRoot.current,
       endOnOne: settings.refs.endRoot.current,
-      includeDiminished: settings.refs.includeDiminished.current,
+      includeSevenths: settings.refs.includeSevenths.current,
+      enabledInversions: settings.refs.enabledInversions.current,
       minMidi: settings.refs.minVocalMidi.current,
       maxMidi: settings.refs.maxVocalMidi.current,
       enabledDegrees: enabledDegreesRef.current,
@@ -119,12 +119,12 @@ export async function runProgressionsCycle(
 
   // Preload vocal samples for Sing Along pass
   const vocalNoteEvents = progression.chords.map(chord => {
-    const { triad } = getChordMidiNotes(
+    const { root } = getChordMidiNotes(
       chord, cycleKey,
       settings.refs.minVocalMidi.current,
       settings.refs.maxVocalMidi.current
     );
-    const pianoRoot = triad[0];
+    const pianoRoot = root;
     return {
       noteInfo: {
         degree: chord.degree,
@@ -155,7 +155,7 @@ export async function runProgressionsCycle(
     let beat = 0;
     progression.chords.forEach((chord, index) => {
       const chordTime = passStartTime + beat * beatSec;
-      const { bass, triad } = getChordMidiNotes(
+      const { bass, root, triad } = getChordMidiNotes(
         chord, cycleKey,
         settings.refs.minVocalMidi.current,
         settings.refs.maxVocalMidi.current
@@ -165,7 +165,7 @@ export async function runProgressionsCycle(
         audioEngine.playChord(bass, triad, time);
 
         if (playVocals) {
-          const pianoRoot = triad[0];
+          const pianoRoot = root;
           const latency = LATENCY_OFFSET[chord.degree] || 0;
           (audioEngine as any).playMelodyNote(
             {
@@ -186,7 +186,7 @@ export async function runProgressionsCycle(
         Tone.Draw.schedule(() => {
           if (!document.hidden) {
             setActiveChordIndex(index);
-            setActiveRootMidi(triad[0]);
+            setActiveRootMidi(root);
           }
         }, time);
       }, chordTime);

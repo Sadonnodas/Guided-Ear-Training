@@ -50,7 +50,54 @@ function isDegreePlayableInRange(
   return false; // No octaves of this degree fit in range
 }
 
+// Minimum number of melodic leaps (a minor 3rd or larger) a melody should
+// contain at each difficulty. Higher difficulties demand more leaps so "hard"
+// reliably produces harder melodies, not just a higher interval ceiling.
+const MIN_LEAPS: Record<MelodyDifficulty, number> = {
+  easiest: 0,
+  easy: 1,
+  normal: 1,
+  hard: 2,
+};
+
+const LEAP_SEMITONES = 3; // A minor 3rd or larger counts as a leap.
+
+function countLeaps(melody: NoteEvent[]): number {
+  let leaps = 0;
+  for (let i = 1; i < melody.length; i++) {
+    if (Math.abs(melody[i].noteInfo.midi - melody[i - 1].noteInfo.midi) >= LEAP_SEMITONES) {
+      leaps++;
+    }
+  }
+  return leaps;
+}
+
+/**
+ * Generate a melody, retrying until it has enough leaps for the chosen
+ * difficulty. Generation is cheap (4 notes), so a few attempts cost nothing;
+ * if the range is too narrow to ever hit the target we keep the leapiest
+ * attempt instead of looping forever.
+ */
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
+  const difficulty = options.constraints.difficulty || "normal";
+  const minLeaps = MIN_LEAPS[difficulty] ?? 0;
+
+  let best: NoteEvent[] = [];
+  let bestLeaps = -1;
+
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const melody = buildMelody(options);
+    const leaps = countLeaps(melody);
+    if (leaps >= minLeaps) return melody;
+    if (leaps > bestLeaps) {
+      bestLeaps = leaps;
+      best = melody;
+    }
+  }
+  return best;
+}
+
+function buildMelody(options: GeneratorOptions): NoteEvent[] {
   const { key, scaleType, constraints } = options;
   const { allowedDegrees, focusedDegrees, startDegree, endDegree, length } = constraints;
   

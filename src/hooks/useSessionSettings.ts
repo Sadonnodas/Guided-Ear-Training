@@ -16,7 +16,9 @@ export function useSessionSettings() {
   const [difficulty, setDifficulty] = useState<MelodyDifficulty>("easy");
   const [selectedShape, setSelectedShape] = useState<CagedShape>("E");
   const [hideFretboardVisuals, setHideFretboardVisuals] = useState(false);
-  const [includeDiminished, setIncludeDiminished] = useState(false); // NEW: For progressions mode
+  // Progressions mode: 7th chords toggle + allowed chord inversions (0=root, 1=1st, 2=2nd)
+  const [includeSevenths, setIncludeSevenths] = useState(false);
+  const [enabledInversions, setEnabledInversions] = useState<number[]>([0]);
   
   // NEW: Vocal Range State
   const [minVocalMidi, setMinVocalMidi] = useState(43); // G2 - default vocal range min
@@ -34,7 +36,8 @@ export function useSessionSettings() {
     difficulty: useRef(difficulty),
     selectedShape: useRef(selectedShape),
     hideFretboardVisuals: useRef(hideFretboardVisuals),
-    includeDiminished: useRef(includeDiminished), // NEW
+    includeSevenths: useRef(includeSevenths),
+    enabledInversions: useRef(enabledInversions),
     minVocalMidi: useRef(minVocalMidi), // NEW
     maxVocalMidi: useRef(maxVocalMidi), // NEW
   };
@@ -50,7 +53,8 @@ export function useSessionSettings() {
   useEffect(() => { refs.difficulty.current = difficulty; }, [difficulty]);
   useEffect(() => { refs.selectedShape.current = selectedShape; }, [selectedShape]);
   useEffect(() => { refs.hideFretboardVisuals.current = hideFretboardVisuals; }, [hideFretboardVisuals]);
-  useEffect(() => { refs.includeDiminished.current = includeDiminished; }, [includeDiminished]); // NEW
+  useEffect(() => { refs.includeSevenths.current = includeSevenths; }, [includeSevenths]);
+  useEffect(() => { refs.enabledInversions.current = enabledInversions; }, [enabledInversions]);
   useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]); // NEW
   useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]); // NEW
 
@@ -63,13 +67,13 @@ export function useSessionSettings() {
     // Values
     bpm, currentPattern, startRoot, endRoot, silentPractice, 
     trainingWheels, inverseMode, questionsPerKey, difficulty,
-    selectedShape, hideFretboardVisuals, includeDiminished, // NEW: includeDiminished
+    selectedShape, hideFretboardVisuals, includeSevenths, enabledInversions,
     minVocalMidi, maxVocalMidi, // NEW
-    
+
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
-    setSelectedShape, setHideFretboardVisuals, setIncludeDiminished, // NEW: setIncludeDiminished
+    setSelectedShape, setHideFretboardVisuals, setIncludeSevenths, setEnabledInversions,
     setMinVocalMidi, setMaxVocalMidi, // NEW
     
     // Refs (Expose these to the game loop)

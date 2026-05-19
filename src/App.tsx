@@ -143,6 +143,7 @@ export default function App() {
             toggleDegree={session.toggleDegree}
             focusedDegrees={session.focusedDegrees}
             toggleFocus={session.toggleFocus}
+            includeSevenths={session.includeSevenths}
           />
         ) : session.activeTab === 'fretboard' ? (
           <FretboardVisualizer 
@@ -215,8 +216,10 @@ export default function App() {
             toggleMute={toggleMute}
             hideFretboardVisuals={session.hideFretboardVisuals}
             setHideFretboardVisuals={session.setHideFretboardVisuals}
-            includeDiminished={session.includeDiminished}
-            setIncludeDiminished={session.setIncludeDiminished}
+            includeSevenths={session.includeSevenths}
+            setIncludeSevenths={session.setIncludeSevenths}
+            enabledInversions={session.enabledInversions}
+            setEnabledInversions={session.setEnabledInversions}
             activeTab={session.activeTab}
             minVocalMidi={session.minVocalMidi}
             maxVocalMidi={session.maxVocalMidi}

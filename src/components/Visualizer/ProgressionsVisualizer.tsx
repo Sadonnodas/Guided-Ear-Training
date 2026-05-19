@@ -89,6 +89,7 @@ interface ProgressionsVisualizerProps {
   toggleDegree: (d: ScaleDegree) => void;
   focusedDegrees: ScaleDegree[];
   toggleFocus: (d: ScaleDegree) => void;
+  includeSevenths: boolean;
 }
 
 export default function ProgressionsVisualizer({
@@ -103,7 +104,8 @@ export default function ProgressionsVisualizer({
   enabledDegrees,
   toggleDegree,
   focusedDegrees,
-  toggleFocus
+  toggleFocus,
+  includeSevenths
 }: ProgressionsVisualizerProps) {
   
   // Get all available degrees for this scale type
@@ -248,8 +250,11 @@ export default function ProgressionsVisualizer({
   };
   
   return (
-    <div className={`visualizer-container ${viewMode}`}>
-      {viewMode === 'tape' ? renderTape() : renderStatic()}
+    <div className="prog-visualizer">
+      {includeSevenths && <div className="sevenths-indicator">7th chords</div>}
+      <div className={`visualizer-container ${viewMode}`}>
+        {viewMode === 'tape' ? renderTape() : renderStatic()}
+      </div>
     </div>
   );
 }
