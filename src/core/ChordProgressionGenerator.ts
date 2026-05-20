@@ -7,6 +7,7 @@ export interface ChordInfo {
   seventh?: boolean; // Include 7th?
   intervals: number[]; // Semitones from root [0, 4, 7] for major triad
   inversion?: number; // 0 = root position, 1 = 1st inversion, 2 = 2nd inversion
+  pianoRoot?: number; // MIDI pitch of the chord root in vocal register, chosen with voice leading
 }
 
 export interface ChordProgression {
@@ -78,22 +79,70 @@ interface GeneratorOptions {
   focusedDegrees?: ScaleDegree[]; // Always include these degrees
 }
 
+// Vocal samples exist only from G2 to G4. The chord root is always sung by
+// the voice, so any pianoRoot we pick must fall within this range — even if
+// somehow the caller passes a wider range than the samples support.
+const VOCAL_SAMPLE_MIN = 43;
+const VOCAL_SAMPLE_MAX = 67;
+
+/**
+ * Pick a piano-root MIDI pitch for each chord in the progression.
+ * The first chord gets a random octave within the singable range so successive
+ * progressions don't all sit on identical pitches; subsequent chords use voice
+ * leading (pick the octave closest to the previous chord's root) so the line
+ * the voice sings is smooth and the visualizer doesn't jump octaves.
+ */
+function assignPianoRoots(
+  progression: ChordInfo[],
+  key: MusicalKey,
+  minMidi: number,
+  maxMidi: number
+): void {
+  // Always intersect the user's singable range with the actual sample range
+  // so the voice can never be asked to sing a root that has no sample.
+  const effMin = Math.max(minMidi, VOCAL_SAMPLE_MIN);
+  const effMax = Math.min(maxMidi, VOCAL_SAMPLE_MAX);
+
+  let prev: number | null = null;
+  progression.forEach((chord, idx) => {
+    const baseRoot = ROOT_MIDI[key] + DEGREE_TO_SEMITONE[chord.degree];
+    const candidates: number[] = [];
+    for (let o = -48; o <= 48; o += 12) {
+      const c = baseRoot + o;
+      if (c >= effMin && c <= effMax) candidates.push(c);
+    }
+    if (candidates.length === 0) {
+      // No octave of this root fits — clamp into the sample range so the
+      // vocal sample still exists (it will just be the nearest singable note).
+      chord.pianoRoot = Math.max(VOCAL_SAMPLE_MIN, Math.min(VOCAL_SAMPLE_MAX, baseRoot));
+    } else if (idx === 0 || prev === null) {
+      chord.pianoRoot = candidates[Math.floor(Math.random() * candidates.length)];
+    } else {
+      candidates.sort((a, b) => Math.abs(a - prev!) - Math.abs(b - prev!));
+      chord.pianoRoot = candidates[0];
+    }
+    prev = chord.pianoRoot;
+  });
+}
+
 /**
  * Generate a modulation progression: I - III - V - I
  */
 export function generateModulationProgression(
   key: MusicalKey,
-  scaleType: ScaleType
+  scaleType: ScaleType,
+  minMidi: number,
+  maxMidi: number
 ): ChordProgression {
   const chordSet = scaleType === 'Minor' ? MINOR_CHORDS : MAJOR_CHORDS;
-  
+
   // Helper to get chord safely
   const getChord = (degree: ScaleDegree): ChordInfo => {
     const chord = chordSet[degree];
     if (!chord) throw new Error(`Chord not found for degree ${degree}`);
     return { ...chord };
   };
-  
+
   const chords: ChordInfo[] = [
     getChord("1"),
     getChord(scaleType === 'Minor' ? "b3" : "3"),
@@ -101,6 +150,7 @@ export function generateModulationProgression(
     getChord("1")
   ];
 
+  assignPianoRoots(chords, key, minMidi, maxMidi);
   return { chords, key };
 }
 
@@ -237,6 +287,9 @@ export function generateChordProgression(options: GeneratorOptions): ChordProgre
     chord.inversion = inversions[Math.floor(Math.random() * inversions.length)];
   });
 
+  // Pick the piano-root pitch for each chord with voice leading.
+  assignPianoRoots(progression, key, minMidi, maxMidi);
+
   return { chords: progression, key };
 }
 
@@ -258,27 +311,26 @@ export function getChordMidiNotes(
   const rootMidi = ROOT_MIDI[key];
   const degreeInterval = DEGREE_TO_SEMITONE[chord.degree];
   const baseRoot = rootMidi + degreeInterval;
-  
-  // Find best octave for piano root note within vocal range
-  let pianoRoot = baseRoot;
-  const candidates: number[] = [];
-  for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
-    candidates.push(baseRoot + octaveOffset);
-  }
-  
-  // Filter to vocal range
-  const validCandidates = candidates.filter(n => n >= minMidi && n <= maxMidi);
-  
-  if (validCandidates.length > 0) {
-    // Choose middle of range
-    validCandidates.sort((a, b) => {
-      const midRange = (minMidi + maxMidi) / 2;
-      return Math.abs(a - midRange) - Math.abs(b - midRange);
-    });
-    pianoRoot = validCandidates[0];
-  } else {
-    // Fallback: clamp to range
-    pianoRoot = Math.max(minMidi, Math.min(maxMidi, baseRoot));
+
+  // Honour the pianoRoot already chosen by the generator (voice-led, with a
+  // randomised first chord). Fall back to a sensible mid-range pick if the
+  // chord wasn't routed through the generator (e.g. ad-hoc test paths).
+  let pianoRoot = chord.pianoRoot ?? baseRoot;
+  if (chord.pianoRoot === undefined) {
+    const candidates: number[] = [];
+    for (let octaveOffset = -48; octaveOffset <= 48; octaveOffset += 12) {
+      candidates.push(baseRoot + octaveOffset);
+    }
+    const validCandidates = candidates.filter(n => n >= minMidi && n <= maxMidi);
+    if (validCandidates.length > 0) {
+      validCandidates.sort((a, b) => {
+        const midRange = (minMidi + maxMidi) / 2;
+        return Math.abs(a - midRange) - Math.abs(b - midRange);
+      });
+      pianoRoot = validCandidates[0];
+    } else {
+      pianoRoot = Math.max(minMidi, Math.min(maxMidi, baseRoot));
+    }
   }
   
   const root = pianoRoot;

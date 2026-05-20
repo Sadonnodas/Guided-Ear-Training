@@ -244,13 +244,21 @@ export class AudioEngine {
     
     let safeStartTime = startTime;
     const now = Tone.Transport.seconds;
-    
-    if (isFirst || safeStartTime === undefined || safeStartTime < now + 0.1) {
+    const beatLen = 60 / Tone.Transport.bpm.value;
+    const measureLen = beatLen * 4;
+
+    // Re-anchor when:
+    //   - first cycle, or no startTime provided
+    //   - startTime is in the past (preload took longer than the small lead)
+    //   - startTime is unreasonably far in the future (Tone.Transport.seconds
+    //     rescales when bpm changes mid-session, which can leave a startTime
+    //     from the previous bpm sitting several seconds ahead of "now" and
+    //     causing a long silent gap before the next cycle plays).
+    const tooFarAhead = safeStartTime !== undefined && safeStartTime > now + measureLen * 1.5;
+    if (isFirst || safeStartTime === undefined || safeStartTime < now + 0.1 || tooFarAhead) {
       if (isFirst && now < 0.1) {
-        safeStartTime = 0; 
+        safeStartTime = 0;
       } else {
-        const beatLen = 60 / Tone.Transport.bpm.value;
-        const measureLen = beatLen * 4;
         safeStartTime = Math.ceil(now / measureLen) * measureLen;
       }
     }

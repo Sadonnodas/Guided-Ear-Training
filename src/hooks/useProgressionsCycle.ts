@@ -82,7 +82,12 @@ export async function runProgressionsCycle(
   let progression: ChordProgression;
 
   if (forceSettle) {
-    progression = generateModulationProgression(cycleKey, scaleTypeRef.current);
+    progression = generateModulationProgression(
+      cycleKey,
+      scaleTypeRef.current,
+      settings.refs.minVocalMidi.current,
+      settings.refs.maxVocalMidi.current
+    );
     setStatus("New Key: I-III-V-I");
   } else {
     progression = generateChordProgression({

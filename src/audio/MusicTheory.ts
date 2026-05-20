@@ -117,12 +117,13 @@ export function getNoteForDegree(
     const validStart = startCandidates.filter(m => m >= minMidi && m <= maxMidi);
     
     if (validStart.length > 0) {
-        // Prefer middle of range for starting notes
-        validStart.sort((a, b) => {
-          const midRange = (minMidi + maxMidi) / 2;
-          return Math.abs(a - midRange) - Math.abs(b - midRange);
-        });
-        targetMidi = validStart[0];
+        // Pick a random octave inside the allowed range. Anchoring the start
+        // to the middle made melodies cluster there — over many cycles the
+        // extremes (e.g. high/low notes of a fretboard shape) would almost
+        // never appear. Randomising the start spreads coverage across the
+        // full range over time; voice-leading on subsequent notes still keeps
+        // each individual melody coherent.
+        targetMidi = validStart[Math.floor(Math.random() * validStart.length)];
     } else {
         // CRITICAL FIX: Clamp if no valid starting notes
         targetMidi = Math.max(minMidi, Math.min(maxMidi, targetMidi));
