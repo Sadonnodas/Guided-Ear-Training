@@ -1,7 +1,8 @@
 .vocal-range-section {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  /* No own border — the parent .control-section already supplies the
+     separator. Adding one here stacked a second line under "Melodies Per Key". */
 }
 
 .vocal-range-header {
