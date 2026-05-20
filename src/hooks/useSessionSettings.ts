@@ -19,6 +19,10 @@ export function useSessionSettings() {
   // Progressions mode: 7th chords toggle + allowed chord inversions (0=root, 1=1st, 2=2nd)
   const [includeSevenths, setIncludeSevenths] = useState(false);
   const [enabledInversions, setEnabledInversions] = useState<number[]>([0]);
+  // What instrument plays anywhere the synth would normally play (fretboard
+  // melodies, pitch guide, out-of-vocal-range fallback). Piano falls back to
+  // synth for notes outside the piano sample range (23-67).
+  const [playbackSound, setPlaybackSound] = useState<'synth' | 'piano'>('synth');
   
   // NEW: Vocal Range State
   const [minVocalMidi, setMinVocalMidi] = useState(43); // G2 - default vocal range min
@@ -38,6 +42,7 @@ export function useSessionSettings() {
     hideFretboardVisuals: useRef(hideFretboardVisuals),
     includeSevenths: useRef(includeSevenths),
     enabledInversions: useRef(enabledInversions),
+    playbackSound: useRef(playbackSound),
     minVocalMidi: useRef(minVocalMidi), // NEW
     maxVocalMidi: useRef(maxVocalMidi), // NEW
   };
@@ -55,6 +60,7 @@ export function useSessionSettings() {
   useEffect(() => { refs.hideFretboardVisuals.current = hideFretboardVisuals; }, [hideFretboardVisuals]);
   useEffect(() => { refs.includeSevenths.current = includeSevenths; }, [includeSevenths]);
   useEffect(() => { refs.enabledInversions.current = enabledInversions; }, [enabledInversions]);
+  useEffect(() => { refs.playbackSound.current = playbackSound; }, [playbackSound]);
   useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]); // NEW
   useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]); // NEW
 
@@ -68,12 +74,14 @@ export function useSessionSettings() {
     bpm, currentPattern, startRoot, endRoot, silentPractice, 
     trainingWheels, inverseMode, questionsPerKey, difficulty,
     selectedShape, hideFretboardVisuals, includeSevenths, enabledInversions,
+    playbackSound,
     minVocalMidi, maxVocalMidi, // NEW
 
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
     setSelectedShape, setHideFretboardVisuals, setIncludeSevenths, setEnabledInversions,
+    setPlaybackSound,
     setMinVocalMidi, setMaxVocalMidi, // NEW
     
     // Refs (Expose these to the game loop)

@@ -48,6 +48,11 @@ export class AudioEngine {
   // FIX #3 & #4: Track fretboard mode to force synth-only playback
   private isFretboardMode = false;
 
+  // Which instrument plays anywhere the synth would normally fire (fretboard
+  // melodies, pitch guide, out-of-vocal-range fallback). Falls back to synth
+  // automatically for notes outside the piano sample range (23-67).
+  private playbackSound: 'synth' | 'piano' = 'synth';
+
   public onNotePlay: ((note: NoteEvent | null, isClick?: boolean) => void) | null = null;
   public onBeat: ((beatNumber: number) => void) | null = null;
   public onStatusChange: ((text: string) => void) | null = null;
@@ -151,6 +156,35 @@ export class AudioEngine {
   }
 
   /**
+   * Choose which instrument replaces the synth in fretboard / pitch-guide /
+   * fallback contexts. 'piano' uses the piano samples (MIDI 23-80, B0 to
+   * G♯5 — covers the full CAGED fretboard range) and falls back to the
+   * synth for any note outside that range.
+   */
+  public setPlaybackSound(sound: 'synth' | 'piano') {
+    this.playbackSound = sound;
+  }
+
+  /**
+   * Play a note via the "non-vocal" path — piano sample if the user picked
+   * piano AND a sample exists for this MIDI, otherwise the training synth.
+   * Routes through trainingGain so the existing "Guide" volume slider works.
+   */
+  private playSynthOrPiano(note: NoteEvent, time: number) {
+    if (this.playbackSound === 'piano') {
+      const pianoBuffer = this.pianoBuffers.get(note.noteInfo.midi);
+      if (pianoBuffer) {
+        const source = new Tone.ToneBufferSource(pianoBuffer).connect(this.trainingGain);
+        source.start(Math.max(0, time));
+        return;
+      }
+      // No piano sample (e.g. note > 67 on the high E string) — fall through.
+    }
+    const shortDuration = note.duration * 0.75;
+    this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
+  }
+
+  /**
    * ENHANCED: Play a melody note with hybrid vocal/synth system
    * FIX #3 & #4: In fretboard mode, ALWAYS use synth (no vocal samples)
    * This eliminates the mixed vocal/synth issue and timing problems
@@ -158,36 +192,28 @@ export class AudioEngine {
   private playMelodyNote(note: NoteEvent, time: number, useSynth: boolean) {
     const midi = note.noteInfo.midi;
     const degree = note.noteInfo.degree;
-    
-    // FIX #3 & #4: Force synth in fretboard mode
+
+    // Fretboard mode: never uses vocal samples — always synth or piano.
     if (this.isFretboardMode) {
-      const shortDuration = note.duration * 0.75;
-      this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
+      this.playSynthOrPiano(note, time);
       return;
     }
-    
-    // HYBRID LOGIC for other modes: Check if we should use synth or vocal
+
+    // Hybrid logic for other modes: prefer vocal samples, fall back otherwise.
     const isOutsideVocalRange = midi < MIN_VOCAL_MIDI || midi > MAX_VOCAL_MIDI;
     const shouldUseSynth = useSynth || isOutsideVocalRange;
-    
+
     if (shouldUseSynth) {
-      // Use synth for notes outside vocal range OR when explicitly requested
-      const shortDuration = note.duration * 0.75;
-      this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
+      this.playSynthOrPiano(note, time);
     } else {
-      // Try to use vocal sample
       const id = `${degree}_${midi}`;
       const buffer = this.noteBuffers.get(id);
-      
       if (buffer) {
-        // Vocal sample available - use it
         const source = new Tone.ToneBufferSource(buffer).connect(this.vocalGain);
         source.start(Math.max(0, time), 0, buffer.duration);
       } else {
-        // Sample missing - fall back to synth
-        console.warn(`Sample not found for ${id}, falling back to synth`);
-        const shortDuration = note.duration * 0.75;
-        this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
+        console.warn(`Sample not found for ${id}, falling back to synth/piano`);
+        this.playSynthOrPiano(note, time);
       }
     }
   }
@@ -347,33 +373,64 @@ export class AudioEngine {
    * Notes outside the range will automatically use synth, so we don't try to load them
    */
   public async preloadNotes(notes: NoteEvent[]) {
-    // FIX #3: Skip preloading in fretboard mode (synth-only)
-    if (this.isFretboardMode) return;
-    
+    // When the user picked piano playback we also need the piano samples for
+    // every melody note (including in fretboard mode, where vocals don't play).
+    const pianoLoad = this.playbackSound === 'piano'
+      ? this.loadPianoBuffers(notes.map(n => n.noteInfo.midi))
+      : Promise.resolve();
+
+    // Fretboard mode doesn't use vocal samples — only the piano preload above.
+    if (this.isFretboardMode) {
+      await pianoLoad;
+      return;
+    }
+
     // Filter to only notes within vocal range
     const notesInVocalRange = notes.filter(
       n => n.noteInfo.midi >= MIN_VOCAL_MIDI && n.noteInfo.midi <= MAX_VOCAL_MIDI
     );
-    
+
     const uniqueIds = Array.from(
       new Set(notesInVocalRange.map(n => `${n.noteInfo.degree}_${n.noteInfo.midi}`))
     );
-    
-    const promises = uniqueIds.map(async (id) => {
+
+    const vocalLoad = Promise.all(uniqueIds.map(async (id) => {
       if (this.noteBuffers.has(id)) return;
-      const degree = id.split('_')[0]; 
+      const degree = id.split('_')[0];
       const safeDegree = degree.replace('#', 's');
       const safeId = id.replace('#', 's');
       const url = `${import.meta.env.BASE_URL}samples/${safeDegree}/${safeId}.mp3`;
       try {
         const buffer = new Tone.ToneAudioBuffer();
         await buffer.load(url);
-        this.noteBuffers.set(id, buffer); 
-      } catch (e) { 
-        // Don't warn - notes outside vocal range use synth automatically
+        this.noteBuffers.set(id, buffer);
+      } catch (e) {
+        // Don't warn - notes outside vocal range use synth/piano automatically
       }
-    });
-    await Promise.all(promises);
+    }));
+
+    await Promise.all([vocalLoad, pianoLoad]);
+  }
+
+  /**
+   * Load piano samples for the given MIDI notes (within the piano sample
+   * range 23-80, B0 to G♯5 — covers progressions, vocals, and the full
+   * CAGED fretboard range). Used by both chord-progression playback and
+   * the melody/fretboard piano-playback option.
+   */
+  private async loadPianoBuffers(midis: number[]) {
+    const unique = Array.from(new Set(midis.filter(m => m >= 23 && m <= 80)));
+    await Promise.all(unique.map(async (midi) => {
+      if (this.pianoBuffers.has(midi)) return;
+      const pianoUrl = `${import.meta.env.BASE_URL}samples/piano/P_${midi}.mp3`;
+      try {
+        const buffer = new Tone.ToneAudioBuffer();
+        await buffer.load(pianoUrl);
+        this.pianoBuffers.set(midi, buffer);
+      } catch (e) {
+        // Missing piano sample — playback will fall back to the synth.
+      }
+    }));
   }
 
   /**

@@ -220,6 +220,8 @@ export default function App() {
             setIncludeSevenths={session.setIncludeSevenths}
             enabledInversions={session.enabledInversions}
             setEnabledInversions={session.setEnabledInversions}
+            playbackSound={session.playbackSound}
+            setPlaybackSound={session.setPlaybackSound}
             activeTab={session.activeTab}
             minVocalMidi={session.minVocalMidi}
             maxVocalMidi={session.maxVocalMidi}

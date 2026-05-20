@@ -73,6 +73,8 @@ interface ControlsProps {
   setIncludeSevenths: (v: boolean) => void;
   enabledInversions: number[];
   setEnabledInversions: (v: number[]) => void;
+  playbackSound: 'synth' | 'piano';
+  setPlaybackSound: (v: 'synth' | 'piano') => void;
   activeTab: string;
   
   minVocalMidi: number;
@@ -566,6 +568,31 @@ export default function Controls(props: ControlsProps) {
           {/* MIXER TAB */}
           {activeControlTab === 'mixer' && (
             <>
+              {/* Playback Sound — only shown where the synth actually plays
+                  (fretboard melodies + the Pitch Guide). Progressions don't
+                  use the synth, so we hide it there. */}
+              {props.activeTab !== 'progressions' && (
+                <div className="control-section">
+                  <h3 className="section-title">Playback Sound</h3>
+                  <div className="toggle-grid-sleek">
+                    <div
+                      className={`toggle-pill-btn ${props.playbackSound === 'synth' ? 'active' : ''}`}
+                      onClick={() => props.setPlaybackSound('synth')}
+                      title="Use the triangle-wave synth for fretboard melodies and the pitch guide"
+                    >
+                      Synth
+                    </div>
+                    <div
+                      className={`toggle-pill-btn ${props.playbackSound === 'piano' ? 'active' : ''}`}
+                      onClick={() => props.setPlaybackSound('piano')}
+                      title="Use piano samples instead. Notes outside the piano range (G4 and above) automatically fall back to the synth."
+                    >
+                      Piano
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="control-section no-border">
                 <h3 className="section-title">Volume Levels</h3>
                 

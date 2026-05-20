@@ -9,6 +9,7 @@ interface AudioSetupProps {
   volMetronome: number;
   volDrone: number; // RESTORED
   debugClick: boolean;
+  playbackSound: 'synth' | 'piano';
   setTriggerPulse: (v: boolean) => void;
   setActiveMidi: (m: number | null) => void;
   visualTimeoutRef: React.MutableRefObject<number>;
@@ -43,4 +44,5 @@ export function useAudioSetup(props: AudioSetupProps) {
   useEffect(() => { audioEngine.setClickVol(props.volMetronome); }, [props.volMetronome]);
   useEffect(() => { audioEngine.setDroneVol(props.volDrone); }, [props.volDrone]); // RESTORED
   useEffect(() => { audioEngine.setDebugClick(props.debugClick); }, [props.debugClick]);
+  useEffect(() => { audioEngine.setPlaybackSound(props.playbackSound); }, [props.playbackSound]);
 }

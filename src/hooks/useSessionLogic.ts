@@ -117,7 +117,9 @@ export function useSessionLogic() {
     volMaster: mixer.volMaster,     volGroove: mixer.volGroove,
     volVoice:  mixer.volVoice,      volMetronome: mixer.volMetronome,
     volDrone:  mixer.volDrone,
-    debugClick, setTriggerPulse, setActiveMidi, visualTimeoutRef,
+    debugClick,
+    playbackSound: settings.playbackSound,
+    setTriggerPulse, setActiveMidi, visualTimeoutRef,
   });
 
   // ── Game loop ────────────────────────────────────────────────────────────────
