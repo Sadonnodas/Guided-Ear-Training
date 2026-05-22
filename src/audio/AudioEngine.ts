@@ -22,6 +22,10 @@ export class AudioEngine {
   private trainingSynth!: Tone.Synth;
   private trainingGain!: Tone.Gain;
   private trainingVol: number = 0.75;
+  // Makeup gain for the piano-replacement playback so piano samples sit at a
+  // comparable loudness to the synth. The user-facing "Synth / Piano" fader
+  // still rides on top of this (it drives trainingGain).
+  private pianoPlaybackGain!: Tone.Gain;
   private transitionSynth!: Tone.MetalSynth;
   private metronome!: Metronome;
   private drumMachine!: DrumMachine;
@@ -100,14 +104,11 @@ export class AudioEngine {
       volume: 8
     });
 
-    const pianoReverb = new Tone.Reverb({
-      decay: 1.8,
-      preDelay: 0.01,
-      wet: 0.35
-    });
-    
-    pianoReverb.generate();
-    
+    // PERF: removed the dedicated piano-reverb on the synth chain — a second
+    // Tone.Reverb (convolution) was running continuously alongside the master
+    // reverb, ~10-15% sustained CPU on mobile for a subtle ambience that
+    // hardly anyone notices. Compressor + makeup gain stay (both cheap) so
+    // the synth keeps its loudness; it just sounds a touch drier.
     const trainingCompressor = new Tone.Compressor({
       threshold: -30,
       ratio: 6,
@@ -115,13 +116,17 @@ export class AudioEngine {
       release: 0.15,
       knee: 10
     });
-    
+
     const makeupGain = new Tone.Gain(4);
-    
-    this.trainingGain = new Tone.Gain(this.trainingVol).connect(this.masterGain); 
-    
-    this.trainingSynth.connect(pianoReverb);
-    pianoReverb.connect(trainingCompressor);
+
+    this.trainingGain = new Tone.Gain(this.trainingVol).connect(this.masterGain);
+
+    // Piano-replacement playback routes through its own makeup gain (so piano
+    // samples sit at roughly synth loudness) and then into trainingGain — the
+    // "Synth / Piano" fader in the mixer rides on top of both.
+    this.pianoPlaybackGain = new Tone.Gain(1.7).connect(this.trainingGain);
+
+    this.trainingSynth.connect(trainingCompressor);
     trainingCompressor.connect(makeupGain);
     makeupGain.connect(this.trainingGain);
 
@@ -174,11 +179,11 @@ export class AudioEngine {
     if (this.playbackSound === 'piano') {
       const pianoBuffer = this.pianoBuffers.get(note.noteInfo.midi);
       if (pianoBuffer) {
-        const source = new Tone.ToneBufferSource(pianoBuffer).connect(this.trainingGain);
+        const source = new Tone.ToneBufferSource(pianoBuffer).connect(this.pianoPlaybackGain);
         source.start(Math.max(0, time));
         return;
       }
-      // No piano sample (e.g. note > 67 on the high E string) — fall through.
+      // No piano sample (e.g. note above the highest sample) — fall through.
     }
     const shortDuration = note.duration * 0.75;
     this.trainingSynth.triggerAttackRelease(note.noteInfo.frequency, shortDuration, time);
@@ -475,31 +480,28 @@ export class AudioEngine {
    */
   public playChord(bassNote: number, triadNotes: number[], time: number) {
     if (!this.isInitialized) return;
-    
-    // DIAGNOSTIC: Log timing info
-    console.log(`🎵 Chord trigger at Transport time: ${time.toFixed(3)}s`);
-    console.log(`   Bass offset: ${this.BASS_TIMING_OFFSET}s → Actual: ${(time + this.BASS_TIMING_OFFSET).toFixed(3)}s`);
-    console.log(`   Piano offset: ${this.PIANO_TIMING_OFFSET}s → Actual: ${(time + this.PIANO_TIMING_OFFSET).toFixed(3)}s`);
-    
+
+    // PERF: dropped per-chord diagnostic logs — they fired 4-5 times per chord,
+    // which on mobile cost real CPU (string formatting + devtools serialization)
+    // every progression cycle. Warnings on missing samples remain below.
+
     // Play bass note with timing offset
     const bassBuffer = this.bassBuffers.get(bassNote);
     if (bassBuffer) {
       const bassSource = new Tone.ToneBufferSource(bassBuffer).connect(this.bassGain);
       const bassTime = time + this.BASS_TIMING_OFFSET;
       bassSource.start(bassTime);
-      console.log(`   🔊 Bass ${bassNote} starting at ${bassTime.toFixed(3)}s`);
     } else {
       console.warn(`Bass sample not found for MIDI ${bassNote}`);
     }
-    
+
     // Play triad notes with timing offset
-    triadNotes.forEach((midi, i) => {
+    triadNotes.forEach((midi) => {
       const pianoBuffer = this.pianoBuffers.get(midi);
       if (pianoBuffer) {
         const pianoSource = new Tone.ToneBufferSource(pianoBuffer).connect(this.pianoGain);
         const pianoTime = time + this.PIANO_TIMING_OFFSET;
         pianoSource.start(pianoTime);
-        if (i === 0) console.log(`   🎹 Piano ${midi} starting at ${pianoTime.toFixed(3)}s`);
       } else {
         console.warn(`Piano sample not found for MIDI ${midi}`);
       }

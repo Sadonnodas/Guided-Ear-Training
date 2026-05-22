@@ -259,30 +259,35 @@ export async function startKeepAlive(): Promise<void> {
     }
   }
   
-  // NEW: Set up watchdog timer to prevent iOS from killing audio
-  // This periodically "pokes" the audio context to keep it alive
+  // Watchdog timer to prevent iOS from killing audio while backgrounded.
+  // PERF: when the tab is visible, the browser keeps the audio context alive
+  // on its own — the poking + gain oscillation just heats the phone for no
+  // benefit. Skip the work when document is visible; the interval still ticks
+  // (cheap) so we react immediately when the tab gets backgrounded.
   if (keepAliveInterval === null) {
     keepAliveInterval = window.setInterval(() => {
+      if (!document.hidden) return;
+
       // 1. Ensure audio element is still playing
       if (audioEl && audioEl.paused) {
         audioEl.play().catch(() => {});
       }
-      
+
       // 2. Ensure audio context is still running
       const ctx = Tone.context.rawContext as AudioContext;
       if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {});
       }
-      
-      // 3. Tiny oscillation to prevent iOS from thinking audio is "idle"
-      // This is inaudible but keeps the system active
+
+      // 3. Tiny oscillation to prevent iOS from thinking audio is "idle".
+      // Inaudible but keeps the system active when backgrounded.
       if (bridgeGain) {
         const currentGain = bridgeGain.gain.value;
         bridgeGain.gain.setValueAtTime(currentGain * 0.999, ctx.currentTime);
         bridgeGain.gain.setValueAtTime(currentGain, ctx.currentTime + 0.01);
       }
     }, 2000); // Check every 2 seconds
-    
+
     console.log('[KeepAlive] Watchdog timer started');
   }
   

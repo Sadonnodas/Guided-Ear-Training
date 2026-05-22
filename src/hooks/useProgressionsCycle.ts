@@ -142,7 +142,8 @@ export async function runProgressionsCycle(
     };
   });
   await audioEngine.preloadNotes(vocalNoteEvents);
-  console.log(`Chord samples preloaded in ${(performance.now() - t0).toFixed(0)}ms`);
+  // PERF: dropped per-cycle preload-timing log (ran every progression cycle).
+  void t0;
   if (!isPlayingRef.current) return;
 
   // Timing constants

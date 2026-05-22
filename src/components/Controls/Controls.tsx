@@ -598,15 +598,15 @@ export default function Controls(props: ControlsProps) {
                 
                 {showGuideVolume && (
                   <div className="slider-row">
-                    <span style={{color:'var(--c-3)'}} title="Volume of pitch guide synth">Guide</span>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="1" 
-                      step="0.05" 
-                      value={props.volTraining} 
+                    <span style={{color:'var(--c-3)'}} title="Volume of the synth / piano playback (fretboard melodies, pitch guide, and the inverse-mode passes)">Synth / Piano</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1.5"
+                      step="0.05"
+                      value={props.volTraining}
                       onChange={e => props.setVolTraining(parseFloat(e.target.value))}
-                      title="Adjust pitch guide volume"
+                      title="Adjust the synth / piano playback volume"
                     />
                   </div>
                 )}
