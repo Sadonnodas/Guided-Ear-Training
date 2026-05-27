@@ -11,6 +11,7 @@ import FretboardVisualizer from "./components/Visualizer/FretboardVisualizer";
 import ProgressionsVisualizer from "./components/Visualizer/ProgressionsVisualizer";
 import Controls from "./components/Controls/Controls";
 import GuidedTutorial from "./components/GuidedTutorial/GuidedTutorial";
+import OfflineStatus from "./components/OfflineStatus/OfflineStatus";
 
 // Helper: Convert musical key to MIDI note (using middle C = 60 as reference)
 const getKeyRootMidi = (key: MusicalKey): number => {
@@ -91,8 +92,11 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* PWA offline-cache status banner */}
+      <OfflineStatus />
+
       {/* Guided Tutorial Overlay - Now can control tab changes */}
-      <GuidedTutorial 
+      <GuidedTutorial
         onTabChange={session.setActiveTab}
       />
 

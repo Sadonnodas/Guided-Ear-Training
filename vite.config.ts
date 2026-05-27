@@ -12,12 +12,11 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       // Auto-update the service worker silently when a new deploy is detected.
       registerType: 'autoUpdate',
-      // Inject the SW registration script into index.html automatically.
-      injectRegister: 'auto',
+      // Register the SW ourselves via the React hook in <OfflineStatus />
+      // so we can surface install progress to the user.
+      injectRegister: false,
       // Keep the hand-crafted public/manifest.json instead of generating one.
       manifest: false,
-      // Files in public/ that the SW should make available to the precache
-      // manifest (these are referenced from index.html / the running app).
       includeAssets: ['icon.png', 'icon2.png', 'manifest.json'],
       workbox: {
         // Precache the app shell AND every audio asset so the app is fully
@@ -28,10 +27,34 @@ export default defineConfig(({ mode }) => ({
         // SPA fallback: every unmatched navigation serves index.html so the
         // app can boot offline regardless of the route the user opened.
         navigateFallback: 'index.html',
+        // Activate the new SW immediately and take control of the page
+        // without waiting for all tabs to close. Without these flags the
+        // first install registers the SW but doesn't intercept fetches —
+        // the next offline visit then hits the network and fails.
+        skipWaiting: true,
+        clientsClaim: true,
+        // Runtime cache fallback for any mp3 that didn't end up in the
+        // precache (e.g. quota-evicted on a first install). CacheFirst so
+        // online visits silently top up the cache for next time.
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, url }) =>
+              request.destination === 'audio' || url.pathname.endsWith('.mp3'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'audio-runtime',
+              expiration: {
+                maxEntries: 1000,
+                maxAgeSeconds: 365 * 24 * 60 * 60,
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
-      // Keep the SW out of the way during `npm run dev` so local development
-      // isn't serving stale cached assets.
       devOptions: {
+        // Keep the SW out of the way during `npm run dev` so local
+        // development isn't serving stale cached assets.
         enabled: false,
       },
     }),

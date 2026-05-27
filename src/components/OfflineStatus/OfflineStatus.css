@@ -1,0 +1,63 @@
+.offline-status {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: #f0f6fc;
+  background: rgba(33, 38, 45, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: calc(100vw - 24px);
+  pointer-events: auto;
+}
+
+.offline-status.ready {
+  border-color: rgba(74, 222, 128, 0.55);
+  color: #4ade80;
+}
+
+.offline-status.installing {
+  border-color: rgba(255, 213, 79, 0.5);
+  color: #ffd54f;
+}
+
+.offline-status.update {
+  border-color: rgba(144, 202, 249, 0.55);
+}
+
+.offline-status-btn {
+  background: var(--btn-play, #4ade80);
+  color: #0d1117;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.offline-status-close {
+  background: transparent;
+  color: inherit;
+  border: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.7;
+}
+
+.offline-status-close:hover {
+  opacity: 1;
+}
