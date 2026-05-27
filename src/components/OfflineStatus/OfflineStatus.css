@@ -36,6 +36,16 @@
   border-color: rgba(144, 202, 249, 0.55);
 }
 
+.offline-status.updating {
+  border-color: rgba(144, 202, 249, 0.55);
+  color: #90caf9;
+}
+
+.offline-status.slow {
+  border-color: rgba(255, 107, 107, 0.55);
+  color: #ff8a65;
+}
+
 .offline-status-btn {
   background: var(--btn-play, #4ade80);
   color: #0d1117;
