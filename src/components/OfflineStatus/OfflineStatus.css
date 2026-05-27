@@ -6,8 +6,8 @@
   z-index: 9999;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -20,6 +20,15 @@
   -webkit-backdrop-filter: blur(8px);
   max-width: calc(100vw - 24px);
   pointer-events: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .offline-status {
+    font-size: 0.7rem;
+    gap: 6px;
+    padding: 5px 6px 5px 12px;
+  }
 }
 
 .offline-status.idle {
@@ -32,24 +41,41 @@
   flex-direction: column;
   align-items: stretch;
   border-radius: 14px;
-  min-width: 260px;
+  min-width: 220px;
+  padding: 8px 12px 8px 14px;
+  white-space: normal;
 }
 
 .offline-status.caching .offline-status-text {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  padding-right: 18px; /* room for the absolute-positioned × */
+}
+
+.offline-status.caching .pct {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  font-weight: 500;
 }
 
 .offline-status.caching .failed {
   color: #ff8a65;
   font-weight: 500;
+  font-size: 0.66rem;
 }
 
 .offline-status.caching .offline-status-close {
   position: absolute;
-  top: 6px;
-  right: 10px;
+  top: 4px;
+  right: 8px;
+}
+
+@media (max-width: 480px) {
+  .offline-status.caching {
+    min-width: 200px;
+    padding: 7px 10px;
+  }
 }
 
 .offline-progress-bar {
@@ -87,10 +113,11 @@
   color: #0d1117;
   border: none;
   border-radius: 999px;
-  padding: 4px 12px;
-  font-size: 0.75rem;
+  padding: 4px 10px;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .offline-status-link {

@@ -131,8 +131,11 @@ export default function OfflineStatus() {
     return (
       <div className="offline-status caching">
         <div className="offline-status-text">
-          Downloading audio for offline… {progress.done} / {progress.total} ({pct}%)
-          {progress.failed > 0 ? <span className="failed"> · {progress.failed} skipped</span> : null}
+          <span>{progress.done} / {progress.total}</span>
+          <span className="pct">{pct}%</span>
+          {progress.failed > 0
+            ? <span className="failed">· {progress.failed} skipped</span>
+            : null}
         </div>
         <div className="offline-progress-bar">
           <div className="offline-progress-fill" style={{ width: `${pct}%` }} />
@@ -151,11 +154,11 @@ export default function OfflineStatus() {
   if (phase === 'cached') {
     return (
       <div className="offline-status ready">
-        <span>✓ Audio cached for offline use</span>
+        <span>✓ Offline ready</span>
         <button
           className="offline-status-link"
           onClick={retry}
-          title="Re-download in case some files got dropped"
+          title="Re-download in case some files got evicted"
         >
           Re-cache
         </button>
@@ -173,7 +176,7 @@ export default function OfflineStatus() {
   if (phase === 'error') {
     return (
       <div className="offline-status slow">
-        <span>Download had problems ({progress.failed} files failed)</span>
+        <span>{progress.failed} files failed</span>
         <button className="offline-status-btn" onClick={startDownload}>Retry</button>
         <button
           className="offline-status-close"
@@ -189,7 +192,9 @@ export default function OfflineStatus() {
   // phase === 'idle'
   return (
     <div className="offline-status idle">
-      <span>Save audio for offline (~135 MB)</span>
+      <span title="Download all audio files (~135 MB) so the app works on a plane / without signal">
+        Save for offline
+      </span>
       <button className="offline-status-btn" onClick={startDownload}>
         Download
       </button>
