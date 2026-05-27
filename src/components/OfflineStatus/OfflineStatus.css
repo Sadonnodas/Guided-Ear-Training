@@ -22,23 +22,59 @@
   pointer-events: auto;
 }
 
+.offline-status.idle {
+  border-color: rgba(144, 202, 249, 0.55);
+}
+
+.offline-status.caching {
+  border-color: rgba(255, 213, 79, 0.5);
+  color: #ffd54f;
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: 14px;
+  min-width: 260px;
+}
+
+.offline-status.caching .offline-status-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.offline-status.caching .failed {
+  color: #ff8a65;
+  font-weight: 500;
+}
+
+.offline-status.caching .offline-status-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+}
+
+.offline-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.offline-progress-fill {
+  height: 100%;
+  background: #ffd54f;
+  border-radius: 2px;
+  transition: width 0.2s ease-out;
+}
+
 .offline-status.ready {
   border-color: rgba(74, 222, 128, 0.55);
   color: #4ade80;
 }
 
-.offline-status.installing {
-  border-color: rgba(255, 213, 79, 0.5);
-  color: #ffd54f;
-}
-
 .offline-status.update {
   border-color: rgba(144, 202, 249, 0.55);
-}
-
-.offline-status.updating {
-  border-color: rgba(144, 202, 249, 0.55);
-  color: #90caf9;
 }
 
 .offline-status.slow {
@@ -55,6 +91,22 @@
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.offline-status-link {
+  background: transparent;
+  color: inherit;
+  border: none;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0 2px;
+}
+
+.offline-status-link:hover {
+  opacity: 1;
 }
 
 .offline-status-close {

@@ -1,111 +1,107 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { getOfflineAudioUrls } from '../../audio/offlineAssetUrls';
 import './OfflineStatus.css';
 
+const OFFLINE_DONE_KEY = 'offlineAudioCached_v1';
+const PARALLEL_FETCHES = 6;
+
+type Phase = 'idle' | 'caching' | 'cached' | 'error';
+
 /**
- * Status banner that surfaces the offline cache state to the user:
- *  - "Caching for offline…" while the SW is downloading its precache
- *  - "Updating offline cache…" if an update is downloading while a previous
- *    cache is already serving the app
- *  - "✓ Ready for offline use" once a SW is controlling the page
- *  - "New version available" when a fresh SW is waiting
- *  - "Cache is taking a while…" if installing hasn't completed in a long time
- *    (helps catch the case where a single bad fetch makes the install hang)
+ * Status banner + manual "Download for offline" flow.
  *
- * Also requests persistent storage so iOS doesn't evict the ~140 MB cache
- * under storage pressure.
+ * Workbox's precache pipeline can't reliably stash 140 MB of audio on iOS
+ * Safari — cache.addAll() aborts on a single fetch failure, and iOS
+ * silently evicts large caches under quota pressure, leaving the SW
+ * thinking it has everything while the blobs are gone. So we precache
+ * only the tiny app shell and let the user explicitly download the audio
+ * (~135 MB) into the SW's runtime cache, with progress and per-file
+ * error tolerance.
  */
 export default function OfflineStatus() {
-  const [hasController, setHasController] = useState(
-    typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller
-  );
-  const [installing, setInstalling] = useState(false);
-  const [installStart, setInstallStart] = useState<number | null>(null);
-  const [slow, setSlow] = useState(false);
+  const [phase, setPhase] = useState<Phase>(() => {
+    return localStorage.getItem(OFFLINE_DONE_KEY) === '1' ? 'cached' : 'idle';
+  });
+  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [dismissed, setDismissed] = useState(false);
-  const slowTimerRef = useRef<number | null>(null);
+  const cancelRef = useRef(false);
 
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegisteredSW(_swUrl, registration) {
-      if (!registration) return;
-
-      // Watch the lifecycle of a given SW (install → activated/redundant)
-      // so we know exactly when the precache finishes for any new SW that
-      // shows up — not just the first one.
-      const track = (sw: ServiceWorker) => {
-        const onState = () => {
-          if (sw.state === 'installing') {
-            beginInstalling();
-          } else if (sw.state === 'activated') {
-            endInstalling();
-            setHasController(true);
-          } else if (sw.state === 'redundant') {
-            endInstalling();
-          }
-        };
-        onState();
-        sw.addEventListener('statechange', onState);
-      };
-
-      if (registration.installing) track(registration.installing);
-      if (registration.waiting) track(registration.waiting);
-
-      registration.addEventListener('updatefound', () => {
-        if (registration.installing) track(registration.installing);
-      });
-    },
+  const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW({
     onRegisterError(err) {
       console.warn('Service worker registration failed:', err);
     },
   });
 
-  function beginInstalling() {
-    setInstalling(true);
-    setInstallStart((prev) => prev ?? Date.now());
-    if (slowTimerRef.current === null) {
-      // After ~3 minutes of installing, flag it as slow so the banner can
-      // explain what's happening instead of silently spinning.
-      slowTimerRef.current = window.setTimeout(() => setSlow(true), 3 * 60 * 1000);
-    }
-  }
-
-  function endInstalling() {
-    setInstalling(false);
-    setInstallStart(null);
-    setSlow(false);
-    if (slowTimerRef.current !== null) {
-      window.clearTimeout(slowTimerRef.current);
-      slowTimerRef.current = null;
-    }
-  }
-
-  // skipWaiting + clientsClaim make the new SW take control mid-session.
-  // 'controllerchange' fires when that happens — flip ready on.
-  useEffect(() => {
-    if (!navigator.serviceWorker) return;
-    const onCtrl = () => setHasController(!!navigator.serviceWorker.controller);
-    navigator.serviceWorker.addEventListener('controllerchange', onCtrl);
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', onCtrl);
-  }, []);
-
-  // Ask for persistent storage once. Without this, iOS can evict the
-  // 140 MB cache under disk pressure and offline mode quietly breaks.
+  // Persistent storage — important so iOS doesn't evict the runtime cache.
   useEffect(() => {
     if (navigator.storage?.persist) {
       navigator.storage.persist().catch(() => { /* ignore */ });
     }
   }, []);
 
-  // Clean up the slow-install timer on unmount.
-  useEffect(() => () => {
-    if (slowTimerRef.current !== null) window.clearTimeout(slowTimerRef.current);
-  }, []);
+  const startDownload = useCallback(async () => {
+    if (phase === 'caching') return;
+    cancelRef.current = false;
 
-  if (dismissed) return null;
+    const urls = getOfflineAudioUrls(import.meta.env.BASE_URL);
+    setProgress({ done: 0, total: urls.length, failed: 0 });
+    setPhase('caching');
+
+    // Simple promise pool: PARALLEL_FETCHES requests in flight at any time.
+    let cursor = 0;
+    let done = 0;
+    let failed = 0;
+
+    const fetchOne = async () => {
+      while (cursor < urls.length && !cancelRef.current) {
+        const idx = cursor++;
+        const url = urls[idx];
+        try {
+          // `cache: 'reload'` bypasses HTTP cache so the SW always sees a
+          // network fetch and puts the response into its runtime cache.
+          // The SW returns from cache afterwards (CacheFirst).
+          const res = await fetch(url, { cache: 'reload' });
+          if (!res.ok) failed++;
+        } catch {
+          failed++;
+        }
+        done++;
+        // Throttle updates: every 4 items or at the end.
+        if (done % 4 === 0 || done === urls.length) {
+          setProgress({ done, total: urls.length, failed });
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(PARALLEL_FETCHES, urls.length) }, fetchOne)
+    );
+
+    setProgress({ done, total: urls.length, failed });
+
+    if (cancelRef.current) {
+      setPhase('idle');
+      return;
+    }
+
+    if (failed < urls.length / 2) {
+      localStorage.setItem(OFFLINE_DONE_KEY, '1');
+      setPhase('cached');
+    } else {
+      setPhase('error');
+    }
+  }, [phase]);
+
+  const cancel = () => { cancelRef.current = true; };
+
+  const retry = () => {
+    localStorage.removeItem(OFFLINE_DONE_KEY);
+    setPhase('idle');
+    setProgress({ done: 0, total: 0, failed: 0 });
+  };
+
+  if (dismissed && phase !== 'caching') return null;
 
   if (needRefresh) {
     return (
@@ -128,45 +124,44 @@ export default function OfflineStatus() {
     );
   }
 
-  // Currently installing.
-  if (installing) {
-    const minutes = installStart ? Math.floor((Date.now() - installStart) / 60000) : 0;
-    if (slow) {
-      return (
-        <div className="offline-status slow">
-          <span>
-            Cache is taking a while ({minutes} min) — try reloading if it
-            doesn't finish soon
-          </span>
-          <button
-            className="offline-status-close"
-            onClick={() => setDismissed(true)}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      );
-    }
+  if (phase === 'caching') {
+    const pct = progress.total > 0
+      ? Math.round((progress.done / progress.total) * 100)
+      : 0;
     return (
-      <div className={hasController ? 'offline-status updating' : 'offline-status installing'}>
-        <span>
-          {hasController
-            ? 'Updating offline cache… current version still works offline'
-            : 'Caching for offline… keep this tab open'}
-        </span>
+      <div className="offline-status caching">
+        <div className="offline-status-text">
+          Downloading audio for offline… {progress.done} / {progress.total} ({pct}%)
+          {progress.failed > 0 ? <span className="failed"> · {progress.failed} skipped</span> : null}
+        </div>
+        <div className="offline-progress-bar">
+          <div className="offline-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <button
+          className="offline-status-close"
+          onClick={cancel}
+          aria-label="Cancel"
+        >
+          ×
+        </button>
       </div>
     );
   }
 
-  // Active SW means offline is ready.
-  if (offlineReady || hasController) {
+  if (phase === 'cached') {
     return (
       <div className="offline-status ready">
-        <span>✓ Ready for offline use</span>
+        <span>✓ Audio cached for offline use</span>
+        <button
+          className="offline-status-link"
+          onClick={retry}
+          title="Re-download in case some files got dropped"
+        >
+          Re-cache
+        </button>
         <button
           className="offline-status-close"
-          onClick={() => { setOfflineReady(false); setDismissed(true); }}
+          onClick={() => setDismissed(true)}
           aria-label="Dismiss"
         >
           ×
@@ -175,5 +170,36 @@ export default function OfflineStatus() {
     );
   }
 
-  return null;
+  if (phase === 'error') {
+    return (
+      <div className="offline-status slow">
+        <span>Download had problems ({progress.failed} files failed)</span>
+        <button className="offline-status-btn" onClick={startDownload}>Retry</button>
+        <button
+          className="offline-status-close"
+          onClick={() => setDismissed(true)}
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+
+  // phase === 'idle'
+  return (
+    <div className="offline-status idle">
+      <span>Save audio for offline (~135 MB)</span>
+      <button className="offline-status-btn" onClick={startDownload}>
+        Download
+      </button>
+      <button
+        className="offline-status-close"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </div>
+  );
 }

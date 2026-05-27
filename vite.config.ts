@@ -17,11 +17,21 @@ export default defineConfig(({ mode }) => ({
       injectRegister: false,
       // Keep the hand-crafted public/manifest.json instead of generating one.
       manifest: false,
-      includeAssets: ['icon.png', 'icon2.png', 'manifest.json'],
+      includeAssets: ['icon.png', 'manifest.json'],
       workbox: {
-        // Precache the app shell AND every audio asset so the app is fully
-        // functional on a plane, in a tunnel, etc. once the SW has installed.
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3,woff,woff2}'],
+        // Precache ONLY the app shell. We deliberately don't precache the
+        // ~135 MB of audio: Workbox's cache.addAll() is fragile (one bad
+        // fetch aborts everything) and iOS Safari silently evicts large
+        // caches under quota pressure — leaving the precache index intact
+        // while the blobs are gone, which produces a SW that thinks it's
+        // cached everything but serves nothing. The app prefetches audio
+        // explicitly via a user-tapped "Download for offline" button, which
+        // populates the runtimeCaching CacheFirst store below; individual
+        // fetch failures there don't abort the others.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // Skip the unused alternate icons sitting in public/ — they pull
+        // ~10 MB into the precache for nothing (only icon.png is referenced).
+        globIgnores: ['**/old icon.png', '**/icon2.png'],
         maximumFileSizeToCacheInBytes: MAX_CACHE_FILE_BYTES,
         cleanupOutdatedCaches: true,
         // SPA fallback: every unmatched navigation serves index.html so the
