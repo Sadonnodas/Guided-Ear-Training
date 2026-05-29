@@ -65,9 +65,16 @@ export function getNoteForDegree(
     let jumpLimit = 12;
     
     if (difficulty === "easiest") {
-      // Easiest: Max interval is Major 3rd (4 semitones)
-      // One perfect 5th (7 semitones) allowed per melody (tracked by hasLeaped)
-      jumpLimit = hasLeaped ? 4 : 7;
+      // Easiest: max a perfect 4th (5 semitones) per jump. The old rule was
+      // "max 4, one perfect-5th exception", but the exception flag only fires
+      // on intervals > 7 semitones — which the 7-semitone cap itself made
+      // impossible — so easiest was effectively just "max 7" and felt the
+      // same as easy. Plain cap at 5 keeps most motion stepwise (1↔2, 2↔3)
+      // while still letting one-step jumps like 1→4 or 5→1 happen
+      // occasionally, so degrees 4-7 are still reachable inside a 4-note
+      // melody (e.g. 1→3→5 or 1→2→4→5).
+      jumpLimit = 5;
+      void hasLeaped; // intentionally unused at this difficulty
     } else if (difficulty === "easy") {
       jumpLimit = 7; // Perfect 5th - NO EXCEPTIONS
     } else if (difficulty === "normal" && hasLeaped) {

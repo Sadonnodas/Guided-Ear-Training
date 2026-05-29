@@ -101,7 +101,7 @@ export class AudioEngine {
         sustain: 0.2,
         release: 0.5
       },
-      volume: 8
+      volume: 3 // dB. Reduced from +8 to tame the synth in default mix.
     });
 
     // PERF: removed the dedicated piano-reverb on the synth chain — a second
@@ -124,7 +124,10 @@ export class AudioEngine {
     // Piano-replacement playback routes through its own makeup gain (so piano
     // samples sit at roughly synth loudness) and then into trainingGain — the
     // "Synth / Piano" fader in the mixer rides on top of both.
-    this.pianoPlaybackGain = new Tone.Gain(1.7).connect(this.trainingGain);
+    // Piano samples are recorded relatively quiet; bumped from 1.7 → 2.4 so
+    // they sit at a comfortable default loudness without needing to push the
+    // user-facing fader past unity.
+    this.pianoPlaybackGain = new Tone.Gain(2.4).connect(this.trainingGain);
 
     this.trainingSynth.connect(trainingCompressor);
     trainingCompressor.connect(makeupGain);
