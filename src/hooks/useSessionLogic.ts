@@ -23,9 +23,32 @@ import { useMixerLogic } from "./useMixerLogic.ts";
 import { useSessionSettings } from "./useSessionSettings.ts";
 import { getAvailableDegrees } from "../audio/MusicTheory.ts";
 import { useGameLoop } from "./useGameLoop.ts";
+import { usePersistentState, asBool, asOneOf } from "./usePersistentState.ts";
 import { KEYS, KEY_DISPLAY_MAP, TAB_DEFAULTS } from "./sessionConstants.ts";
 import type { ChordProgression } from "../core/ChordProgressionGenerator.ts";
 import type { MusicalKey, ScaleDegree, ScaleType } from "../types.ts";
+
+const TABS = Object.keys(TAB_DEFAULTS);
+const SCALE_TYPES: ScaleType[] = [
+  "Major", "Minor", "PentatonicMajor", "PentatonicMinor", "Chromatic",
+];
+
+/**
+ * A saved list of degrees is only usable if every entry still exists in the
+ * scale we are restoring alongside it. One stranger rejects the whole list:
+ * a partly-restored selection looks deliberate and would be practised as if
+ * it were.
+ */
+function reviveDegrees(available: ScaleDegree[], allowEmpty: boolean) {
+  return (raw: unknown): ScaleDegree[] | undefined => {
+    if (!Array.isArray(raw)) return undefined;
+    if (raw.length === 0) return allowEmpty ? [] : undefined;
+    const kept = raw.filter(
+      (d): d is ScaleDegree => typeof d === 'string' && available.includes(d as ScaleDegree),
+    );
+    return kept.length === raw.length ? kept : undefined;
+  };
+}
 
 // The scale degree whose chord is diminished, by scale type.
 const DIMINISHED_DEGREE: Partial<Record<ScaleType, ScaleDegree>> = {
@@ -54,7 +77,7 @@ export function useSessionLogic() {
   const [isPlaying,   setIsPlaying]   = useState(false);
   const [isPaused,    setIsPaused]    = useState(false);
   const [status,      setStatus]      = useState("Start Session");
-  const [activeTab,   setActiveTab]   = useState("random");
+  const [activeTab,   setActiveTab]   = usePersistentState("activeTab", "random", asOneOf(TABS));
 
   // Progressions visualizer state
   const [activeChordIndex, setActiveChordIndex] = useState<number | null>(null);
@@ -65,23 +88,36 @@ export function useSessionLogic() {
   const hasInitializedAudio = useRef(false);
 
   // Per-tab settings cache (restores user choices on tab switch)
+  // The tab we launched into keeps the flags the user actually left it with,
+  // so leaving it and coming back does not hand back the factory defaults.
   const tabSettingsCache = useRef<Record<string, typeof TAB_DEFAULTS.random>>({
     random:    { ...TAB_DEFAULTS.random },
     training:  { ...TAB_DEFAULTS.training },
     fretboard: { ...TAB_DEFAULTS.fretboard },
+    [activeTab]: {
+      inverseMode:          settings.inverseMode,
+      trainingWheels:       settings.trainingWheels,
+      hideFretboardVisuals: settings.hideFretboardVisuals,
+    },
   });
 
   // ── Music theory state ───────────────────────────────────────────────────────
-  const [currentKey,     setCurrentKey]     = useState<MusicalKey>("C");
-  const [visualizerKey,  setVisualizerKey]  = useState<MusicalKey>("C");
-  const [scaleType,      setScaleType]      = useState<ScaleType>("Major");
-  const [enabledDegrees, setEnabledDegrees] = useState<ScaleDegree[]>(["1","2","3","4","5","6","7"]);
-  const [focusedDegrees, setFocusedDegrees] = useState<ScaleDegree[]>([]);
+  const [currentKey,     setCurrentKey]     = usePersistentState<MusicalKey>("currentKey", "C", asOneOf(KEYS));
+  const [visualizerKey,  setVisualizerKey]  = useState<MusicalKey>(currentKey);
+  const [scaleType,      setScaleType]      = usePersistentState<ScaleType>("scaleType", "Major", asOneOf(SCALE_TYPES));
+  const [enabledDegrees, setEnabledDegrees] = usePersistentState<ScaleDegree[]>(
+    "enabledDegrees",
+    getDefaultEnabledDegrees(scaleType, activeTab),
+    reviveDegrees(getAvailableDegrees(scaleType), false),
+  );
+  const [focusedDegrees, setFocusedDegrees] = usePersistentState<ScaleDegree[]>(
+    "focusedDegrees", [], reviveDegrees(getAvailableDegrees(scaleType), true),
+  );
   const [activeMidi,     setActiveMidi]     = useState<number | null>(null);
 
   // ── Visual / debug state ─────────────────────────────────────────────────────
   const [triggerPulse, setTriggerPulse] = useState(false);
-  const [debugClick,   setDebugClick]   = useState(false);
+  const [debugClick,   setDebugClick]   = usePersistentState("debugClick", false, asBool);
   const visualTimeoutRef = useRef<number>(0);
 
   // ── Logic refs (read by async callbacks without stale closures) ──────────────

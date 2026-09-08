@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MAJOR_LEVELS, MINOR_LEVELS, CHROMATIC_LEVELS } from '../config/TrainingLevels';
+import { usePersistentState, asInt } from './usePersistentState';
 import type { MelodyConstraints, ScaleDegree, ScaleType, TrainingLevel } from '../types';
 
 const UNLOCK_TIME_SECONDS = 600; // 10 minutes
@@ -40,8 +41,10 @@ export function useTrainingMode(scaleType: ScaleType) {
     loadLevelProgress(scaleType)
   );
   
-  const [activeLevelId, setActiveLevelId] = useState<number>(1);
-  const activeLevelIdRef = useRef(1);
+  // The level survives a relaunch; the effect below sends it back to 1 if the
+  // scale it belongs to has not unlocked it.
+  const [activeLevelId, setActiveLevelId] = usePersistentState('trainingLevelId', 1, asInt(1, 99));
+  const activeLevelIdRef = useRef(activeLevelId);
   
   const [uiSessionTime, setUiSessionTime] = useState(0); 
   const [stageLabel, setStageLabel] = useState("");

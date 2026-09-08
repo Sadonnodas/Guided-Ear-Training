@@ -1,16 +1,21 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { audioEngine } from "../audio/AudioEngine";
+import { usePersistentState, asNumber } from "./usePersistentState";
+
+// The widest slider in the mixer runs to 1.5; anything outside that was not
+// written by this app.
+const asVolume = asNumber(0, 1.5);
 
 export function useMixerLogic() {
-  const [volMaster, setVolMaster] = useState(1.0);
-  const [volVoice, setVolVoice] = useState(1.0);
-  const [volDrone, setVolDrone] = useState(0.4);
-  const [volGroove, setVolGroove] = useState(0.6);
-  const [volMetronome, setVolMetronome] = useState(0.8);
-  const [volTraining, setVolTraining] = useState(0.4);
-  const [volReverb, setVolReverb] = useState(0.3);
-  const [volBass, setVolBass] = useState(0.7);    // NEW
-  const [volPiano, setVolPiano] = useState(0.6);  // NEW
+  const [volMaster, setVolMaster] = usePersistentState("volMaster", 1.0, asVolume);
+  const [volVoice, setVolVoice] = usePersistentState("volVoice", 1.0, asVolume);
+  const [volDrone, setVolDrone] = usePersistentState("volDrone", 0.4, asVolume);
+  const [volGroove, setVolGroove] = usePersistentState("volGroove", 0.6, asVolume);
+  const [volMetronome, setVolMetronome] = usePersistentState("volMetronome", 0.8, asVolume);
+  const [volTraining, setVolTraining] = usePersistentState("volTraining", 0.4, asVolume);
+  const [volReverb, setVolReverb] = usePersistentState("volReverb", 0.3, asVolume);
+  const [volBass, setVolBass] = usePersistentState("volBass", 0.7, asVolume);
+  const [volPiano, setVolPiano] = usePersistentState("volPiano", 0.6, asVolume);
 
   // Sync to AudioEngine
   useEffect(() => { audioEngine.setMasterVol(volMaster); }, [volMaster]);
@@ -20,8 +25,8 @@ export function useMixerLogic() {
   useEffect(() => { audioEngine.setClickVol(volMetronome); }, [volMetronome]);
   useEffect(() => { audioEngine.setTrainingVol(volTraining); }, [volTraining]);
   useEffect(() => { audioEngine.setReverbAmt(volReverb); }, [volReverb]);
-  useEffect(() => { audioEngine.setBassVolume(volBass); }, [volBass]);      // NEW
-  useEffect(() => { audioEngine.setPianoVolume(volPiano); }, [volPiano]);    // NEW
+  useEffect(() => { audioEngine.setBassVolume(volBass); }, [volBass]);
+  useEffect(() => { audioEngine.setPianoVolume(volPiano); }, [volPiano]);
 
   return {
     volMaster, setVolMaster,
@@ -31,7 +36,7 @@ export function useMixerLogic() {
     volMetronome, setVolMetronome,
     volTraining, setVolTraining,
     volReverb, setVolReverb,
-    volBass, setVolBass,        // NEW
-    volPiano, setVolPiano,      // NEW
+    volBass, setVolBass,
+    volPiano, setVolPiano,
   };
 }

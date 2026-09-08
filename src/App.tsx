@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { getScaleStepsFromRoot } from "./audio/MusicTheory";
 import { useSessionLogic } from "./hooks/useSessionLogic";
+import { usePersistentState, asOneOf } from "./hooks/usePersistentState";
 import type { MusicalKey } from "./types";
 import "./App.css";
 
@@ -25,7 +26,9 @@ const getKeyRootMidi = (key: MusicalKey): number => {
 export default function App() {
   const session = useSessionLogic();
   
-  const [viewMode, setViewMode] = useState<'tape' | 'static'>('tape');
+  const [viewMode, setViewMode] = usePersistentState<'tape' | 'static'>(
+    'viewMode', 'tape', asOneOf(['tape', 'static'] as const),
+  );
   const [lastValidStep, setLastValidStep] = useState(0); 
 
   // Volume Mute Helper

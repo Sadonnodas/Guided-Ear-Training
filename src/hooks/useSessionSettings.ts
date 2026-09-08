@@ -1,32 +1,63 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { audioEngine } from "../audio/AudioEngine";
+import { DRUM_PATTERNS } from "../config/AudioConfig";
+import { usePersistentState, asBool, asInt, asOneOf } from "./usePersistentState";
 import type { MelodyDifficulty, CagedShape} from "../types";
 
+const DIFFICULTIES: MelodyDifficulty[] = ["easiest", "easy", "normal", "hard"];
+const SHAPES: CagedShape[] = ["C", "A", "G", "E", "D"];
+const PATTERN_NAMES = Object.keys(DRUM_PATTERNS);
+
+// Vocal sample range: G2 to G4. Anything outside it cannot be sung back.
+const VOCAL_MIN = 43;
+const VOCAL_MAX = 67;
+
 export function useSessionSettings() {
-  // --- STATE ---
-  const [bpm, setBpm] = useState(80);
-  const [currentPattern, setCurrentPattern] = useState("Lofi Chill");
-  
-  const [startRoot, setStartRoot] = useState(true);
-  const [endRoot, setEndRoot] = useState(false);
-  const [silentPractice, setSilentPractice] = useState(true);
-  const [trainingWheels, setTrainingWheels] = useState(false);
-  const [inverseMode, setInverseMode] = useState(false);
-  const [questionsPerKey, setQuestionsPerKey] = useState(10);
-  const [difficulty, setDifficulty] = useState<MelodyDifficulty>("easy");
-  const [selectedShape, setSelectedShape] = useState<CagedShape>("E");
-  const [hideFretboardVisuals, setHideFretboardVisuals] = useState(false);
+  // --- STATE (all of it restored from the previous launch) ---
+  const [bpm, setBpm] = usePersistentState("bpm", 80, asInt(30, 300));
+  const [currentPattern, setCurrentPattern] = usePersistentState(
+    "drumPattern", "Lofi Chill", asOneOf(PATTERN_NAMES),
+  );
+
+  const [startRoot, setStartRoot] = usePersistentState("startRoot", true, asBool);
+  const [endRoot, setEndRoot] = usePersistentState("endRoot", false, asBool);
+  const [silentPractice, setSilentPractice] = usePersistentState("silentPractice", true, asBool);
+  const [trainingWheels, setTrainingWheels] = usePersistentState("trainingWheels", false, asBool);
+  const [inverseMode, setInverseMode] = usePersistentState("inverseMode", false, asBool);
+  const [questionsPerKey, setQuestionsPerKey] = usePersistentState("questionsPerKey", 10, asInt(1, 50));
+  const [difficulty, setDifficulty] = usePersistentState<MelodyDifficulty>(
+    "difficulty", "easy", asOneOf(DIFFICULTIES),
+  );
+  const [selectedShape, setSelectedShape] = usePersistentState<CagedShape>(
+    "cagedShape", "E", asOneOf(SHAPES),
+  );
+  const [hideFretboardVisuals, setHideFretboardVisuals] = usePersistentState(
+    "hideFretboardVisuals", false, asBool,
+  );
   // Progressions mode: 7th chords toggle + allowed chord inversions (0=root, 1=1st, 2=2nd)
-  const [includeSevenths, setIncludeSevenths] = useState(false);
-  const [enabledInversions, setEnabledInversions] = useState<number[]>([0]);
+  const [includeSevenths, setIncludeSevenths] = usePersistentState("includeSevenths", false, asBool);
+  const [enabledInversions, setEnabledInversions] = usePersistentState<number[]>(
+    "enabledInversions", [0],
+    (raw) => {
+      if (!Array.isArray(raw) || raw.length === 0) return undefined;
+      const kept = raw.filter((v): v is number => v === 0 || v === 1 || v === 2);
+      return kept.length === raw.length ? kept : undefined;
+    },
+  );
   // What instrument plays anywhere the synth would normally play (fretboard
   // melodies, pitch guide, out-of-vocal-range fallback). Piano falls back to
   // synth for notes outside the piano sample range (23-67).
-  const [playbackSound, setPlaybackSound] = useState<'synth' | 'piano'>('synth');
-  
-  // NEW: Vocal Range State
-  const [minVocalMidi, setMinVocalMidi] = useState(43); // G2 - default vocal range min
-  const [maxVocalMidi, setMaxVocalMidi] = useState(67); // G4 - default vocal range max
+  const [playbackSound, setPlaybackSound] = usePersistentState<'synth' | 'piano'>(
+    "playbackSound", 'synth', asOneOf(['synth', 'piano'] as const),
+  );
+
+  // Vocal Range
+  const [minVocalMidi, setMinVocalMidi] = usePersistentState(
+    "minVocalMidi", 43, asInt(VOCAL_MIN, VOCAL_MAX), // G2 - default vocal range min
+  );
+  const [maxVocalMidi, setMaxVocalMidi] = usePersistentState(
+    "maxVocalMidi", 67, asInt(VOCAL_MIN, VOCAL_MAX), // G4 - default vocal range max
+  );
 
   // --- REFS (For access inside the async Game Loop) ---
   const refs = {
@@ -43,8 +74,8 @@ export function useSessionSettings() {
     includeSevenths: useRef(includeSevenths),
     enabledInversions: useRef(enabledInversions),
     playbackSound: useRef(playbackSound),
-    minVocalMidi: useRef(minVocalMidi), // NEW
-    maxVocalMidi: useRef(maxVocalMidi), // NEW
+    minVocalMidi: useRef(minVocalMidi),
+    maxVocalMidi: useRef(maxVocalMidi),
   };
 
   // --- SYNC REFS & ENGINE ---
@@ -61,8 +92,8 @@ export function useSessionSettings() {
   useEffect(() => { refs.includeSevenths.current = includeSevenths; }, [includeSevenths]);
   useEffect(() => { refs.enabledInversions.current = enabledInversions; }, [enabledInversions]);
   useEffect(() => { refs.playbackSound.current = playbackSound; }, [playbackSound]);
-  useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]); // NEW
-  useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]); // NEW
+  useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]);
+  useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]);
 
   const setPattern = (name: string) => {
     setCurrentPattern(name);
@@ -75,14 +106,14 @@ export function useSessionSettings() {
     trainingWheels, inverseMode, questionsPerKey, difficulty,
     selectedShape, hideFretboardVisuals, includeSevenths, enabledInversions,
     playbackSound,
-    minVocalMidi, maxVocalMidi, // NEW
+    minVocalMidi, maxVocalMidi,
 
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
     setSelectedShape, setHideFretboardVisuals, setIncludeSevenths, setEnabledInversions,
     setPlaybackSound,
-    setMinVocalMidi, setMaxVocalMidi, // NEW
+    setMinVocalMidi, setMaxVocalMidi,
     
     // Refs (Expose these to the game loop)
     refs
