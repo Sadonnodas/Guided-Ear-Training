@@ -69,6 +69,11 @@ export default defineConfig(({ mode }) => ({
       },
     }),
   ],
+  // Stamped at build time so Settings can say which build is running, and so
+  // "you are on the latest version" is a claim the user can check.
+  define: {
+    __APP_VERSION__: JSON.stringify(new Date().toISOString()),
+  },
   // FIX: Only use the repo name in production. Use '/' locally.
   base: mode === 'production' ? '/Guided-Ear-Training/' : '/',
 }))

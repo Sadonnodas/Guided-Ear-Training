@@ -1,0 +1,60 @@
+.update-checker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.update-build {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.update-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.update-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.update-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-btn.accent {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: var(--btn-play);
+}
+
+.update-btn.accent:hover:not(:disabled) {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: var(--btn-play);
+}
+
+.update-note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.update-note.ok { color: var(--btn-play); }
+.update-note.warn { color: #f0b429; }

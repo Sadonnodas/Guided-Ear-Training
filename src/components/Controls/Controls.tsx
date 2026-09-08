@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DRUM_PATTERNS } from '../../config/AudioConfig';
+import UpdateChecker from '../UpdateChecker/UpdateChecker';
 import type { MelodyDifficulty } from '../../types'; 
 import VoiceRangeControl from '../VoiceRangeControl/VoiceRangeControl';
 import { calibrateVocalRange } from '../VoiceRangeControl/PitchDetector';
@@ -753,6 +754,9 @@ export default function Controls(props: ControlsProps) {
                   <span>Restart Interactive Tutorial</span>
                 </button>
               )}
+
+              <h3 className="section-title" style={{ marginTop: '24px' }}>Version</h3>
+              <UpdateChecker />
             </div>
           )}
 
