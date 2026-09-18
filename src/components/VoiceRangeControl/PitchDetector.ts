@@ -10,6 +10,8 @@
  * 6. Higher correlation threshold (0.95)
  */
 
+import { declarePlaybackSession, declareRecordingSession } from '../../audio/KeepAlive';
+
 export interface PitchDetectionResult {
   frequency: number;
   midi: number;
@@ -26,6 +28,7 @@ export class PitchDetector {
   private sampleRate = 44100;
 
   async initialize(): Promise<void> {
+    declareRecordingSession();
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -142,6 +145,7 @@ export class PitchDetector {
     }
 
     this.analyser = null;
+    declarePlaybackSession();
   }
 }
 

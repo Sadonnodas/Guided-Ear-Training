@@ -109,7 +109,7 @@ export function useGameLoop(deps: GameLoopDeps) {
       setStatus(`Key Change: ${KEY_DISPLAY_MAP[currentCycleKey]}`);
       skipPrepareMessage = true;
       if (!isPlayingRef.current) return;
-      await audioEngine.loadBackingTracks(currentCycleKey, "");
+      await audioEngine.loadBackingTracksWithin(currentCycleKey);
       if (!isPlayingRef.current) return;
       setVisualizerKey(currentCycleKey);
       forceOneThreeFive = true;
@@ -126,7 +126,7 @@ export function useGameLoop(deps: GameLoopDeps) {
       setCurrentKey(newKey);
       setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
       skipPrepareMessage = true;
-      await audioEngine.loadBackingTracks(newKey, "");
+      await audioEngine.loadBackingTracksWithin(newKey);
       if (!isPlayingRef.current) return;
       currentCycleKey = newKey;
       setVisualizerKey(newKey);
@@ -181,7 +181,7 @@ export function useGameLoop(deps: GameLoopDeps) {
         const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
         setCurrentKey(newKey);
         setStatus(`Level Modulation: ${KEY_DISPLAY_MAP[newKey]}`);
-        await audioEngine.loadBackingTracks(newKey, "");
+        await audioEngine.loadBackingTracksWithin(newKey);
         currentCycleKey = newKey;
       }
 

@@ -48,6 +48,44 @@ async function tryResumeAudio() {
   }
 }
 
+/**
+ * Tell iOS this page is a media player, not a page that happens to make sound.
+ *
+ * Whether a backgrounded web page may keep playing is WebKit's call, and
+ * everything else in this file tries to influence it indirectly — a looping
+ * silent file, a watchdog timer. The Audio Session API is WebKit's own switch
+ * for exactly this, on recent iOS versions: 'playback' is the category a music
+ * app runs in. Older versions have no navigator.audioSession and skip this.
+ *
+ * Side effect worth knowing: 'playback' does not mix with other apps, so
+ * starting a session pauses music playing elsewhere (the silent keep-alive
+ * element very likely already did), and sound plays with the ringer switch on
+ * silent (which the header comment above says was the intent all along).
+ */
+export function declarePlaybackSession() {
+  setAudioSessionType('playback');
+}
+
+/**
+ * 'playback' is output only. Auto-Calibrate listens to the microphone, so it
+ * switches to the recording category while it listens and back afterwards
+ * (PitchDetector.cleanup). Without this, what iOS does with a microphone
+ * request under 'playback' is not something to leave to chance.
+ */
+export function declareRecordingSession() {
+  setAudioSessionType('play-and-record');
+}
+
+function setAudioSessionType(type: 'playback' | 'play-and-record') {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (!session) return;
+  try {
+    session.type = type;
+  } catch {
+    // Unknown category on this WebKit — leave it where it was.
+  }
+}
+
 function handleVisibilityChange() {
   if (!document.hidden) {
     tryResumeAudio();
@@ -63,6 +101,10 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
   activeHandlers = handlers;
 
   if (isInitialized) return;
+
+  // Before any sound plays: a category change applies from the next time
+  // audio starts, not to audio already running.
+  declarePlaybackSession();
 
   // Create the silent audio element
   audioEl = document.createElement("audio");

@@ -44,6 +44,9 @@ export class AudioEngine {
   private readonly PIANO_TIMING_OFFSET = -0.05; // Positive = later, Negative = earlier
   
   private currentTonic: string = "C"; 
+  // Bumped on every drone request, so a slow load that finishes after a newer
+  // one was asked for cannot swap the wrong key's drone in.
+  private droneRequest = 0;
   private isInitialized = false;
   
   // Track intended state to prevent race conditions
@@ -246,19 +249,51 @@ export class AudioEngine {
   public async loadBackingTracks(key: MusicalKey, _unused: string) {
     if (!this.isInitialized) return;
     this.currentTonic = typeof key === 'string' ? key : (key as any).tonic;
+    const request = ++this.droneRequest;
     
     const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
     const tonicLower = this.currentTonic.toLowerCase();
     const droneUrl = `${baseUrl}loops/drones/${tonicLower}_drone.mp3`;
+
+    // The old key's drone fades out now (the player's own fadeOut) instead of
+    // humming on under the new key's melody while the new one decodes. That
+    // clash was hidden when the game loop always waited for the load; it
+    // no longer waits indefinitely (see loadBackingTracksWithin).
+    if (this.dronePlayer.state === 'started') this.dronePlayer.stop();
     
     try {
-      await this.dronePlayer.load(droneUrl);
+      // Decoded into a buffer of its own and only then handed to the player.
+      // Two loads racing on the player itself would let the slower, older one
+      // land last and leave the drone in the wrong key.
+      const buffer = await new Tone.ToneAudioBuffer().load(droneUrl);
+      if (request !== this.droneRequest) return; // a newer key was asked for
+      this.dronePlayer.buffer = buffer;
       if (this.shouldBePlaying && Tone.Transport.state === 'started') {
         this.dronePlayer.start(0);
       }
     } catch (e) { console.error(`AudioEngine: Failed to load drone`, e); }
     
     if (this.shouldBePlaying) this.drumMachine.sync(); 
+  }
+
+  /**
+   * The game loop's way to change key: waits for the new drone, but never
+   * longer than maxWaitMs. The load carries on regardless, and the drone
+   * fades in whenever it lands.
+   *
+   * The loop used to wait for the drone however long it took, and nothing
+   * else was scheduled meanwhile — the next melody is written only once this
+   * returns. A 3-minute drone decodes quickly enough on screen, but in the
+   * background iOS can slow or stall that decode, so every key change was a
+   * point where a session that had survived leaving the app could go quiet.
+   * A cached drone normally lands inside the limit, so on screen this sounds
+   * the same as before.
+   */
+  public async loadBackingTracksWithin(key: MusicalKey, maxWaitMs = 1500) {
+    await Promise.race([
+      this.loadBackingTracks(key, ""),
+      new Promise<void>((resolve) => setTimeout(resolve, maxWaitMs)),
+    ]);
   }
 
   public scheduleRoutine(

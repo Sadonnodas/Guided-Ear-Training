@@ -71,7 +71,7 @@ export async function runProgressionsCycle(
     const newKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
     setCurrentKey(newKey);
     setStatus(`Modulating to ${KEY_DISPLAY_MAP[newKey]}...`);
-    await audioEngine.loadBackingTracks(newKey, "");
+    await audioEngine.loadBackingTracksWithin(newKey);
     if (!isPlayingRef.current) return;
     cycleKey = newKey;
     setVisualizerKey(newKey);
