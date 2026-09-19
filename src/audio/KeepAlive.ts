@@ -19,6 +19,12 @@ let bridgeGain: GainNode | null = null;
 let isInitialized = false;
 let isBridgeConnected = false;
 let keepAliveInterval: number | null = null; // NEW: Periodic wake-up timer
+// Whether the session currently wants the keep-alive running. Checked after
+// each await in startKeepAlive: a pause that lands while play() is still
+// pending must win, or the silent file starts after the pause — and with it
+// the watchdog, which then restarts the file whenever it stops — leaving the
+// lock screen saying "playing" for a paused session.
+let keepAliveWanted = false;
 
 type PlaybackHandlers = {
   onPlay: () => void;
@@ -257,10 +263,13 @@ export function updateMediaSessionState(isPlaying: boolean) {
  * MUST be called from a user gesture (click/tap) for iOS compatibility.
  */
 export async function startKeepAlive(): Promise<void> {
+  keepAliveWanted = true;
+
   // Ensure Tone.js context is running
   if (Tone.context.state !== 'running') {
     await Tone.context.resume();
   }
+  if (!keepAliveWanted) return;
 
   if (!audioEl) {
     console.warn("KeepAlive: Not initialized. Call initKeepAlive first.");
@@ -300,6 +309,11 @@ export async function startKeepAlive(): Promise<void> {
       console.warn("KeepAlive: Failed to play silent audio", e);
     }
   }
+  if (!keepAliveWanted) {
+    // Paused or stopped while play() was pending.
+    audioEl.pause();
+    return;
+  }
   
   // Watchdog timer to prevent iOS from killing audio while backgrounded.
   // PERF: when the tab is visible, the browser keeps the audio context alive
@@ -333,13 +347,15 @@ export async function startKeepAlive(): Promise<void> {
     console.log('[KeepAlive] Watchdog timer started');
   }
   
-  updateMediaSessionState(true);
+  if (keepAliveWanted) updateMediaSessionState(true);
 }
 
 /**
  * Stop the background audio (allows system to sleep)
  */
 export function stopKeepAlive() {
+  keepAliveWanted = false;
+
   // Clear watchdog timer
   if (keepAliveInterval !== null) {
     window.clearInterval(keepAliveInterval);

@@ -374,6 +374,12 @@ export class AudioEngine {
   public pausePlayback() {
     if (!this.isInitialized) return;
     this.shouldBePlaying = false;
+    // The silent keep-alive file has to pause too. The lock screen's
+    // play/pause state is iOS's reading of what is actually playing, and
+    // navigator.mediaSession.playbackState is only a hint it weighs against
+    // that — so a paused session with the silent file still looping went on
+    // showing as playing. resumePlayback starts it again.
+    stopKeepAlive();
     this.scheduler.pause();
     this.drumMachine.unsync();
     this.dronePlayer.stop();
