@@ -232,7 +232,7 @@ export class AudioEngine {
   public setDrumPattern(name: string) { 
     if (this.isInitialized) {
       this.drumMachine.setPattern(name as any);
-      if (this.shouldBePlaying && Tone.Transport.state === 'started') {
+      if (this.shouldBePlaying && Tone.getTransport().state === 'started') {
         this.drumMachine.sync();
       }
     }
@@ -268,12 +268,46 @@ export class AudioEngine {
       const buffer = await new Tone.ToneAudioBuffer().load(droneUrl);
       if (request !== this.droneRequest) return; // a newer key was asked for
       this.dronePlayer.buffer = buffer;
-      if (this.shouldBePlaying && Tone.Transport.state === 'started') {
+      if (this.shouldBePlaying && Tone.getTransport().state === 'started') {
         this.dronePlayer.start(0);
       }
     } catch (e) { console.error(`AudioEngine: Failed to load drone`, e); }
     
     if (this.shouldBePlaying) this.drumMachine.sync(); 
+  }
+
+  /**
+   * Start again on a brand-new audio context.
+   *
+   * iOS can leave an AudioContext unusable after an interruption or an audio
+   * route change — getting out of the car and off Bluetooth is the reliable
+   * way to produce it. resume() then never settles, and neither does the
+   * media element's play(), so stopping and starting the session inside the
+   * page changes nothing: it is all the same dead context. Killing the app
+   * worked because it built a new one, which is what this does without
+   * making you kill the app.
+   *
+   * Everything is rebuilt because every Tone node belongs to the context it
+   * was constructed on. The sample caches are dropped too — those buffers
+   * were decoded by the dead context — and reload on demand.
+   */
+  public async rebuildContext(vols: { groove: number, voice: number, click: number, master: number, drone: number }) {
+    const deadContext = Tone.getContext();
+
+    this.isInitialized = false;
+    this.noteBuffers.clear();
+    this.bassBuffers.clear();
+    this.pianoBuffers.clear();
+
+    Tone.setContext(new Tone.Context({ latencyHint: 'interactive' }));
+
+    // Never awaited: disposing a wedged context can hang exactly like
+    // resuming one, and nothing here depends on it finishing.
+    Promise.resolve()
+      .then(() => deadContext.dispose())
+      .catch(() => { /* already gone */ });
+
+    await this.init(vols);
   }
 
   /**
@@ -308,18 +342,18 @@ export class AudioEngine {
     fretboardMode: boolean = false // FIX #3: Add fretboardMode parameter
   ) {
     if (!this.isInitialized) return;
-    const beatSec = 60 / Tone.Transport.bpm.value;
+    const beatSec = 60 / Tone.getTransport().bpm.value;
     const melodyDur = notes.reduce((sum, n) => sum + n.duration, 0) * beatSec; 
     
     let safeStartTime = startTime;
-    const now = Tone.Transport.seconds;
-    const beatLen = 60 / Tone.Transport.bpm.value;
+    const now = Tone.getTransport().seconds;
+    const beatLen = 60 / Tone.getTransport().bpm.value;
     const measureLen = beatLen * 4;
 
     // Re-anchor when:
     //   - first cycle, or no startTime provided
     //   - startTime is in the past (preload took longer than the small lead)
-    //   - startTime is unreasonably far in the future (Tone.Transport.seconds
+    //   - startTime is unreasonably far in the future (Tone.getTransport().seconds
     //     rescales when bpm changes mid-session, which can leave a startTime
     //     from the previous bpm sitting several seconds ahead of "now" and
     //     causing a long silent gap before the next cycle plays).
@@ -350,11 +384,11 @@ export class AudioEngine {
     if (!this.isInitialized) return;
     this.shouldBePlaying = true; 
 
-    if (Tone.context.state !== 'running') Tone.context.resume();
+    if (Tone.getContext().state !== 'running') Tone.getContext().resume();
 
     startKeepAlive();
 
-    if (Tone.Transport.state !== 'started') {
+    if (Tone.getTransport().state !== 'started') {
       if (this.dronePlayer.loaded) this.dronePlayer.start(0);
       this.drumMachine.sync();
       this.scheduler.start();
@@ -368,7 +402,7 @@ export class AudioEngine {
     this.scheduler.stop(); 
     this.drumMachine.unsync();
     this.dronePlayer.stop(); 
-    Tone.Transport.cancel();
+    Tone.getTransport().cancel();
   }
 
   public pausePlayback() {
@@ -399,7 +433,7 @@ export class AudioEngine {
     this.scheduler.stop(); 
     this.drumMachine.unsync();
     this.dronePlayer.stop(); 
-    Tone.Transport.cancel();
+    Tone.getTransport().cancel();
   }
 
   // Volume setters

@@ -72,7 +72,7 @@ export class DrumMachine {
           const timeString = `0:${quarters}:${sixteenths}`;
           const offset = DRUM_OFFSETS[instrument] || 0;
           
-          const id = Tone.Transport.scheduleRepeat((time) => {
+          const id = Tone.getTransport().scheduleRepeat((time) => {
             this.players.player(instrument).start(time + offset);
           }, "1m", timeString); 
           
@@ -83,7 +83,7 @@ export class DrumMachine {
   }
 
   public unsync() {
-    this.scheduledEvents.forEach(id => Tone.Transport.clear(id));
+    this.scheduledEvents.forEach(id => Tone.getTransport().clear(id));
     this.scheduledEvents = [];
   }
 }

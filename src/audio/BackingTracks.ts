@@ -83,7 +83,7 @@ export class BackingTracks {
       this.drumPlayer.playbackRate = settings.playbackRate;
 
       // 3. If the app is already playing, start immediately
-      if (Tone.Transport.state === 'started') {
+      if (Tone.getTransport().state === 'started') {
         // Sync drums to transport
         this.drumPlayer.sync().start(0, settings.nudge || 0);
         

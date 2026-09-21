@@ -154,8 +154,8 @@ export async function runProgressionsCycle(
 
   // schedulePass helper
   const schedulePass = (passStartTime: number, playVocals: boolean, label: string) => {
-    Tone.Transport.schedule((time) => {
-      Tone.Draw.schedule(() => { if (!document.hidden) setStatus(label); }, time);
+    Tone.getTransport().schedule((time) => {
+      Tone.getDraw().schedule(() => { if (!document.hidden) setStatus(label); }, time);
     }, passStartTime);
 
     let beat = 0;
@@ -167,7 +167,7 @@ export async function runProgressionsCycle(
         settings.refs.maxVocalMidi.current
       );
 
-      Tone.Transport.schedule((time) => {
+      Tone.getTransport().schedule((time) => {
         audioEngine.playChord(bass, triad, time);
 
         if (playVocals) {
@@ -189,7 +189,7 @@ export async function runProgressionsCycle(
           );
         }
 
-        Tone.Draw.schedule(() => {
+        Tone.getDraw().schedule(() => {
           if (!document.hidden) {
             setActiveChordIndex(index);
             setActiveRootMidi(root);
@@ -200,8 +200,8 @@ export async function runProgressionsCycle(
       beat += chordDuration;
     });
 
-    Tone.Transport.schedule((time) => {
-      Tone.Draw.schedule(() => {
+    Tone.getTransport().schedule((time) => {
+      Tone.getDraw().schedule(() => {
         if (!document.hidden) {
           setActiveChordIndex(null);
           setActiveRootMidi(null);
@@ -213,10 +213,10 @@ export async function runProgressionsCycle(
   // Anchor time
   let anchorTime: number;
   if (isFirst) {
-    const now = Tone.Transport.seconds;
+    const now = Tone.getTransport().seconds;
     anchorTime = now < 0.1 ? 0 : Math.ceil(now / measureSec) * measureSec;
   } else {
-    const now = Tone.Transport.seconds;
+    const now = Tone.getTransport().seconds;
     const provided = startTime ?? now;
     anchorTime = provided < now + 0.1
       ? Math.ceil((now + 0.1) / measureSec) * measureSec
@@ -225,8 +225,8 @@ export async function runProgressionsCycle(
 
   const safeStartTime = anchorTime + measureSec;
 
-  Tone.Transport.schedule((time) => {
-    Tone.Draw.schedule(() => {
+  Tone.getTransport().schedule((time) => {
+    Tone.getDraw().schedule(() => {
       if (!document.hidden) {
         setStatus("Settling In...");
         setActiveChordIndex(null);
@@ -247,8 +247,8 @@ export async function runProgressionsCycle(
   // giving exactly 1 bar between cycles instead of the previous 3.
   const nextCycleStart = Math.ceil(cycleEndTime / measureSec) * measureSec;
 
-  Tone.Transport.schedule((time) => {
-    Tone.Draw.schedule(() => {
+  Tone.getTransport().schedule((time) => {
+    Tone.getDraw().schedule(() => {
       if (!document.hidden) {
         setStatus("Next...");
         setActiveChordIndex(null);
@@ -257,7 +257,7 @@ export async function runProgressionsCycle(
     }, time);
   }, cycleEndTime);
 
-  Tone.Transport.schedule(() => {
+  Tone.getTransport().schedule(() => {
     if (!isPlayingRef.current) return;
     questionCount.current++;
     runCycle(cycleKey, false, nextCycleStart);

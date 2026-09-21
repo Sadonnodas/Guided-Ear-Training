@@ -21,30 +21,30 @@ export class Scheduler {
     this.callbacks = callbacks;
   }
 
-  public setBpm(bpm: number) { Tone.Transport.bpm.value = bpm; }
+  public setBpm(bpm: number) { Tone.getTransport().bpm.value = bpm; }
 
   public start() {
-    if (Tone.context.state !== 'running') Tone.context.resume();
-    if (Tone.Transport.state !== 'started') {
+    if (Tone.getContext().state !== 'running') Tone.getContext().resume();
+    if (Tone.getTransport().state !== 'started') {
       this.ensureSystemEvents();
-      Tone.Transport.start();
+      Tone.getTransport().start();
     }
   }
 
   public stop() {
-    Tone.Transport.stop();
+    Tone.getTransport().stop();
     this.clearMelody();
     this.clearSystemEvents();
-    Tone.Transport.cancel(); 
+    Tone.getTransport().cancel(); 
   }
 
   public pause() {
-    Tone.Transport.pause();
+    Tone.getTransport().pause();
   }
 
   public resume() {
-    if (Tone.context.state !== 'running') Tone.context.resume();
-    Tone.Transport.start();
+    if (Tone.getContext().state !== 'running') Tone.getContext().resume();
+    Tone.getTransport().start();
   }
 
   public scheduleRoutine(
@@ -62,12 +62,12 @@ export class Scheduler {
     this.clearMelody();
     this.ensureSystemEvents();
 
-    const beatSec = 60 / Tone.Transport.bpm.value;
+    const beatSec = 60 / Tone.getTransport().bpm.value;
     const measureSec = 4 * beatSec;
 
     let anchorTime = atTime;
     if (anchorTime === undefined) {
-        const now = Tone.Transport.seconds;
+        const now = Tone.getTransport().seconds;
         const nextQuarter = Math.ceil(now / beatSec) * beatSec;
         anchorTime = nextQuarter; 
     }
@@ -75,7 +75,7 @@ export class Scheduler {
     const melodyStart = anchorTime + measureSec;
 
     const schedule = (callback: (time: number) => void, time: number) => {
-        const id = Tone.Transport.schedule(callback, time);
+        const id = Tone.getTransport().schedule(callback, time);
         this.melodyEventIds.push(id);
     };
 
@@ -85,7 +85,7 @@ export class Scheduler {
      */
     const schedulePass = (start: number, playAudio: boolean, isSilentPass: boolean, label: string) => {
         schedule((time) => {
-            Tone.Draw.schedule(() => {
+            Tone.getDraw().schedule(() => {
                 this.callbacks.onStatusChange(label);
             }, time);
         }, start);
@@ -101,7 +101,7 @@ export class Scheduler {
             }
 
             schedule((time) => {
-                Tone.Draw.schedule(() => {
+                Tone.getDraw().schedule(() => {
                     if (!document.hidden) this.callbacks.onNotePlay(note, false);
                 }, time);
             }, noteTime);
@@ -163,43 +163,43 @@ export class Scheduler {
     // 1. Visual Status Update: "Prepare..." (Skip if modulation is next)
     if (!skipPrepare) {
         schedule((time) => {
-            Tone.Draw.schedule(() => {
+            Tone.getDraw().schedule(() => {
                 this.callbacks.onStatusChange("Prepare...");
             }, time);
         }, cursor - 0.1);
     }
 
     // 2. Logic: Next Cycle Trigger
-    // CRITICAL: NOT wrapped in Tone.Draw. This ensures the game continues even if the tab is hidden.
+    // CRITICAL: NOT wrapped in Tone.getDraw(). This ensures the game continues even if the tab is hidden.
     schedule(() => {
         onComplete(cursor); 
     }, cursor - 0.05); 
   }
 
   private clearMelody() {
-    this.melodyEventIds.forEach(id => Tone.Transport.clear(id));
+    this.melodyEventIds.forEach(id => Tone.getTransport().clear(id));
     this.melodyEventIds = [];
   }
 
   private ensureSystemEvents() {
     if (this.clickEventId !== null) return;
 
-    this.pulseEventId = Tone.Transport.scheduleRepeat((time) => {
-        Tone.Draw.schedule(() => {
+    this.pulseEventId = Tone.getTransport().scheduleRepeat((time) => {
+        Tone.getDraw().schedule(() => {
              if (!document.hidden) {
-                 this.callbacks.onBeat(Math.floor(Tone.Transport.position as number));
+                 this.callbacks.onBeat(Math.floor(Tone.getTransport().position as number));
              }
         }, time);
     }, "4n");
 
-    this.clickEventId = Tone.Transport.scheduleRepeat((time) => {
+    this.clickEventId = Tone.getTransport().scheduleRepeat((time) => {
         this.callbacks.onTick(time);
     }, "4n");
   }
 
   private clearSystemEvents() {
-    if (this.pulseEventId !== null) Tone.Transport.clear(this.pulseEventId);
-    if (this.clickEventId !== null) Tone.Transport.clear(this.clickEventId);
+    if (this.pulseEventId !== null) Tone.getTransport().clear(this.pulseEventId);
+    if (this.clickEventId !== null) Tone.getTransport().clear(this.clickEventId);
     this.pulseEventId = null;
     this.clickEventId = null;
   }

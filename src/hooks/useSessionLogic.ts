@@ -16,7 +16,8 @@
 import * as Tone from "tone";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { audioEngine } from "../audio/AudioEngine.ts";
-import { initKeepAlive, updateMediaSessionState, startKeepAlive } from "../audio/KeepAlive.ts";
+import { initKeepAlive, updateMediaSessionState, startKeepAlive, rebuildKeepAlive } from "../audio/KeepAlive.ts";
+import { withDeadline } from "../lib/withDeadline.ts";
 import { useAudioSetup } from "./useAudioSetup.ts";
 import { useTrainingMode } from "./useTrainingMode.ts";
 import { useMixerLogic } from "./useMixerLogic.ts";
@@ -187,6 +188,14 @@ export function useSessionLogic() {
       onPause: () => pauseSession(),
       onNext:  () => { if (isPlayingRef.current) runCycle(currentKeyRef.current, false); },
       onAudioInterrupted: () => { if (isPlayingRef.current) pauseSession(); },
+      onAudioRecovered: () => {
+        // The audio came back on its own after an interruption or a route
+        // change. Transport time drifted while it was gone, so the cycle is
+        // restarted from scratch rather than resumed mid-melody.
+        if (!isPlayingRef.current) return;
+        audioEngine.softReset();
+        runCycle(currentKeyRef.current, true);
+      },
     });
   }, [resumeFromMediaSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -375,29 +384,60 @@ export function useSessionLogic() {
     }
     if (isPlaying) { pauseSession(); return; }
 
+    const vols = {
+      groove: mixer.volGroove, voice: mixer.volVoice,
+      click:  mixer.volMetronome, master: mixer.volMaster, drone: mixer.volDrone,
+    };
+
     try {
       setStatus("Initializing...");
       setIsPlaying(true);
       isPlayingRef.current = true;
 
-      await Tone.start();
-      await startKeepAlive();
+      // Every step here is deadlined. On iOS these calls hang rather than
+      // fail once an audio route change (leaving the car, unplugging
+      // headphones) has wedged the audio context, and an await with no
+      // deadline is why the app used to sit on "Initializing..." until it
+      // was force-quit.
+      let audioIsUsable = true;
+      try {
+        await withDeadline(Tone.start(), 3000, 'Tone.start');
+        await withDeadline(startKeepAlive(), 3000, 'startKeepAlive');
+        audioIsUsable = Tone.getContext().state === 'running';
+      } catch (stall) {
+        console.warn('Audio would not start; rebuilding the context.', stall);
+        audioIsUsable = false;
+      }
+
+      if (!audioIsUsable) {
+        // A wedged context cannot be revived, only replaced — the thing
+        // force-quitting the app used to do.
+        setStatus("Restarting audio...");
+        await withDeadline(audioEngine.rebuildContext(vols), 8000, 'rebuildContext');
+        hasInitializedAudio.current = true;
+        rebuildKeepAlive();
+        try {
+          await withDeadline(startKeepAlive(), 3000, 'startKeepAlive after rebuild');
+        } catch {
+          // Background playback may be weaker until the next start; sound
+          // itself does not depend on it, so carry on.
+        }
+      }
 
       if (!hasInitializedAudio.current) {
-        await audioEngine.init({
-          groove: mixer.volGroove, voice: mixer.volVoice,
-          click:  mixer.volMetronome, master: mixer.volMaster, drone: mixer.volDrone,
-        });
+        await audioEngine.init(vols);
         hasInitializedAudio.current = true;
       }
 
-      Tone.Transport.stop();
-      Tone.Transport.cancel();
-      Tone.Transport.position = 0;
+      Tone.getTransport().stop();
+      Tone.getTransport().cancel();
+      Tone.getTransport().position = 0;
       if (!isPlayingRef.current) return;
 
       setVisualizerKey(currentKey);
-      await audioEngine.loadBackingTracks(currentKey, "");
+      // Bounded for the same reason: decoding runs on the audio context, so
+      // a bad one takes this down with it.
+      await audioEngine.loadBackingTracksWithin(currentKey, 5000);
       audioEngine.setBpm(settings.bpm);
       audioEngine.setDrumPattern(settings.currentPattern);
       audioEngine.setReverbAmt(mixer.volReverb);

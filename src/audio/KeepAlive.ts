@@ -1,4 +1,5 @@
 import * as Tone from "tone";
+import { withDeadline } from "../lib/withDeadline";
 
 /**
  * KeepAlive.ts - Background Audio & Media Controls
@@ -26,32 +27,93 @@ let keepAliveInterval: number | null = null; // NEW: Periodic wake-up timer
 // lock screen saying "playing" for a paused session.
 let keepAliveWanted = false;
 
+// The context the statechange listener is attached to. After a rebuild the
+// global context is a different object, so "remove the listener" has to mean
+// the one we actually added it to.
+let listeningContext: AudioContext | null = null;
+
 type PlaybackHandlers = {
   onPlay: () => void;
   onPause: () => void;
   onNext?: () => void;
   onAudioInterrupted?: () => void;
+  onAudioRecovered?: () => void;
 };
 
 let activeHandlers: PlaybackHandlers | null = null;
 
+// Set when the audio context drops out from under a running session, so
+// coming back to 'running' can be told apart from ordinary start-up.
+let wasInterrupted = false;
+
+/**
+ * The audio context changed state without us asking — an interruption
+ * (a call, Siri) or a route change (plugging in headphones, the car's
+ * Bluetooth connecting on a drive home).
+ *
+ * This is the only recovery path that works with the app in your pocket.
+ * tryResumeAudio below needs you to touch the screen or come back to the
+ * app, and the watchdog needs its timer to still be running. Neither is true
+ * while the phone is locked in a pocket, which is exactly when a car
+ * connects.
+ */
+function handleContextStateChange() {
+  if (!keepAliveWanted) return;
+  const ctx = Tone.getContext().rawContext as AudioContext;
+
+  if (ctx.state !== 'running') {
+    // Safari reports 'interrupted' here, not 'suspended'.
+    wasInterrupted = true;
+    ctx.resume().catch(() => { /* iOS may want a gesture; the next event retries */ });
+    return;
+  }
+
+  if (!wasInterrupted) return; // ordinary start-up, nothing to recover from
+  wasInterrupted = false;
+
+  // The silent keep-alive file is usually stopped by the same route change.
+  if (audioEl?.paused) audioEl.play().catch(() => {});
+  updateMediaSessionState(true);
+
+  // Carry on rather than pause. The session never asked to stop, and if the
+  // app goes quiet here iOS hands the car's play button to whichever native
+  // app it considers the player instead.
+  activeHandlers?.onAudioRecovered?.();
+}
+
 /**
  * Resumes the audio context after an interruption (e.g. phone call).
  * Must be called from a user gesture to work on iOS.
+ *
+ * This is the path where YOU brought the app back, so it pauses cleanly and
+ * leaves the next move to you. Recovery that happens on its own, with the
+ * app still in your pocket, goes through handleContextStateChange above and
+ * keeps playing.
  */
 async function tryResumeAudio() {
-  if (!keepAliveInterval) return; // Only when session is active
-  const ctx = Tone.context.rawContext as AudioContext;
-  if (ctx.state !== 'running') {
-    try {
-      await ctx.resume();
-      if (audioEl && audioEl.paused) {
-        await audioEl.play();
-      }
-      // Notify session so it can pause cleanly — Transport time may have drifted
-      activeHandlers?.onAudioInterrupted?.();
-    } catch (e) { /* requires user gesture - will retry on next interaction */ }
+  if (!keepAliveWanted) return; // Only when the session wants audio
+  const ctx = Tone.getContext().rawContext as AudioContext;
+
+  if (ctx.state === 'running') {
+    // Audio is fine but the silent file is not running. This is what a
+    // context rebuild leaves behind: the element has to be built anew (a
+    // MediaElementSource belongs to one context for good), and by then the
+    // tap that started the session is long over, so play() was refused.
+    // Any later touch is a fresh gesture, so try again.
+    if (audioEl?.paused) audioEl.play().catch(() => {});
+    return;
   }
+
+  // Anything else ('suspended' or Safari's 'interrupted') needs reviving, and
+  // this path runs from a real gesture, which is what iOS asks for.
+  try {
+    await ctx.resume();
+    if (audioEl && audioEl.paused) {
+      await audioEl.play();
+    }
+    // Notify session so it can pause cleanly — Transport time may have drifted
+    activeHandlers?.onAudioInterrupted?.();
+  } catch (e) { /* requires user gesture - will retry on next interaction */ }
 }
 
 /**
@@ -149,6 +211,8 @@ export function initKeepAlive(handlers: PlaybackHandlers) {
   setupMediaSession();
 
   // Resume audio context after interruptions (e.g. phone calls) on mobile
+  listeningContext = Tone.getContext().rawContext as AudioContext;
+  listeningContext.addEventListener('statechange', handleContextStateChange);
   document.addEventListener('visibilitychange', handleVisibilityChange);
   document.addEventListener('touchstart', tryResumeAudio, { capture: true, passive: true });
   document.addEventListener('click', tryResumeAudio, { capture: true });
@@ -266,8 +330,8 @@ export async function startKeepAlive(): Promise<void> {
   keepAliveWanted = true;
 
   // Ensure Tone.js context is running
-  if (Tone.context.state !== 'running') {
-    await Tone.context.resume();
+  if (Tone.getContext().state !== 'running') {
+    await Tone.getContext().resume();
   }
   if (!keepAliveWanted) return;
 
@@ -279,7 +343,7 @@ export async function startKeepAlive(): Promise<void> {
   // Connect the audio bridge to Web Audio graph (only once)
   if (!isBridgeConnected) {
     try {
-      const ctx = Tone.context.rawContext as AudioContext;
+      const ctx = Tone.getContext().rawContext as AudioContext;
       
       // Create source from the silent audio element
       mediaSource = ctx.createMediaElementSource(audioEl);
@@ -300,10 +364,12 @@ export async function startKeepAlive(): Promise<void> {
     }
   }
 
-  // Start playing the silent audio
+  // Start playing the silent audio. Deadlined because play() does not always
+  // come back at all once iOS has disturbed the audio session — it hangs
+  // instead of failing, and this sits in the path to starting a session.
   if (audioEl.paused) {
     try {
-      await audioEl.play();
+      await withDeadline(audioEl.play(), 2500, 'keep-alive play()');
       console.log('[KeepAlive] Silent audio started');
     } catch (e) {
       console.warn("KeepAlive: Failed to play silent audio", e);
@@ -329,9 +395,11 @@ export async function startKeepAlive(): Promise<void> {
         audioEl.play().catch(() => {});
       }
 
-      // 2. Ensure audio context is still running
-      const ctx = Tone.context.rawContext as AudioContext;
-      if (ctx.state === 'suspended') {
+      // 2. Ensure audio context is still running. Anything but 'running'
+      // counts: Safari parks an interrupted context in 'interrupted', which
+      // the old 'suspended' test walked straight past.
+      const ctx = Tone.getContext().rawContext as AudioContext;
+      if (ctx.state !== 'running') {
         ctx.resume().catch(() => {});
       }
 
@@ -371,6 +439,20 @@ export function stopKeepAlive() {
 }
 
 /**
+ * Throw the silent element and its bridge away and build them again.
+ *
+ * Needed for two things that cannot be repaired in place: an element whose
+ * play() has stopped coming back, and a new audio context — a
+ * MediaElementSource belongs to the context that created it, and an element
+ * can never be given a second one.
+ */
+export function rebuildKeepAlive() {
+  const handlers = activeHandlers;
+  resetKeepAlive();
+  if (handlers) initKeepAlive(handlers);
+}
+
+/**
  * Check if the keep-alive bridge is active
  */
 export function isKeepAliveActive(): boolean {
@@ -402,6 +484,8 @@ export function resetKeepAlive() {
     audioEl = null;
   }
   
+  listeningContext?.removeEventListener('statechange', handleContextStateChange);
+  listeningContext = null;
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   document.removeEventListener('touchstart', tryResumeAudio, { capture: true });
   document.removeEventListener('click', tryResumeAudio, { capture: true });
