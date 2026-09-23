@@ -18,6 +18,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { audioEngine } from "../audio/AudioEngine.ts";
 import { initKeepAlive, updateMediaSessionState, startKeepAlive, rebuildKeepAlive } from "../audio/KeepAlive.ts";
 import { withDeadline } from "../lib/withDeadline.ts";
+import { isContextTicking } from "../audio/contextHealth.ts";
 import { useAudioSetup } from "./useAudioSetup.ts";
 import { useTrainingMode } from "./useTrainingMode.ts";
 import { useMixerLogic } from "./useMixerLogic.ts";
@@ -172,15 +173,56 @@ export function useSessionLogic() {
   });
 
   // ── MediaSession / KeepAlive ─────────────────────────────────────────────────
-  const resumeFromMediaSession = useCallback(() => {
-    if (isPaused) {
-      setIsPlaying(true);
-      setIsPaused(false);
-      isPlayingRef.current = true;
-      audioEngine.resumePlayback();
-      updateMediaSessionState(true);
+  /** Is there a working audio context, or one that only claims to be? */
+  const audioIsAlive = () =>
+    isContextTicking(Tone.getContext().rawContext as AudioContext);
+
+  /**
+   * Throw the audio away and build it again. Returns whether that produced
+   * something that actually plays.
+   */
+  const rebuildAudio = async (): Promise<boolean> => {
+    setStatus("Restarting audio...");
+    try {
+      await withDeadline(audioEngine.rebuildContext({
+        groove: mixer.volGroove, voice: mixer.volVoice,
+        click:  mixer.volMetronome, master: mixer.volMaster, drone: mixer.volDrone,
+      }), 8000, 'rebuildContext');
+    } catch (e) {
+      console.warn('Rebuilding the audio context failed.', e);
+      return false;
     }
-  }, [isPaused]);
+    hasInitializedAudio.current = true;
+    rebuildKeepAlive();
+    try {
+      await withDeadline(startKeepAlive(), 3000, 'startKeepAlive after rebuild');
+    } catch {
+      // Background playback may be weaker; sound itself does not need it.
+    }
+    return audioIsAlive();
+  };
+
+  const resumeFromMediaSession = useCallback(async () => {
+    if (!isPaused) return;
+    setIsPlaying(true);
+    setIsPaused(false);
+    isPlayingRef.current = true;
+    updateMediaSessionState(true);
+
+    if (await audioIsAlive()) {
+      audioEngine.resumePlayback();
+      return;
+    }
+    // A call left the context dead. Resuming onto it would look exactly like
+    // playing and make no sound, which is what used to happen.
+    if (await rebuildAudio()) {
+      audioEngine.softReset();
+      runCycle(currentKeyRef.current, true);
+    } else {
+      pauseSession();
+      setStatus("Audio stopped — press play");
+    }
+  }, [isPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     initKeepAlive({
@@ -188,11 +230,23 @@ export function useSessionLogic() {
       onPause: () => pauseSession(),
       onNext:  () => { if (isPlayingRef.current) runCycle(currentKeyRef.current, false); },
       onAudioInterrupted: () => { if (isPlayingRef.current) pauseSession(); },
-      onAudioRecovered: () => {
+      onAudioRecovered: async () => {
         // The audio came back on its own after an interruption or a route
         // change. Transport time drifted while it was gone, so the cycle is
         // restarted from scratch rather than resumed mid-melody.
         if (!isPlayingRef.current) return;
+
+        if (!(await audioIsAlive())) {
+          // Back in name only — the context says 'running' and plays
+          // silence. Rebuilding wants a gesture to be dependable, and there
+          // is none here, so say so rather than mime playing. The lock
+          // screen now reads paused, so the car's play button comes back
+          // through resumeFromMediaSession, which does rebuild.
+          pauseSession();
+          setStatus("Audio interrupted — press play");
+          return;
+        }
+
         audioEngine.softReset();
         runCycle(currentKeyRef.current, true);
       },
@@ -374,13 +428,18 @@ export function useSessionLogic() {
 
   const startSession = async () => {
     if (isPaused) {
-      setIsPlaying(true);
+      if (await audioIsAlive()) {
+        setIsPlaying(true);
+        setIsPaused(false);
+        isPlayingRef.current = true;
+        setStatus("Resuming...");
+        updateMediaSessionState(true);
+        audioEngine.resumePlayback();
+        return;
+      }
+      // Dead context: resuming onto it plays nothing. Fall through to the
+      // full start below, which rebuilds.
       setIsPaused(false);
-      isPlayingRef.current = true;
-      setStatus("Resuming...");
-      updateMediaSessionState(true);
-      audioEngine.resumePlayback();
-      return;
     }
     if (isPlaying) { pauseSession(); return; }
 
@@ -403,7 +462,7 @@ export function useSessionLogic() {
       try {
         await withDeadline(Tone.start(), 3000, 'Tone.start');
         await withDeadline(startKeepAlive(), 3000, 'startKeepAlive');
-        audioIsUsable = Tone.getContext().state === 'running';
+        audioIsUsable = await audioIsAlive();
       } catch (stall) {
         console.warn('Audio would not start; rebuilding the context.', stall);
         audioIsUsable = false;
@@ -412,16 +471,7 @@ export function useSessionLogic() {
       if (!audioIsUsable) {
         // A wedged context cannot be revived, only replaced — the thing
         // force-quitting the app used to do.
-        setStatus("Restarting audio...");
-        await withDeadline(audioEngine.rebuildContext(vols), 8000, 'rebuildContext');
-        hasInitializedAudio.current = true;
-        rebuildKeepAlive();
-        try {
-          await withDeadline(startKeepAlive(), 3000, 'startKeepAlive after rebuild');
-        } catch {
-          // Background playback may be weaker until the next start; sound
-          // itself does not depend on it, so carry on.
-        }
+        await rebuildAudio();
       }
 
       if (!hasInitializedAudio.current) {

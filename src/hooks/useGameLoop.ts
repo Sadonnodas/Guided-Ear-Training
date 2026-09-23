@@ -1,5 +1,6 @@
 import { useRef, useCallback } from "react";
 import { audioEngine } from "../audio/AudioEngine.ts";
+import { withDeadline } from "../lib/withDeadline.ts";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator.ts";
 import { getFretboardConfig } from "../config/FretboardData.ts";
 import { runProgressionsCycle } from "./useProgressionsCycle.ts";
@@ -284,7 +285,12 @@ export function useGameLoop(deps: GameLoopDeps) {
 
     // ── E. Preload & schedule ───────────────────────────────────────────────────
     if (noteEvents && isPlayingRef.current) {
-      await audioEngine.preloadNotes(noteEvents);
+      // Deadlined and allowed to fail: decoding runs on the audio context, so
+      // a dead one hangs here for good — this is where the app sat on
+      // "Initializing..." after a call. Notes with no sample fall back to the
+      // synth, which is a far better outcome than never playing again.
+      await withDeadline(audioEngine.preloadNotes(noteEvents), 5000, 'preloadNotes')
+        .catch((e) => console.warn('Sample preload stalled; using the synth.', e));
       if (!isPlayingRef.current) return;
 
       audioEngine.scheduleRoutine(

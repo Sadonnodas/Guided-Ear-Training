@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import { audioEngine } from "../audio/AudioEngine.ts";
+import { withDeadline } from "../lib/withDeadline.ts";
 import {
   generateChordProgression,
   generateModulationProgression,
@@ -119,7 +120,12 @@ export async function runProgressionsCycle(
 
   if (!isPlayingRef.current) return;
   const t0 = performance.now();
-  await audioEngine.preloadChordSamples(allMidiNotes);
+  // Deadlined and allowed to fail: decoding runs on the audio context, so
+  // a dead one hangs here for good — this is where the app sat on
+  // "Initializing..." after a call. Notes with no sample fall back to the
+  // synth, which is a far better outcome than never playing again.
+  await withDeadline(audioEngine.preloadChordSamples(allMidiNotes), 5000, 'preloadChordSamples')
+    .catch((e) => console.warn('Sample preload stalled; using the synth.', e));
   if (!isPlayingRef.current) return;
 
   // Preload vocal samples for Sing Along pass
@@ -141,7 +147,12 @@ export async function runProgressionsCycle(
       duration: 2,
     };
   });
-  await audioEngine.preloadNotes(vocalNoteEvents);
+  // Deadlined and allowed to fail: decoding runs on the audio context, so
+  // a dead one hangs here for good — this is where the app sat on
+  // "Initializing..." after a call. Notes with no sample fall back to the
+  // synth, which is a far better outcome than never playing again.
+  await withDeadline(audioEngine.preloadNotes(vocalNoteEvents), 5000, 'preloadNotes')
+    .catch((e) => console.warn('Sample preload stalled; using the synth.', e));
   // PERF: dropped per-cycle preload-timing log (ran every progression cycle).
   void t0;
   if (!isPlayingRef.current) return;
