@@ -17,4 +17,5 @@ export const TAB_DEFAULTS: Record<string, {
   training:     { inverseMode: false, trainingWheels: false, hideFretboardVisuals: false },
   fretboard:    { inverseMode: true,  trainingWheels: false, hideFretboardVisuals: false },
   progressions: { inverseMode: false, trainingWheels: false, hideFretboardVisuals: false },
+  tonic:        { inverseMode: false, trainingWheels: false, hideFretboardVisuals: false },
 };

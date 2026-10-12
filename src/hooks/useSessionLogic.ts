@@ -82,6 +82,9 @@ export function useSessionLogic() {
   const [activeTab,   setActiveTab]   = usePersistentState("activeTab", "random", asOneOf(TABS));
 
   // Progressions visualizer state
+  // Find the Tonic hides the key until you have answered.
+  const [tonicRevealed, setTonicRevealed] = useState(false);
+
   const [activeChordIndex, setActiveChordIndex] = useState<number | null>(null);
   const [activeRootMidi,   setActiveRootMidi]   = useState<number | null>(null);
   const currentProgression = useRef<ChordProgression | null>(null);
@@ -158,6 +161,7 @@ export function useSessionLogic() {
     debugClick,
     playbackSound: settings.playbackSound,
     keyAnchor: settings.keyAnchor,
+    activeTab,
     setTriggerPulse, setActiveMidi, visualTimeoutRef,
   });
 
@@ -171,6 +175,7 @@ export function useSessionLogic() {
     training,
     setVisualizerKey, setActiveMidi, setStatus, setCurrentKey,
     setEnabledDegrees, setActiveChordIndex, setActiveRootMidi,
+    setTonicRevealed,
   });
 
   // ── MediaSession / KeepAlive ─────────────────────────────────────────────────
@@ -518,6 +523,7 @@ export function useSessionLogic() {
     triggerPulse,
     debugClick, setDebugClick,
     activeChordIndex, activeRootMidi, currentProgression,
+    tonicRevealed,
 
     ...mixer,
     ...settings,

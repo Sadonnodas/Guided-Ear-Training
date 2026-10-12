@@ -236,6 +236,71 @@ export class Scheduler {
     schedule(() => opts.onComplete(end), end - 0.05);
   }
 
+  /**
+   * One round of Find the Tonic: the key stated by chords, a silence long
+   * enough to sing into, then the tonic sung back so you can compare.
+   *
+   * The silence is the exercise. Nothing holds the key through it, and the
+   * answer only arrives after you have committed to one.
+   */
+  public scheduleTonicRound(opts: {
+    playChords: (time: number, beatSec: number) => void;
+    chordBeats: number;
+    silenceBeats: number;
+    revealNote: NoteEvent;
+    onReveal: () => void;
+    onComplete: (nextStartTime: number) => void;
+    atTime?: number;
+  }) {
+    this.clearMelody();
+    this.ensureSystemEvents();
+
+    const beatSec = 60 / Tone.getTransport().bpm.value;
+    const measureSec = 4 * beatSec;
+
+    let anchorTime = opts.atTime;
+    if (anchorTime === undefined) {
+      const now = Tone.getTransport().seconds;
+      anchorTime = Math.ceil(now / beatSec) * beatSec;
+    }
+    const start = anchorTime + measureSec;
+
+    const schedule = (callback: (time: number) => void, time: number) => {
+      this.melodyEventIds.push(Tone.getTransport().schedule(callback, time));
+    };
+    const say = (label: string, at: number) => {
+      schedule((time) => {
+        Tone.getDraw().schedule(() => this.callbacks.onStatusChange(label), time);
+      }, at);
+    };
+
+    say("Listen", start);
+    schedule((time) => opts.playChords(time, beatSec), start);
+
+    const singFrom = start + opts.chordBeats * beatSec;
+    say("Sing the 1", singFrom);
+
+    const revealAt = singFrom + opts.silenceBeats * beatSec;
+    say("That was the 1", revealAt);
+    schedule((time) => {
+      this.callbacks.playNoteAudio(opts.revealNote, time, false);
+      // Revealing the key is state, not drawing, so it runs here rather than
+      // inside Draw: Draw drops callbacks it reaches late, and an answer that
+      // sometimes fails to appear is worse than one that appears a frame early.
+      opts.onReveal();
+      Tone.getDraw().schedule(() => {
+        if (!document.hidden) this.callbacks.onNotePlay(opts.revealNote, false);
+      }, time);
+    }, revealAt);
+
+    // Two bars after the answer, not one: the next round hides the key again
+    // the moment it starts, and a glimpse of the answer is no use. The hiding
+    // is deliberately immediate rather than scheduled — a dropped frame must
+    // never leave the last round's key on screen during the next question.
+    const end = revealAt + 8 * beatSec;
+    schedule(() => opts.onComplete(end), end - 0.05);
+  }
+
   private clearMelody() {
     this.melodyEventIds.forEach(id => Tone.getTransport().clear(id));
     this.melodyEventIds = [];

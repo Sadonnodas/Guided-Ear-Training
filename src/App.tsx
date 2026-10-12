@@ -110,6 +110,7 @@ export default function App() {
           setActiveTab={session.setActiveTab}
           currentKey={session.currentKey} 
           setKeyManually={session.setKeyManually}
+          hideKey={session.activeTab === 'tonic' && !session.tonicRevealed}
           viewMode={viewMode} 
           setViewMode={setViewMode}
           scaleType={session.scaleType}

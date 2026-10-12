@@ -10,6 +10,9 @@ import type { MusicalKey, ScaleDegree, ScaleType, MelodyConstraints, MelodyDiffi
 import { KEYS, KEY_DISPLAY_MAP } from "./sessionConstants.ts";
 
 const ANCHOR_CHORD_BEATS = 2;
+// Two bars of silence to find and sing the tonic in: long enough to hunt for
+// it, short enough that you commit rather than work it out.
+const TONIC_SILENCE_BEATS = 8;
 
 /**
  * The anchor progression: I-IV-V-I, the plainest way to state a key.
@@ -89,6 +92,7 @@ export interface GameLoopDeps {
   setEnabledDegrees: (d: ScaleDegree[]) => void;
   setActiveChordIndex: (i: number | null) => void;
   setActiveRootMidi: (m: number | null) => void;
+  setTonicRevealed: (revealed: boolean) => void;
 }
 
 export function useGameLoop(deps: GameLoopDeps) {
@@ -111,6 +115,7 @@ export function useGameLoop(deps: GameLoopDeps) {
       settings, training,
       setVisualizerKey, setActiveMidi, setStatus, setCurrentKey,
       setEnabledDegrees, setActiveChordIndex, setActiveRootMidi,
+      setTonicRevealed,
     } = deps;
 
     if (!isPlayingRef.current) return;
@@ -118,6 +123,54 @@ export function useGameLoop(deps: GameLoopDeps) {
     setVisualizerKey(keyToUse);
     setActiveMidi(null);
     questionCount.current += 1;
+
+    // ── Find the Tonic ─────────────────────────────────────────────────────────
+    // Its own shape: a key stated by chords, a silence to sing into, then the
+    // tonic sung back. A fresh key every round, because the point is finding
+    // the tonic cold rather than keeping one you already have.
+    if (activeTabRef.current === 'tonic') {
+      const options = KEYS.filter((k: MusicalKey) => k !== currentKeyRef.current);
+      const roundKey = options[Math.floor(Math.random() * options.length)];
+
+      const chords = anchorChords(scaleTypeRef.current);
+      const voiced = chords.map((chord) => getChordMidiNotes(
+        chord, roundKey,
+        settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
+      ));
+      const [revealNote] = generateFixedPattern(
+        ["1"], roundKey, scaleTypeRef.current,
+        settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
+      );
+
+      await withDeadline(Promise.all([
+        audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad])),
+        audioEngine.preloadNotes([revealNote]),
+      ]), 5000, 'tonic preload').catch((e) => console.warn('Tonic preload stalled.', e));
+      if (!isPlayingRef.current) return;
+
+      setTonicRevealed(false);
+      audioEngine.scheduleTonicRound({
+        playChords: (time, beatSec) => {
+          voiced.forEach((v, i) => {
+            audioEngine.playChord(v.bass, v.triad, time + i * ANCHOR_CHORD_BEATS * beatSec);
+          });
+        },
+        chordBeats: voiced.length * ANCHOR_CHORD_BEATS,
+        silenceBeats: TONIC_SILENCE_BEATS,
+        revealNote,
+        onReveal: () => {
+          // The key is only named once you have answered.
+          setCurrentKey(roundKey);
+          setVisualizerKey(roundKey);
+          setTonicRevealed(true);
+        },
+        onComplete: (next) => { if (isPlayingRef.current) runCycle(roundKey, false, next); },
+        atTime: startTime,
+      });
+
+      if (isFirst) audioEngine.startPlayback();
+      return;
+    }
 
     let currentCycleKey = keyToUse;
     let forceOneThreeFive = false;

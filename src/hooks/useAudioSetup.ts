@@ -11,6 +11,7 @@ interface AudioSetupProps {
   debugClick: boolean;
   playbackSound: 'synth' | 'piano' | 'guitar';
   keyAnchor: 'drone' | 'vocals' | 'chords';
+  activeTab: string;
   setTriggerPulse: (v: boolean) => void;
   setActiveMidi: (m: number | null) => void;
   visualTimeoutRef: React.MutableRefObject<number>;
@@ -46,6 +47,9 @@ export function useAudioSetup(props: AudioSetupProps) {
   useEffect(() => { audioEngine.setDroneVol(props.volDrone); }, [props.volDrone]); // RESTORED
   useEffect(() => { audioEngine.setDebugClick(props.debugClick); }, [props.debugClick]);
   useEffect(() => { audioEngine.setPlaybackSound(props.playbackSound); }, [props.playbackSound]);
-  // An anchor exercise is pointless with a drone humming under it.
-  useEffect(() => { audioEngine.setDroneEnabled(props.keyAnchor === 'drone'); }, [props.keyAnchor]);
+  // An anchor exercise is pointless with a drone humming under it — and in
+  // Find the Tonic the drone IS the answer, sounding continuously.
+  useEffect(() => {
+    audioEngine.setDroneEnabled(props.keyAnchor === 'drone' && props.activeTab !== 'tonic');
+  }, [props.keyAnchor, props.activeTab]);
 }

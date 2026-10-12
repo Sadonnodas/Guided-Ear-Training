@@ -17,6 +17,8 @@ const KEY_DISPLAY_MAP: Record<MusicalKey, string> = {
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  /** Find the Tonic hides the key: showing it would be the answer. */
+  hideKey?: boolean;
   currentKey: MusicalKey;
   setKeyManually: (k: MusicalKey) => void;
   viewMode: 'tape' | 'static';
@@ -38,7 +40,7 @@ interface HeaderProps {
 }
 
 export default function Header({ 
-  activeTab, setActiveTab, currentKey, setKeyManually, 
+  activeTab, setActiveTab, currentKey, setKeyManually, hideKey,
   viewMode, setViewMode, scaleType, handleScaleChange,
   activeLevelId, setActiveLevelId, levels,
   selectedShape, setSelectedShape,
@@ -110,6 +112,13 @@ export default function Header({
         >
           Progressions
         </button>
+        <button 
+          className={`tab-btn ${activeTab === 'tonic' ? 'active' : ''}`} 
+          onClick={() => handleTabChange("tonic")}
+          title="Find the Tonic: chords state a key, you sing the 1, then it is sung back"
+        >
+          Tonic
+        </button>
       </div>
 
       <div className="info-display">
@@ -146,14 +155,18 @@ export default function Header({
           <div className="separator"></div>
 
           {/* KEY SELECTOR */}
-          <select 
-            className="key-select" 
-            value={currentKey} 
-            onChange={(e) => handleKeyChange(e.target.value as MusicalKey)}
-            title="Select the musical key - all melodies will be in this key"
-          >
-            {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]}</option>))}
-          </select>
+          {hideKey ? (
+            <span className="key-select" title="Sing the tonic first — the key is revealed with the answer">?</span>
+          ) : (
+            <select 
+              className="key-select" 
+              value={currentKey} 
+              onChange={(e) => handleKeyChange(e.target.value as MusicalKey)}
+              title="Select the musical key - all melodies will be in this key"
+            >
+              {KEYS.map(k => (<option key={k} value={k}>{KEY_DISPLAY_MAP[k]}</option>))}
+            </select>
+          )}
           
           <button 
             className="icon-btn" 

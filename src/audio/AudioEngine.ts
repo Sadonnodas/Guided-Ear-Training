@@ -449,6 +449,20 @@ export class AudioEngine {
     this.scheduler.scheduleAnchor(opts);
   }
 
+  /** One Find the Tonic round. See Scheduler.scheduleTonicRound. */
+  public scheduleTonicRound(opts: {
+    playChords: (time: number, beatSec: number) => void;
+    chordBeats: number;
+    silenceBeats: number;
+    revealNote: NoteEvent;
+    onReveal: () => void;
+    onComplete: (nextStartTime: number) => void;
+    atTime?: number;
+  }) {
+    if (!this.isInitialized) return;
+    this.scheduler.scheduleTonicRound(opts);
+  }
+
   /**
    * Whether the tonic drone plays at all. Off for the anchor exercises: a
    * drone humming under them would hand back the very reference they exist
