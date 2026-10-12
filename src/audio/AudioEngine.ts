@@ -9,6 +9,31 @@ import { startKeepAlive, stopKeepAlive } from "./KeepAlive";
 
 // Vocal sample range constants - these are the MIDI notes we have samples for
 // Export these so MelodyGenerator can use them to constrain note generation
+/**
+ * Open-string pitches in standard tuning, string 1 (high E) first.
+ *
+ * The guitar samples are named <string>-<fret>.mp3 and run frets 0-12 on all
+ * six strings, so together they cover MIDI 40-76 (E2 to E5) with no gaps.
+ * Notes outside that fall back to the synth, exactly as the piano does.
+ */
+const GUITAR_OPEN_MIDI = [64, 59, 55, 50, 45, 40];
+const GUITAR_MAX_FRET = 12;
+
+/**
+ * Which recording to use for a pitch. The same note exists in up to three
+ * places on the neck, and the lowest fret is chosen: that favours open
+ * strings, which is where a guitar sounds most like itself.
+ */
+export function guitarSampleName(midi: number): string | null {
+  let best: { str: number; fret: number } | null = null;
+  for (let str = 1; str <= GUITAR_OPEN_MIDI.length; str++) {
+    const fret = midi - GUITAR_OPEN_MIDI[str - 1];
+    if (fret < 0 || fret > GUITAR_MAX_FRET) continue;
+    if (!best || fret < best.fret) best = { str, fret };
+  }
+  return best ? `${best.str}-${best.fret}` : null;
+}
+
 export const MIN_VOCAL_MIDI = 43; // G2
 export const MAX_VOCAL_MIDI = 67; // G4
 
@@ -26,6 +51,7 @@ export class AudioEngine {
   // comparable loudness to the synth. The user-facing "Synth / Piano" fader
   // still rides on top of this (it drives trainingGain).
   private pianoPlaybackGain!: Tone.Gain;
+  private guitarPlaybackGain!: Tone.Gain;
   private transitionSynth!: Tone.MetalSynth;
   private metronome!: Metronome;
   private drumMachine!: DrumMachine;
@@ -33,6 +59,7 @@ export class AudioEngine {
   private noteBuffers: Map<string, Tone.ToneAudioBuffer> = new Map();
   private bassBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // NEW: Bass samples B_23 to B_67
   private pianoBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // NEW: Piano samples P_23 to P_67
+  private guitarBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // Guitar samples, MIDI 40-76
   
   // NEW: Separate gain nodes for bass and piano
   private bassGain!: Tone.Gain;
@@ -58,7 +85,7 @@ export class AudioEngine {
   // Which instrument plays anywhere the synth would normally fire (fretboard
   // melodies, pitch guide, out-of-vocal-range fallback). Falls back to synth
   // automatically for notes outside the piano sample range (23-67).
-  private playbackSound: 'synth' | 'piano' = 'synth';
+  private playbackSound: 'synth' | 'piano' | 'guitar' = 'synth';
 
   public onNotePlay: ((note: NoteEvent | null, isClick?: boolean) => void) | null = null;
   public onBeat: ((beatNumber: number) => void) | null = null;
@@ -132,6 +159,10 @@ export class AudioEngine {
     // user-facing fader past unity.
     this.pianoPlaybackGain = new Tone.Gain(2.4).connect(this.trainingGain);
 
+    // Guitar samples are recorded hotter than the piano ones, so they need
+    // less makeup to sit at the same loudness under the same fader.
+    this.guitarPlaybackGain = new Tone.Gain(1.2).connect(this.trainingGain);
+
     this.trainingSynth.connect(trainingCompressor);
     trainingCompressor.connect(makeupGain);
     makeupGain.connect(this.trainingGain);
@@ -172,7 +203,7 @@ export class AudioEngine {
    * G♯5 — covers the full CAGED fretboard range) and falls back to the
    * synth for any note outside that range.
    */
-  public setPlaybackSound(sound: 'synth' | 'piano') {
+  public setPlaybackSound(sound: 'synth' | 'piano' | 'guitar') {
     this.playbackSound = sound;
   }
 
@@ -182,6 +213,16 @@ export class AudioEngine {
    * Routes through trainingGain so the existing "Guide" volume slider works.
    */
   private playSynthOrPiano(note: NoteEvent, time: number) {
+    if (this.playbackSound === 'guitar') {
+      const guitarBuffer = this.guitarBuffers.get(note.noteInfo.midi);
+      if (guitarBuffer) {
+        const source = new Tone.ToneBufferSource(guitarBuffer).connect(this.guitarPlaybackGain);
+        source.start(Math.max(0, time));
+        return;
+      }
+      // Outside E2-E5, or not loaded yet — fall through to the synth.
+    }
+
     if (this.playbackSound === 'piano') {
       const pianoBuffer = this.pianoBuffers.get(note.noteInfo.midi);
       if (pianoBuffer) {
@@ -298,6 +339,7 @@ export class AudioEngine {
     this.noteBuffers.clear();
     this.bassBuffers.clear();
     this.pianoBuffers.clear();
+    this.guitarBuffers.clear();
 
     Tone.setContext(new Tone.Context({ latencyHint: 'interactive' }));
 
@@ -460,7 +502,9 @@ export class AudioEngine {
     // every melody note (including in fretboard mode, where vocals don't play).
     const pianoLoad = this.playbackSound === 'piano'
       ? this.loadPianoBuffers(notes.map(n => n.noteInfo.midi))
-      : Promise.resolve();
+      : this.playbackSound === 'guitar'
+        ? this.loadGuitarBuffers(notes.map(n => n.noteInfo.midi))
+        : Promise.resolve();
 
     // Fretboard mode doesn't use vocal samples — only the piano preload above.
     if (this.isFretboardMode) {
@@ -512,6 +556,26 @@ export class AudioEngine {
         this.pianoBuffers.set(midi, buffer);
       } catch (e) {
         // Missing piano sample — playback will fall back to the synth.
+      }
+    }));
+  }
+
+  /**
+   * Load the guitar recordings for these pitches. Anything the neck cannot
+   * reach is skipped and plays on the synth instead.
+   */
+  private async loadGuitarBuffers(midis: number[]) {
+    const unique = Array.from(new Set(midis));
+    await Promise.all(unique.map(async (midi) => {
+      if (this.guitarBuffers.has(midi)) return;
+      const position = guitarSampleName(midi);
+      if (!position) return;
+      try {
+        const buffer = new Tone.ToneAudioBuffer();
+        await buffer.load(`${import.meta.env.BASE_URL}samples/guitar/${position}.mp3`);
+        this.guitarBuffers.set(midi, buffer);
+      } catch {
+        // Missing recording — playback falls back to the synth.
       }
     }));
   }

@@ -9,7 +9,7 @@ interface AudioSetupProps {
   volMetronome: number;
   volDrone: number; // RESTORED
   debugClick: boolean;
-  playbackSound: 'synth' | 'piano';
+  playbackSound: 'synth' | 'piano' | 'guitar';
   setTriggerPulse: (v: boolean) => void;
   setActiveMidi: (m: number | null) => void;
   visualTimeoutRef: React.MutableRefObject<number>;

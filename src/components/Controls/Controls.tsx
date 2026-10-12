@@ -74,8 +74,8 @@ interface ControlsProps {
   setIncludeSevenths: (v: boolean) => void;
   enabledInversions: number[];
   setEnabledInversions: (v: number[]) => void;
-  playbackSound: 'synth' | 'piano';
-  setPlaybackSound: (v: 'synth' | 'piano') => void;
+  playbackSound: 'synth' | 'piano' | 'guitar';
+  setPlaybackSound: (v: 'synth' | 'piano' | 'guitar') => void;
   activeTab: string;
   
   minVocalMidi: number;
@@ -590,6 +590,13 @@ export default function Controls(props: ControlsProps) {
                     >
                       Piano
                     </div>
+                    <div
+                      className={`toggle-pill-btn ${props.playbackSound === 'guitar' ? 'active' : ''}`}
+                      onClick={() => props.setPlaybackSound('guitar')}
+                      title="Use recorded guitar notes instead. Covers E2 to E5; anything outside that falls back to the synth."
+                    >
+                      Guitar
+                    </div>
                   </div>
                 </div>
               )}
@@ -599,7 +606,7 @@ export default function Controls(props: ControlsProps) {
                 
                 {showGuideVolume && (
                   <div className="slider-row">
-                    <span style={{color:'var(--c-3)'}} title="Volume of the synth / piano playback (fretboard melodies, pitch guide, and the inverse-mode passes)">Synth / Piano</span>
+                    <span style={{color:'var(--c-3)'}} title="Volume of the melody playback — synth, piano or guitar (fretboard melodies, pitch guide, and the inverse-mode passes)">Playback</span>
                     <input
                       type="range"
                       min="0"
@@ -607,7 +614,7 @@ export default function Controls(props: ControlsProps) {
                       step="0.05"
                       value={props.volTraining}
                       onChange={e => props.setVolTraining(parseFloat(e.target.value))}
-                      title="Adjust the synth / piano playback volume"
+                      title="Adjust the melody playback volume"
                     />
                   </div>
                 )}

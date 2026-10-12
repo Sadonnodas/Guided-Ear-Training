@@ -53,6 +53,12 @@ export function getOfflineAudioUrls(baseUrl: string): string[] {
   for (let m = PIANO_MIDI_MIN; m <= PIANO_MIDI_MAX; m++) {
     urls.push(`${base}samples/piano/P_${m}.mp3`);
   }
+  // Guitar: <string>-<fret>, frets 0-12 on all six strings.
+  for (let str = 1; str <= 6; str++) {
+    for (let fret = 0; fret <= 12; fret++) {
+      urls.push(`${base}samples/guitar/${str}-${fret}.mp3`);
+    }
+  }
   for (const drum of DRUM_SAMPLES) {
     urls.push(`${base}samples/drums/${drum}.mp3`);
   }

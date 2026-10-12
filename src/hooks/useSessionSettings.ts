@@ -47,8 +47,8 @@ export function useSessionSettings() {
   // What instrument plays anywhere the synth would normally play (fretboard
   // melodies, pitch guide, out-of-vocal-range fallback). Piano falls back to
   // synth for notes outside the piano sample range (23-67).
-  const [playbackSound, setPlaybackSound] = usePersistentState<'synth' | 'piano'>(
-    "playbackSound", 'synth', asOneOf(['synth', 'piano'] as const),
+  const [playbackSound, setPlaybackSound] = usePersistentState<'synth' | 'piano' | 'guitar'>(
+    "playbackSound", 'synth', asOneOf(['synth', 'piano', 'guitar'] as const),
   );
 
   // Vocal Range
