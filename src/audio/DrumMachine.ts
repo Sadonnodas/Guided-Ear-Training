@@ -16,7 +16,9 @@ export class DrumMachine {
   // NEW: Internal Send Channel
   private reverbSend: Tone.Gain; 
 
-  constructor(destination: Tone.ToneAudioNode, reverbNode: Tone.Reverb) {
+  // Takes any node, not a Reverb: the engine feeds it the reverb bus, which
+  // bypasses the reverb until its impulse response exists.
+  constructor(destination: Tone.ToneAudioNode, reverbNode: Tone.ToneAudioNode) {
     
     // 1. Create a send channel
     this.reverbSend = new Tone.Gain(0.25).connect(reverbNode); // Adjust 0.25 for how wet you want the drums

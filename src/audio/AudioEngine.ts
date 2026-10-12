@@ -41,6 +41,10 @@ export class AudioEngine {
   private masterGain!: Tone.Gain;
   private compressor!: Tone.Compressor;
   private reverb!: Tone.Reverb;
+  private reverbBus!: Tone.Gain;
+  // Bumped on every graph build, so a reverb that becomes ready after a
+  // rebuild cannot rewire the graph that replaced it.
+  private graphGeneration = 0;
   private vocalGain!: Tone.Gain;
   private droneGain!: Tone.Gain;
   private dronePlayer!: Tone.Player;
@@ -110,12 +114,35 @@ export class AudioEngine {
     this.reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.01 }).connect(this.masterGain);
     this.reverb.wet.value = 0.3; 
 
+    // Everything tonal reaches the master through this bus, and it starts
+    // BYPASSING the reverb.
+    //
+    // Tone generates a reverb's impulse response asynchronously, and until it
+    // exists the reverb — in Tone's own words — "will not make a sound". Not
+    // its wet path: the whole node. So anything routed through it is silent,
+    // which is vocals, bass and piano, while the drums reach the master
+    // directly and carry on. On a normal launch the response is ready long
+    // before the first note, which is why this never showed; after a mid-
+    // session rebuild, playback resumes in under a second and the app goes
+    // quiet until it is killed. Bypassing first costs a second of ambience
+    // and cannot cost the signal.
+    const graphGeneration = ++this.graphGeneration;
+    this.reverbBus = new Tone.Gain(1).connect(this.masterGain);
+    this.reverb.ready
+      .then(() => {
+        // A rebuild may have replaced this whole graph while we waited.
+        if (graphGeneration !== this.graphGeneration) return;
+        this.reverbBus.disconnect();
+        this.reverbBus.connect(this.reverb);
+      })
+      .catch(() => { /* no impulse response — stay dry rather than silent */ });
+
     // Vocal Path (Voice -> Reverb -> Master)
-    this.vocalGain = new Tone.Gain(vols.voice).connect(this.reverb);
+    this.vocalGain = new Tone.Gain(vols.voice).connect(this.reverbBus);
     
     // NEW: Bass and Piano paths (for chord progressions)
-    this.bassGain = new Tone.Gain(0.7).connect(this.reverb); // Default 0.7
-    this.pianoGain = new Tone.Gain(0.6).connect(this.reverb); // Default 0.6
+    this.bassGain = new Tone.Gain(0.7).connect(this.reverbBus); // Default 0.7
+    this.pianoGain = new Tone.Gain(0.6).connect(this.reverbBus); // Default 0.6
 
     // Drone Path (Drone -> Master) *Bypasses Reverb to stay clean*
     this.droneGain = new Tone.Gain(vols.drone).connect(this.masterGain);
@@ -174,7 +201,7 @@ export class AudioEngine {
     }).connect(this.masterGain);
 
     this.metronome = new Metronome(this.masterGain);
-    this.drumMachine = new DrumMachine(this.masterGain, this.reverb);
+    this.drumMachine = new DrumMachine(this.masterGain, this.reverbBus);
     
     this.scheduler = new Scheduler({
       onBeat: (b) => { if (this.onBeat) this.onBeat(b); },
