@@ -10,6 +10,7 @@ interface AudioSetupProps {
   volDrone: number; // RESTORED
   debugClick: boolean;
   playbackSound: 'synth' | 'piano' | 'guitar';
+  keyAnchor: 'drone' | 'vocals' | 'chords';
   setTriggerPulse: (v: boolean) => void;
   setActiveMidi: (m: number | null) => void;
   visualTimeoutRef: React.MutableRefObject<number>;
@@ -45,4 +46,6 @@ export function useAudioSetup(props: AudioSetupProps) {
   useEffect(() => { audioEngine.setDroneVol(props.volDrone); }, [props.volDrone]); // RESTORED
   useEffect(() => { audioEngine.setDebugClick(props.debugClick); }, [props.debugClick]);
   useEffect(() => { audioEngine.setPlaybackSound(props.playbackSound); }, [props.playbackSound]);
+  // An anchor exercise is pointless with a drone humming under it.
+  useEffect(() => { audioEngine.setDroneEnabled(props.keyAnchor === 'drone'); }, [props.keyAnchor]);
 }

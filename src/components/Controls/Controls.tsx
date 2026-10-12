@@ -74,6 +74,8 @@ interface ControlsProps {
   setIncludeSevenths: (v: boolean) => void;
   enabledInversions: number[];
   setEnabledInversions: (v: number[]) => void;
+  keyAnchor: 'drone' | 'vocals' | 'chords';
+  setKeyAnchor: (v: 'drone' | 'vocals' | 'chords') => void;
   playbackSound: 'synth' | 'piano' | 'guitar';
   setPlaybackSound: (v: 'synth' | 'piano' | 'guitar') => void;
   activeTab: string;
@@ -436,6 +438,42 @@ export default function Controls(props: ControlsProps) {
               )}
 
 
+
+              {/* Only Melody mode changes key on its own, so only it has a
+                key to anchor. */}
+              {props.activeTab === 'random' && (
+                <div className="control-section">
+                  <h3 className="section-title">Key Anchor</h3>
+                  <div className="toggle-grid-sleek">
+                    <div
+                      className={`toggle-pill-btn ${props.keyAnchor === 'drone' ? 'active' : ''}`}
+                      onClick={() => props.setKeyAnchor('drone')}
+                      title="A tonic drone holds under everything, so the reference is always in your ears."
+                    >
+                      Drone
+                    </div>
+                    <div
+                      className={`toggle-pill-btn ${props.keyAnchor === 'vocals' ? 'active' : ''}`}
+                      onClick={() => props.setKeyAnchor('vocals')}
+                      title="The vocals sing 1-3-5-1 once at each key change, then nothing. No drone — you hold the key yourself."
+                    >
+                      Sung 1-3-5-1
+                    </div>
+                    <div
+                      className={`toggle-pill-btn ${props.keyAnchor === 'chords' ? 'active' : ''}`}
+                      onClick={() => props.setKeyAnchor('chords')}
+                      title="A I-IV-V-I plays once at each key change, then nothing. Closest to how real music states a key."
+                    >
+                      Chords I-IV-V-I
+                    </div>
+                  </div>
+                  {props.keyAnchor !== 'drone' && (
+                    <div className="section-subtitle">
+                      No drone. Set Melodies Per Key to 1 for a new key every round.
+                    </div>
+                  )}
+                </div>
+                )}
 
               <div className="control-section">
                 <h3 className="section-title">Repetition</h3>

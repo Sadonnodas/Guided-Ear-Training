@@ -4,9 +4,28 @@ import { withDeadline } from "../lib/withDeadline.ts";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator.ts";
 import { getFretboardConfig } from "../config/FretboardData.ts";
 import { runProgressionsCycle } from "./useProgressionsCycle.ts";
-import type { ChordProgression } from "../core/ChordProgressionGenerator.ts";
+import type { ChordProgression, ChordInfo } from "../core/ChordProgressionGenerator.ts";
+import { getChordMidiNotes } from "../core/ChordProgressionGenerator.ts";
 import type { MusicalKey, ScaleDegree, ScaleType, MelodyConstraints, MelodyDifficulty, CagedShape } from "../types.ts";
 import { KEYS, KEY_DISPLAY_MAP } from "./sessionConstants.ts";
+
+const ANCHOR_CHORD_BEATS = 2;
+
+/**
+ * The anchor progression: I-IV-V-I, the plainest way to state a key.
+ * Minor uses i-iv-V-i — the major V is what makes a minor key sound settled.
+ */
+function anchorChords(scaleType: ScaleType): ChordInfo[] {
+  const minor = scaleType === 'Minor' || scaleType === 'PentatonicMinor';
+  const major = (roman: string, degree: ScaleDegree): ChordInfo =>
+    ({ roman, degree, quality: 'major', intervals: [0, 4, 7] });
+  const min = (roman: string, degree: ScaleDegree): ChordInfo =>
+    ({ roman, degree, quality: 'minor', intervals: [0, 3, 7] });
+
+  return minor
+    ? [min('i', '1'), min('iv', '4'), major('V', '5'), min('i', '1')]
+    : [major('I', '1'), major('IV', '4'), major('V', '5'), major('I', '1')];
+}
 
 // Everything runCycle needs, threaded in as a single deps object so the
 // hook signature stays stable even as the game loop grows.
@@ -45,6 +64,7 @@ export interface GameLoopDeps {
       trainingWheels: React.MutableRefObject<boolean>;
       inverseMode: React.MutableRefObject<boolean>;
       selectedShape: React.MutableRefObject<CagedShape>;
+      keyAnchor: React.MutableRefObject<'drone' | 'vocals' | 'chords'>;
     };
   };
 
@@ -132,6 +152,71 @@ export function useGameLoop(deps: GameLoopDeps) {
       currentCycleKey = newKey;
       setVisualizerKey(newKey);
       forceOneThreeFive = true;
+    }
+
+    // ── A2. Key anchor ─────────────────────────────────────────────────────────
+    // With an anchor chosen, a key change states the key ONCE — sung 1-3-5-1,
+    // or a I-IV-V-I — instead of running the settling pattern through the full
+    // listen/repeat structure. From then until the next change there is no
+    // reference at all, which is the exercise.
+    const anchor = settings.refs.keyAnchor.current;
+    if (forceOneThreeFive && anchor !== 'drone' && activeTabRef.current === 'random') {
+      const anchorKey = currentCycleKey;
+
+      // Stating the key is not one of the melodies for that key. Without
+      // this the anchor eats the key's only slot when Melodies Per Key is 1,
+      // and the session modulates forever without ever asking you anything.
+      questionCount.current = 0;
+
+      if (anchor === 'vocals') {
+        const pattern: ScaleDegree[] = (scaleTypeRef.current === 'Minor' || scaleTypeRef.current === 'PentatonicMinor')
+          ? ["1", "b3", "5", "1"] : ["1", "3", "5", "1"];
+        const anchorNotes = generateFixedPattern(
+          pattern, anchorKey, scaleTypeRef.current,
+          settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
+        );
+        await withDeadline(audioEngine.preloadNotes(anchorNotes), 5000, 'anchor preload')
+          .catch((e) => console.warn('Anchor preload stalled.', e));
+        if (!isPlayingRef.current) return;
+
+        setStatus(`Key: ${KEY_DISPLAY_MAP[anchorKey]}`);
+        audioEngine.scheduleAnchor({
+          notes: anchorNotes,
+          playChords: null,
+          beatsLong: 4,
+          label: `Key: ${KEY_DISPLAY_MAP[anchorKey]}`,
+          onComplete: (next) => { if (isPlayingRef.current) runCycle(anchorKey, false, next); },
+          atTime: startTime,
+        });
+      } else {
+        const chords = anchorChords(scaleTypeRef.current);
+        const voiced = chords.map((chord) => getChordMidiNotes(
+          chord, anchorKey,
+          settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
+        ));
+        await withDeadline(
+          audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad])),
+          5000, 'anchor chord preload',
+        ).catch((e) => console.warn('Anchor preload stalled.', e));
+        if (!isPlayingRef.current) return;
+
+        setStatus(`Key: ${KEY_DISPLAY_MAP[anchorKey]}`);
+        audioEngine.scheduleAnchor({
+          notes: null,
+          playChords: (time, beatSec) => {
+            voiced.forEach((v, i) => {
+              audioEngine.playChord(v.bass, v.triad, time + i * ANCHOR_CHORD_BEATS * beatSec);
+            });
+          },
+          beatsLong: voiced.length * ANCHOR_CHORD_BEATS,
+          label: `Key: ${KEY_DISPLAY_MAP[anchorKey]}`,
+          onComplete: (next) => { if (isPlayingRef.current) runCycle(anchorKey, false, next); },
+          atTime: startTime,
+        });
+      }
+
+      if (isFirst) audioEngine.startPlayback();
+      return;
     }
 
     // ── B. Fretboard MIDI range ─────────────────────────────────────────────────

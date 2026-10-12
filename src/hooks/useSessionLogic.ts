@@ -157,6 +157,7 @@ export function useSessionLogic() {
     volDrone:  mixer.volDrone,
     debugClick,
     playbackSound: settings.playbackSound,
+    keyAnchor: settings.keyAnchor,
     setTriggerPulse, setActiveMidi, visualTimeoutRef,
   });
 

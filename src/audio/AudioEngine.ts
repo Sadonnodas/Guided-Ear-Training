@@ -71,6 +71,7 @@ export class AudioEngine {
   private readonly PIANO_TIMING_OFFSET = -0.05; // Positive = later, Negative = earlier
   
   private currentTonic: string = "C"; 
+  private droneEnabled = true;
   // Bumped on every drone request, so a slow load that finishes after a newer
   // one was asked for cannot swap the wrong key's drone in.
   private droneRequest = 0;
@@ -296,6 +297,16 @@ export class AudioEngine {
     const tonicLower = this.currentTonic.toLowerCase();
     const droneUrl = `${baseUrl}loops/drones/${tonicLower}_drone.mp3`;
 
+    // With an anchor exercise running there is no drone to play, so there is
+    // nothing to fetch or decode either. Worth skipping rather than loading
+    // and ignoring: a drone is three minutes of stereo audio, around 70 MB
+    // once decoded, and anchor practice changes key every round.
+    if (!this.droneEnabled) {
+      if (this.dronePlayer.state === 'started') this.dronePlayer.stop();
+      if (this.shouldBePlaying) this.drumMachine.sync();
+      return;
+    }
+
     // The old key's drone fades out now (the player's own fadeOut) instead of
     // humming on under the new key's melody while the new one decodes. That
     // clash was hidden when the game loop always waited for the load; it
@@ -309,7 +320,7 @@ export class AudioEngine {
       const buffer = await new Tone.ToneAudioBuffer().load(droneUrl);
       if (request !== this.droneRequest) return; // a newer key was asked for
       this.dronePlayer.buffer = buffer;
-      if (this.shouldBePlaying && Tone.getTransport().state === 'started') {
+      if (this.droneEnabled && this.shouldBePlaying && Tone.getTransport().state === 'started') {
         this.dronePlayer.start(0);
       }
     } catch (e) { console.error(`AudioEngine: Failed to load drone`, e); }
@@ -422,6 +433,32 @@ export class AudioEngine {
     );
   }
 
+  /**
+   * Play the key once — sung 1-3-5-1, or a I-IV-V-I — with no drone under it.
+   * See Scheduler.scheduleAnchor.
+   */
+  public scheduleAnchor(opts: {
+    notes: NoteEvent[] | null;
+    playChords: ((time: number, beatSec: number) => void) | null;
+    beatsLong: number;
+    label: string;
+    onComplete: (nextStartTime: number) => void;
+    atTime?: number;
+  }) {
+    if (!this.isInitialized) return;
+    this.scheduler.scheduleAnchor(opts);
+  }
+
+  /**
+   * Whether the tonic drone plays at all. Off for the anchor exercises: a
+   * drone humming under them would hand back the very reference they exist
+   * to withhold.
+   */
+  public setDroneEnabled(enabled: boolean) {
+    this.droneEnabled = enabled;
+    if (!enabled && this.isInitialized) this.dronePlayer.stop();
+  }
+
   public startPlayback() {
     if (!this.isInitialized) return;
     this.shouldBePlaying = true; 
@@ -431,7 +468,7 @@ export class AudioEngine {
     startKeepAlive();
 
     if (Tone.getTransport().state !== 'started') {
-      if (this.dronePlayer.loaded) this.dronePlayer.start(0);
+      if (this.droneEnabled && this.dronePlayer.loaded) this.dronePlayer.start(0);
       this.drumMachine.sync();
       this.scheduler.start();
     }
@@ -465,7 +502,7 @@ export class AudioEngine {
     if (!this.isInitialized) return;
     this.shouldBePlaying = true;
     startKeepAlive();
-    this.dronePlayer.start(0);
+    if (this.droneEnabled) this.dronePlayer.start(0);
     this.drumMachine.sync();
     this.scheduler.resume();
   }

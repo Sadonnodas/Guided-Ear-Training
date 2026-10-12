@@ -176,6 +176,66 @@ export class Scheduler {
     }, cursor - 0.05); 
   }
 
+  /**
+   * Schedule a key anchor: the key stated once, then taken away.
+   *
+   * Deliberately not a pass of scheduleRoutine. An anchor is heard once and
+   * never repeated — repeating it would make it a melody to recognise rather
+   * than a reference to remember, which is the whole point of practising
+   * without the drone.
+   */
+  public scheduleAnchor(opts: {
+    notes: NoteEvent[] | null;
+    playChords: ((time: number, beatSec: number) => void) | null;
+    beatsLong: number;
+    label: string;
+    onComplete: (nextStartTime: number) => void;
+    atTime?: number;
+  }) {
+    this.clearMelody();
+    this.ensureSystemEvents();
+
+    const beatSec = 60 / Tone.getTransport().bpm.value;
+    const measureSec = 4 * beatSec;
+
+    let anchorTime = opts.atTime;
+    if (anchorTime === undefined) {
+      const now = Tone.getTransport().seconds;
+      anchorTime = Math.ceil(now / beatSec) * beatSec;
+    }
+    const start = anchorTime + measureSec;
+
+    const schedule = (callback: (time: number) => void, time: number) => {
+      this.melodyEventIds.push(Tone.getTransport().schedule(callback, time));
+    };
+
+    schedule((time) => {
+      Tone.getDraw().schedule(() => this.callbacks.onStatusChange(opts.label), time);
+    }, start);
+
+    if (opts.notes) {
+      opts.notes.forEach((note) => {
+        const noteTime = start + note.startTime * beatSec;
+        // isSilentPass false: the vocals sing it, so the anchor arrives with
+        // its degree names attached.
+        schedule((time) => this.callbacks.playNoteAudio(note, time, false), noteTime);
+        schedule((time) => {
+          Tone.getDraw().schedule(() => {
+            if (!document.hidden) this.callbacks.onNotePlay(note, false);
+          }, time);
+        }, noteTime);
+      });
+    }
+
+    if (opts.playChords) {
+      const playChords = opts.playChords;
+      schedule((time) => playChords(time, beatSec), start);
+    }
+
+    const end = start + opts.beatsLong * beatSec;
+    schedule(() => opts.onComplete(end), end - 0.05);
+  }
+
   private clearMelody() {
     this.melodyEventIds.forEach(id => Tone.getTransport().clear(id));
     this.melodyEventIds = [];
