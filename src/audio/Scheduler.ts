@@ -250,7 +250,7 @@ export class Scheduler {
     chordBeats: number;
     promptBeats: number;
     silenceBeats: number;
-    onPrompt: () => void;
+    onPrompt: (time: number) => void;
     promptLabel: string;
     revealLabel: string;
     revealNote: NoteEvent;
@@ -289,7 +289,7 @@ export class Scheduler {
     }
 
     say(opts.promptLabel, cursor);
-    schedule(() => opts.onPrompt(), cursor);
+    schedule((time) => opts.onPrompt(time), cursor);
     cursor += opts.promptBeats * beatSec;
 
     const revealAt = cursor + opts.silenceBeats * beatSec;

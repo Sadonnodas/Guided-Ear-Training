@@ -165,6 +165,7 @@ export function useGameLoop(deps: GameLoopDeps) {
           ? audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad]))
           : Promise.resolve(),
         audioEngine.preloadNotes([revealNote]),
+        audioEngine.loadPromptBuffer(degree),
       ]), 5000, 'degree preload').catch((e) => console.warn('Degree preload stalled.', e));
       if (!isPlayingRef.current) return;
 
@@ -182,7 +183,8 @@ export function useGameLoop(deps: GameLoopDeps) {
         silenceBeats: TONIC_SILENCE_BEATS,
         promptLabel: `Sing ${degree}`,
         revealLabel: `That was ${degree}`,
-        onPrompt: () => speakDegree(degree),
+        // The recording if we have it, the device's own voice if we do not.
+        onPrompt: (time) => { if (!audioEngine.playPrompt(degree, time)) speakDegree(degree); },
         revealNote,
         onReveal: () => {
           // The key is only named once you have answered.

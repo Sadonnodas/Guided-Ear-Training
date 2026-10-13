@@ -56,6 +56,7 @@ export class AudioEngine {
   // still rides on top of this (it drives trainingGain).
   private pianoPlaybackGain!: Tone.Gain;
   private guitarPlaybackGain!: Tone.Gain;
+  private promptGain!: Tone.Gain;
   private transitionSynth!: Tone.MetalSynth;
   private metronome!: Metronome;
   private drumMachine!: DrumMachine;
@@ -64,6 +65,8 @@ export class AudioEngine {
   private bassBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // NEW: Bass samples B_23 to B_67
   private pianoBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // NEW: Piano samples P_23 to P_67
   private guitarBuffers: Map<number, Tone.ToneAudioBuffer> = new Map(); // Guitar samples, MIDI 40-76
+  // Spoken degree names ("flat seven"), one per degree, for the Sing exercise.
+  private promptBuffers: Map<string, Tone.ToneAudioBuffer> = new Map();
   
   // NEW: Separate gain nodes for bass and piano
   private bassGain!: Tone.Gain;
@@ -186,6 +189,10 @@ export class AudioEngine {
     // they sit at a comfortable default loudness without needing to push the
     // user-facing fader past unity.
     this.pianoPlaybackGain = new Tone.Gain(2.4).connect(this.trainingGain);
+
+    // Spoken prompts go straight to the master, dry: they are an instruction,
+    // not music, and reverb on a spoken word costs clarity for nothing.
+    this.promptGain = new Tone.Gain(1).connect(this.masterGain);
 
     // Guitar samples are recorded hotter than the piano ones, so they need
     // less makeup to sit at the same loudness under the same fader.
@@ -378,6 +385,7 @@ export class AudioEngine {
     this.bassBuffers.clear();
     this.pianoBuffers.clear();
     this.guitarBuffers.clear();
+    this.promptBuffers.clear();
 
     Tone.setContext(new Tone.Context({ latencyHint: 'interactive' }));
 
@@ -628,6 +636,35 @@ export class AudioEngine {
         // Missing piano sample — playback will fall back to the synth.
       }
     }));
+  }
+
+  /**
+   * A spoken degree name, recorded rather than spoken by the device.
+   *
+   * Device speech reads English words in whatever voice the phone is set to,
+   * which on a Dutch phone does not sound like English at all. These are the
+   * same words every time, on every device, and work offline.
+   */
+  public async loadPromptBuffer(degree: string) {
+    const name = degree.replace('#', 's');
+    if (this.promptBuffers.has(name)) return;
+    try {
+      const buffer = new Tone.ToneAudioBuffer();
+      await buffer.load(`${import.meta.env.BASE_URL}samples/prompts/${name}.mp3`);
+      this.promptBuffers.set(name, buffer);
+    } catch {
+      // Missing recording — the caller falls back to the device voice.
+    }
+  }
+
+  /** Returns false if there is no recording, so the caller can fall back. */
+  public playPrompt(degree: string, time: number): boolean {
+    if (!this.isInitialized) return false;
+    const buffer = this.promptBuffers.get(degree.replace('#', 's'));
+    if (!buffer) return false;
+    const source = new Tone.ToneBufferSource(buffer).connect(this.promptGain);
+    source.start(Math.max(0, time));
+    return true;
   }
 
   /**

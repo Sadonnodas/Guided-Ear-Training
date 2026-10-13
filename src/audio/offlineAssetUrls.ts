@@ -53,6 +53,10 @@ export function getOfflineAudioUrls(baseUrl: string): string[] {
   for (let m = PIANO_MIDI_MIN; m <= PIANO_MIDI_MAX; m++) {
     urls.push(`${base}samples/piano/P_${m}.mp3`);
   }
+  // Spoken degree names for the Sing exercise.
+  for (const degree of ['1', 'b2', '2', 'b3', '3', '4', 's4', '5', 'b6', '6', 'b7', '7']) {
+    urls.push(`${base}samples/prompts/${degree}.mp3`);
+  }
   // Guitar: <string>-<fret>, frets 0-12 on all six strings.
   for (let str = 1; str <= 6; str++) {
     for (let fret = 0; fret <= 12; fret++) {
