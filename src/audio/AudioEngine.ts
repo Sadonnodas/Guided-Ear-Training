@@ -476,18 +476,10 @@ export class AudioEngine {
     this.scheduler.scheduleAnchor(opts);
   }
 
-  /** One Find the Tonic round. See Scheduler.scheduleTonicRound. */
-  public scheduleTonicRound(opts: {
-    playChords: (time: number, beatSec: number) => void;
-    chordBeats: number;
-    silenceBeats: number;
-    revealNote: NoteEvent;
-    onReveal: () => void;
-    onComplete: (nextStartTime: number) => void;
-    atTime?: number;
-  }) {
+  /** One sing-a-degree round. See Scheduler.scheduleDegreeRound. */
+  public scheduleDegreeRound(opts: Parameters<Scheduler['scheduleDegreeRound']>[0]) {
     if (!this.isInitialized) return;
-    this.scheduler.scheduleTonicRound(opts);
+    this.scheduler.scheduleDegreeRound(opts);
   }
 
   /**

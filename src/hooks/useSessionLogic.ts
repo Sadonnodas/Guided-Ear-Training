@@ -358,7 +358,8 @@ export function useSessionLogic() {
   };
 
   const toggleDegree = (d: ScaleDegree) => {
-    if (activeTab !== 'random' && activeTab !== 'progressions') return;
+    // 'tonic' too: which degrees are lit is the pool it asks you to sing.
+    if (activeTab !== 'random' && activeTab !== 'progressions' && activeTab !== 'tonic') return;
     if (enabledDegrees.includes(d)) {
       if (enabledDegrees.length > 1) {
         setEnabledDegrees(prev => prev.filter(x => x !== d));
@@ -372,7 +373,8 @@ export function useSessionLogic() {
   };
 
   const toggleFocus = (d: ScaleDegree) => {
-    if (activeTab !== 'random' && activeTab !== 'progressions') return;
+    // 'tonic' too: which degrees are lit is the pool it asks you to sing.
+    if (activeTab !== 'random' && activeTab !== 'progressions' && activeTab !== 'tonic') return;
     if (focusedDegrees.includes(d)) {
       setFocusedDegrees(prev => prev.filter(x => x !== d));
       setStatus(`Removed focus: ${d}`);

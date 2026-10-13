@@ -24,7 +24,7 @@ export function useSessionSettings() {
   const [silentPractice, setSilentPractice] = usePersistentState("silentPractice", true, asBool);
   const [trainingWheels, setTrainingWheels] = usePersistentState("trainingWheels", false, asBool);
   const [inverseMode, setInverseMode] = usePersistentState("inverseMode", false, asBool);
-  const [questionsPerKey, setQuestionsPerKey] = usePersistentState("questionsPerKey", 10, asInt(1, 50));
+  const [questionsPerKey, setQuestionsPerKey] = usePersistentState("questionsPerKey", 3, asInt(1, 50));
   const [difficulty, setDifficulty] = usePersistentState<MelodyDifficulty>(
     "difficulty", "easy", asOneOf(DIFFICULTIES),
   );

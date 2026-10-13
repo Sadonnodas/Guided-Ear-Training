@@ -1,6 +1,7 @@
 import { useRef, useCallback } from "react";
 import { audioEngine } from "../audio/AudioEngine.ts";
 import { withDeadline } from "../lib/withDeadline.ts";
+import { speakDegree } from "../audio/speech.ts";
 import { generateMelody, generateFixedPattern } from "../core/MelodyGenerator.ts";
 import { getFretboardConfig } from "../config/FretboardData.ts";
 import { runProgressionsCycle } from "./useProgressionsCycle.ts";
@@ -13,6 +14,9 @@ const ANCHOR_CHORD_BEATS = 2;
 // Two bars of silence to find and sing the tonic in: long enough to hunt for
 // it, short enough that you commit rather than work it out.
 const TONIC_SILENCE_BEATS = 8;
+// Room for the phone to finish saying "sing flat seven" before the silence
+// that is yours.
+const PROMPT_BEATS = 3;
 
 /**
  * The anchor progression: I-IV-V-I, the plainest way to state a key.
@@ -125,38 +129,60 @@ export function useGameLoop(deps: GameLoopDeps) {
     questionCount.current += 1;
 
     // ── Find the Tonic ─────────────────────────────────────────────────────────
-    // Its own shape: a key stated by chords, a silence to sing into, then the
-    // tonic sung back. A fresh key every round, because the point is finding
-    // the tonic cold rather than keeping one you already have.
+    // Its own shape: the key stated by chords, then a named degree to sing
+    // from memory, then that degree sung back. Recognising a degree you are
+    // given and producing one you are asked for are different skills, and
+    // only the second is what singing or playing by ear actually needs.
     if (activeTabRef.current === 'tonic') {
-      const options = KEYS.filter((k: MusicalKey) => k !== currentKeyRef.current);
-      const roundKey = options[Math.floor(Math.random() * options.length)];
+      // The chords state the key; they are repeated only when it changes, so
+      // Melodies Per Key decides how many degrees you sing per key.
+      const keyChanged = isFirst || questionCount.current > settings.refs.questionsPerKey.current;
+      let roundKey = keyToUse;
+      if (keyChanged) {
+        questionCount.current = 1;
+        const options = KEYS.filter((k: MusicalKey) => k !== keyToUse);
+        roundKey = options[Math.floor(Math.random() * options.length)];
+      }
 
-      const chords = anchorChords(scaleTypeRef.current);
-      const voiced = chords.map((chord) => getChordMidiNotes(
-        chord, roundKey,
-        settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
-      ));
+      // Whatever is lit in the visualizer, so you can start on 1-3-5 and open
+      // it up later.
+      const pool = enabledDegreesRef.current.length ? enabledDegreesRef.current : (["1"] as ScaleDegree[]);
+      const degree = pool[Math.floor(Math.random() * pool.length)];
+
+      const voiced = keyChanged
+        ? anchorChords(scaleTypeRef.current).map((chord) => getChordMidiNotes(
+            chord, roundKey,
+            settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
+          ))
+        : [];
       const [revealNote] = generateFixedPattern(
-        ["1"], roundKey, scaleTypeRef.current,
+        [degree], roundKey, scaleTypeRef.current,
         settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
       );
 
       await withDeadline(Promise.all([
-        audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad])),
+        voiced.length
+          ? audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad]))
+          : Promise.resolve(),
         audioEngine.preloadNotes([revealNote]),
-      ]), 5000, 'tonic preload').catch((e) => console.warn('Tonic preload stalled.', e));
+      ]), 5000, 'degree preload').catch((e) => console.warn('Degree preload stalled.', e));
       if (!isPlayingRef.current) return;
 
-      setTonicRevealed(false);
-      audioEngine.scheduleTonicRound({
-        playChords: (time, beatSec) => {
-          voiced.forEach((v, i) => {
-            audioEngine.playChord(v.bass, v.triad, time + i * ANCHOR_CHORD_BEATS * beatSec);
-          });
-        },
+      if (keyChanged) setTonicRevealed(false);
+      audioEngine.scheduleDegreeRound({
+        playChords: voiced.length
+          ? (time, beatSec) => {
+              voiced.forEach((v, i) => {
+                audioEngine.playChord(v.bass, v.triad, time + i * ANCHOR_CHORD_BEATS * beatSec);
+              });
+            }
+          : null,
         chordBeats: voiced.length * ANCHOR_CHORD_BEATS,
+        promptBeats: PROMPT_BEATS,
         silenceBeats: TONIC_SILENCE_BEATS,
+        promptLabel: `Sing ${degree}`,
+        revealLabel: `That was ${degree}`,
+        onPrompt: () => speakDegree(degree),
         revealNote,
         onReveal: () => {
           // The key is only named once you have answered.
@@ -213,7 +239,11 @@ export function useGameLoop(deps: GameLoopDeps) {
     // listen/repeat structure. From then until the next change there is no
     // reference at all, which is the exercise.
     const anchor = settings.refs.keyAnchor.current;
-    if (forceOneThreeFive && anchor !== 'drone' && activeTabRef.current === 'random') {
+    // isFirst as well as forceOneThreeFive: the first cycle of a session is
+    // not a key change, so without it the session opened cold — straight into
+    // a melody with the key never stated, which is the one round where you
+    // have nothing at all to go on.
+    if ((forceOneThreeFive || isFirst) && anchor !== 'drone' && activeTabRef.current === 'random') {
       const anchorKey = currentCycleKey;
 
       // Stating the key is not one of the melodies for that key. Without

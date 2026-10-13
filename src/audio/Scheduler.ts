@@ -237,16 +237,22 @@ export class Scheduler {
   }
 
   /**
-   * One round of Find the Tonic: the key stated by chords, a silence long
-   * enough to sing into, then the tonic sung back so you can compare.
+   * One round of the sing-a-degree exercise: the key stated by chords (only
+   * when it has just changed), a spoken "sing 7", a silence to sing into,
+   * then that degree sung back at its real pitch.
    *
-   * The silence is the exercise. Nothing holds the key through it, and the
-   * answer only arrives after you have committed to one.
+   * The spoken prompt is NOT scheduled through Draw. Draw discards callbacks
+   * it reaches late, and a round whose prompt went missing is a round of
+   * silence you cannot answer.
    */
-  public scheduleTonicRound(opts: {
-    playChords: (time: number, beatSec: number) => void;
+  public scheduleDegreeRound(opts: {
+    playChords: ((time: number, beatSec: number) => void) | null;
     chordBeats: number;
+    promptBeats: number;
     silenceBeats: number;
+    onPrompt: () => void;
+    promptLabel: string;
+    revealLabel: string;
     revealNote: NoteEvent;
     onReveal: () => void;
     onComplete: (nextStartTime: number) => void;
@@ -274,30 +280,30 @@ export class Scheduler {
       }, at);
     };
 
-    say("Listen", start);
-    schedule((time) => opts.playChords(time, beatSec), start);
+    let cursor = start;
+    if (opts.playChords) {
+      const playChords = opts.playChords;
+      say("Listen", cursor);
+      schedule((time) => playChords(time, beatSec), cursor);
+      cursor += opts.chordBeats * beatSec;
+    }
 
-    const singFrom = start + opts.chordBeats * beatSec;
-    say("Sing the 1", singFrom);
+    say(opts.promptLabel, cursor);
+    schedule(() => opts.onPrompt(), cursor);
+    cursor += opts.promptBeats * beatSec;
 
-    const revealAt = singFrom + opts.silenceBeats * beatSec;
-    say("That was the 1", revealAt);
+    const revealAt = cursor + opts.silenceBeats * beatSec;
+    say(opts.revealLabel, revealAt);
     schedule((time) => {
       this.callbacks.playNoteAudio(opts.revealNote, time, false);
-      // Revealing the key is state, not drawing, so it runs here rather than
-      // inside Draw: Draw drops callbacks it reaches late, and an answer that
-      // sometimes fails to appear is worse than one that appears a frame early.
+      // State, not drawing — see the reveal in Find the Tonic.
       opts.onReveal();
       Tone.getDraw().schedule(() => {
         if (!document.hidden) this.callbacks.onNotePlay(opts.revealNote, false);
       }, time);
     }, revealAt);
 
-    // Two bars after the answer, not one: the next round hides the key again
-    // the moment it starts, and a glimpse of the answer is no use. The hiding
-    // is deliberately immediate rather than scheduled — a dropped frame must
-    // never leave the last round's key on screen during the next question.
-    const end = revealAt + 8 * beatSec;
+    const end = revealAt + 6 * beatSec;
     schedule(() => opts.onComplete(end), end - 0.05);
   }
 
