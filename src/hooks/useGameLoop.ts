@@ -74,6 +74,7 @@ export interface GameLoopDeps {
       keyAnchor: React.MutableRefObject<'drone' | 'vocals' | 'chords'>;
       singNotes: React.MutableRefObject<number>;
       singBars: React.MutableRefObject<number>;
+      singKeyFrom: React.MutableRefObject<'chords' | 'degree'>;
     };
   };
 
@@ -155,12 +156,28 @@ export function useGameLoop(deps: GameLoopDeps) {
         () => pool[Math.floor(Math.random() * pool.length)],
       );
 
-      const voiced = keyChanged
+      // The key is stated by a cadence, or by one degree sung with its name —
+      // a reference you have to measure from rather than a home handed over.
+      const byDegree = settings.refs.singKeyFrom.current === 'degree';
+      const voiced = keyChanged && !byDegree
         ? anchorChords(scaleTypeRef.current).map((chord) => getChordMidiNotes(
             chord, roundKey,
             settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
           ))
         : [];
+
+      // Never the degree being asked for: hearing it and then singing it back
+      // is not the exercise.
+      const referencePool = pool.filter(d => d !== asked[0]);
+      const reference = (referencePool.length ? referencePool : pool)[
+        Math.floor(Math.random() * (referencePool.length ? referencePool.length : pool.length))
+      ];
+      const introNotes = keyChanged && byDegree
+        ? generateFixedPattern(
+            [reference], roundKey, scaleTypeRef.current,
+            settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
+          )
+        : null;
       // generateFixedPattern spaces its notes two beats apart, which is also
       // the spacing the prompts are called out at, so question and answer are
       // the same shape.
@@ -173,7 +190,7 @@ export function useGameLoop(deps: GameLoopDeps) {
         voiced.length
           ? audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad]))
           : Promise.resolve(),
-        audioEngine.preloadNotes(revealNotes),
+        audioEngine.preloadNotes([...revealNotes, ...(introNotes ?? [])]),
         ...Array.from(new Set(asked)).map(d => audioEngine.loadPromptBuffer(d)),
       ]), 5000, 'degree preload').catch((e) => console.warn('Degree preload stalled.', e));
       if (!isPlayingRef.current) return;
@@ -193,7 +210,11 @@ export function useGameLoop(deps: GameLoopDeps) {
               });
             }
           : null,
-        chordBeats: voiced.length * ANCHOR_CHORD_BEATS,
+        introNotes,
+        introLabel: introNotes ? `Reference ${reference}` : "Listen",
+        introBeats: introNotes
+          ? toBars(introNotes.length * DEGREE_SPACING_BEATS)
+          : voiced.length * ANCHOR_CHORD_BEATS,
         prompts: asked,
         promptSpacingBeats: DEGREE_SPACING_BEATS,
         promptBeats: spokenBeats,

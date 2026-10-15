@@ -78,6 +78,69 @@ function countLeaps(melody: NoteEvent[]): number {
  * if the range is too narrow to ever hit the target we keep the leapiest
  * attempt instead of looping forever.
  */
+/**
+ * Note lengths each difficulty may use, in beats.
+ *
+ * The easy settings stay on steady two-beat notes: rhythm is a second thing
+ * to hear at once, and someone still placing the degrees does not need it.
+ * Above that the melody gets eighths to fill a bar and long notes to leave
+ * space, which is what real melodies do.
+ */
+const RHYTHM_VALUES: Record<string, number[]> = {
+  easiest: [2],
+  easy: [2],
+  normal: [1, 2, 3, 4],
+  hard: [0.5, 1, 1.5, 2, 3, 4],
+};
+
+/**
+ * Note lengths for one melody, always totalling the same as the steady
+ * version (two beats a note).
+ *
+ * Holding the total fixed is what keeps this safe: the cycle's passes, the
+ * gap before the next melody and the bar alignment are all derived from the
+ * melody's length, so a rhythm that ran long would drift against the drums.
+ */
+function buildRhythm(length: number, difficulty: string): number[] {
+  const values = RHYTHM_VALUES[difficulty] ?? RHYTHM_VALUES.normal;
+  if (values.length === 1) return new Array(length).fill(values[0]);
+
+  const shortest = Math.min(...values);
+  const longest = Math.max(...values);
+
+  // Can `rest` beats be made from exactly `notes` legal lengths?
+  //
+  // Asking only whether the remainder lies between the shortest and longest
+  // possible is not enough: six and a half beats across two notes sits inside
+  // that range and cannot be built from these lengths at all, which left the
+  // last note an off-grid two and a half.
+  const memo = new Map<string, boolean>();
+  const canFill = (rest: number, notes: number): boolean => {
+    if (notes === 0) return Math.abs(rest) < 1e-9;
+    if (rest < notes * shortest - 1e-9 || rest > notes * longest + 1e-9) return false;
+    const key = `${rest}|${notes}`;
+    const seen = memo.get(key);
+    if (seen !== undefined) return seen;
+    const ok = values.some((v) => canFill(rest - v, notes - 1));
+    memo.set(key, ok);
+    return ok;
+  };
+
+  const durations: number[] = [];
+  let left = length * 2;
+
+  for (let i = 0; i < length; i++) {
+    const after = length - i - 1;
+    const feasible = values.filter((v) => canFill(left - v, after));
+    if (!feasible.length) return new Array(length).fill(2); // steady, always valid
+    const pick = feasible[Math.floor(Math.random() * feasible.length)];
+    durations.push(pick);
+    left -= pick;
+  }
+
+  return durations;
+}
+
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
   const difficulty = options.constraints.difficulty || "normal";
   const minLeaps = MIN_LEAPS[difficulty] ?? 0;
@@ -182,10 +245,11 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
   let currentBeat = 0;
   let lastMidi: number | null = null;
   let hasLeaped = false; // Internal flag to track if we've already done a big leap
-  const noteDur = 2; 
+  const rhythm = buildRhythm(length, constraints.difficulty || "normal");
 
-  degrees.forEach(d => {
+  degrees.forEach((d, i) => {
       const safeDegree = d || "1"; 
+      const noteDur = rhythm[i] ?? 2;
       
       // Pass the difficulty and current leap status
       const event = createEvent(safeDegree, key, scaleType, currentBeat, noteDur, lastMidi, constraints.difficulty || "normal", hasLeaped, constraints);

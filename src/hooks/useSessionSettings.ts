@@ -70,6 +70,15 @@ export function useSessionSettings() {
    */
   const [singNotes, setSingNotes] = usePersistentState("singNotes", 1, asInt(1, 4));
   const [singBars, setSingBars] = usePersistentState("singBars", 1, asInt(1, 4));
+  /**
+   * How the key is given in Numbers. 'chords' is a cadence, which settles the
+   * key for you. 'degree' is one note sung with its name — you have to work
+   * out where home is from it, which is what a song playing on the radio
+   * actually gives you.
+   */
+  const [singKeyFrom, setSingKeyFrom] = usePersistentState<'chords' | 'degree'>(
+    "singKeyFrom", 'chords', asOneOf(['chords', 'degree'] as const),
+  );
 
   // Vocal Range
   const [minVocalMidi, setMinVocalMidi] = usePersistentState(
@@ -97,6 +106,7 @@ export function useSessionSettings() {
     keyAnchor: useRef(keyAnchor),
     singNotes: useRef(singNotes),
     singBars: useRef(singBars),
+    singKeyFrom: useRef(singKeyFrom),
     minVocalMidi: useRef(minVocalMidi),
     maxVocalMidi: useRef(maxVocalMidi),
   };
@@ -118,6 +128,7 @@ export function useSessionSettings() {
   useEffect(() => { refs.keyAnchor.current = keyAnchor; }, [keyAnchor]);
   useEffect(() => { refs.singNotes.current = singNotes; }, [singNotes]);
   useEffect(() => { refs.singBars.current = singBars; }, [singBars]);
+  useEffect(() => { refs.singKeyFrom.current = singKeyFrom; }, [singKeyFrom]);
   useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]);
   useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]);
 
@@ -131,14 +142,14 @@ export function useSessionSettings() {
     bpm, currentPattern, startRoot, endRoot, silentPractice, 
     trainingWheels, inverseMode, questionsPerKey, difficulty,
     selectedShape, hideFretboardVisuals, includeSevenths, enabledInversions,
-    playbackSound, keyAnchor, singNotes, singBars,
+    playbackSound, keyAnchor, singNotes, singBars, singKeyFrom,
     minVocalMidi, maxVocalMidi,
 
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
     setSelectedShape, setHideFretboardVisuals, setIncludeSevenths, setEnabledInversions,
-    setPlaybackSound, setKeyAnchor, setSingNotes, setSingBars,
+    setPlaybackSound, setKeyAnchor, setSingNotes, setSingBars, setSingKeyFrom,
     setMinVocalMidi, setMaxVocalMidi,
     
     // Refs (Expose these to the game loop)

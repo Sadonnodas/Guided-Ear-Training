@@ -78,6 +78,8 @@ interface ControlsProps {
   setSingNotes: (v: number) => void;
   singBars: number;
   setSingBars: (v: number) => void;
+  singKeyFrom: 'chords' | 'degree';
+  setSingKeyFrom: (v: 'chords' | 'degree') => void;
   keyAnchor: 'drone' | 'vocals' | 'chords';
   setKeyAnchor: (v: 'drone' | 'vocals' | 'chords') => void;
   playbackSound: 'synth' | 'piano' | 'guitar';
@@ -446,6 +448,23 @@ export default function Controls(props: ControlsProps) {
               {props.activeTab === 'tonic' && (
                 <div className="control-section">
                   <h3 className="section-title">Numbers</h3>
+                  <div className="section-subtitle">Key from</div>
+                  <div className="toggle-grid-sleek">
+                    <div
+                      className={`toggle-pill-btn ${props.singKeyFrom === 'chords' ? 'active' : ''}`}
+                      onClick={() => props.setSingKeyFrom('chords')}
+                      title="A I-IV-V-I settles the key for you before each new key."
+                    >
+                      Chords
+                    </div>
+                    <div
+                      className={`toggle-pill-btn ${props.singKeyFrom === 'degree' ? 'active' : ''}`}
+                      onClick={() => props.setSingKeyFrom('degree')}
+                      title="One degree is sung with its name — work out where home is from it. Harder, and closer to hearing a song cold."
+                    >
+                      One degree
+                    </div>
+                  </div>
                   <div className="section-subtitle">Notes per question</div>
                   <div className="toggle-grid-sleek">
                     {[1, 2, 3, 4].map(n => (

@@ -253,7 +253,9 @@ export class Scheduler {
    */
   public scheduleDegreeRound(opts: {
     playChords: ((time: number, beatSec: number) => void) | null;
-    chordBeats: number;
+    introNotes: NoteEvent[] | null;
+    introLabel: string;
+    introBeats: number;
     prompts: string[];
     promptSpacingBeats: number;
     promptBeats: number;
@@ -293,11 +295,25 @@ export class Scheduler {
     };
 
     let cursor = start;
-    if (opts.playChords) {
-      const playChords = opts.playChords;
-      say("Listen", cursor);
-      schedule((time) => playChords(time, beatSec), cursor);
-      cursor += opts.chordBeats * beatSec;
+    // The key, stated once: a cadence, or a single degree sung with its name
+    // so you have to derive home from it.
+    if (opts.playChords || opts.introNotes) {
+      const { playChords, introNotes } = opts;
+      say(opts.introLabel, cursor);
+      if (playChords) {
+        const at = cursor;
+        schedule((time) => playChords(time, beatSec), at);
+      }
+      introNotes?.forEach((note) => {
+        const noteTime = cursor + note.startTime * beatSec;
+        schedule((time) => {
+          this.callbacks.playNoteAudio(note, time, false);
+          Tone.getDraw().schedule(() => {
+            if (!document.hidden) this.callbacks.onNotePlay(note, false);
+          }, time);
+        }, noteTime);
+      });
+      cursor += opts.introBeats * beatSec;
     }
 
     const promptsAt = cursor;
