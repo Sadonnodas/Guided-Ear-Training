@@ -74,6 +74,10 @@ interface ControlsProps {
   setIncludeSevenths: (v: boolean) => void;
   enabledInversions: number[];
   setEnabledInversions: (v: number[]) => void;
+  singNotes: number;
+  setSingNotes: (v: number) => void;
+  singBars: number;
+  setSingBars: (v: number) => void;
   keyAnchor: 'drone' | 'vocals' | 'chords';
   setKeyAnchor: (v: 'drone' | 'vocals' | 'chords') => void;
   playbackSound: 'synth' | 'piano' | 'guitar';
@@ -438,6 +442,38 @@ export default function Controls(props: ControlsProps) {
               )}
 
 
+
+              {props.activeTab === 'tonic' && (
+                <div className="control-section">
+                  <h3 className="section-title">Numbers</h3>
+                  <div className="section-subtitle">Notes per question</div>
+                  <div className="toggle-grid-sleek">
+                    {[1, 2, 3, 4].map(n => (
+                      <div
+                        key={n}
+                        className={`toggle-pill-btn ${props.singNotes === n ? 'active' : ''}`}
+                        onClick={() => props.setSingNotes(n)}
+                        title={n === 1 ? 'One degree called out at a time' : `${n} degrees called out as a melody to sing back`}
+                      >
+                        {n}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="section-subtitle">Time to sing</div>
+                  <div className="toggle-grid-sleek">
+                    {[1, 2, 3, 4].map(n => (
+                      <div
+                        key={n}
+                        className={`toggle-pill-btn ${props.singBars === n ? 'active' : ''}`}
+                        onClick={() => props.setSingBars(n)}
+                        title={`${n} bar${n > 1 ? 's' : ''} of silence before the answer is sung`}
+                      >
+                        {n} bar{n > 1 ? 's' : ''}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Only Melody mode changes key on its own, so only it has a
                 key to anchor. */}

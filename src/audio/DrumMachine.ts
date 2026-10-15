@@ -8,6 +8,9 @@ const SAMPLE_GAINS: Record<string, number> = {
   clave: -4, woodblock: -2, triangle: -4, racktom: -2, floortom: -2
 };
 
+// How much of the snare/clap/snap/rimshot goes to the reverb at full fader.
+const REVERB_SEND_LEVEL = 0.25;
+
 export class DrumMachine {
   private players: Tone.Players;
   private currentPatternName: keyof typeof DRUM_PATTERNS = "Lofi Chill";
@@ -21,7 +24,7 @@ export class DrumMachine {
   constructor(destination: Tone.ToneAudioNode, reverbNode: Tone.ToneAudioNode) {
     
     // 1. Create a send channel
-    this.reverbSend = new Tone.Gain(0.25).connect(reverbNode); // Adjust 0.25 for how wet you want the drums
+    this.reverbSend = new Tone.Gain(REVERB_SEND_LEVEL).connect(reverbNode);
 
     this.players = new Tone.Players({
       urls: {
@@ -55,6 +58,11 @@ export class DrumMachine {
 
   public setVolume(v: number) {
     this.players.volume.rampTo(Tone.gainToDb(v), 0.1);
+    // The selective reverb sends tap each player BEFORE the group volume, so
+    // the fader never reached them: pulling the drums to zero left the snare
+    // and claps still ringing through the reverb. Scale the send by the fader
+    // so it follows.
+    this.reverbSend.gain.rampTo(REVERB_SEND_LEVEL * v, 0.1);
   }
 
   public setPattern(name: keyof typeof DRUM_PATTERNS) {

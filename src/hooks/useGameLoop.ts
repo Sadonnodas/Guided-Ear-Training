@@ -13,10 +13,10 @@ import { KEYS, KEY_DISPLAY_MAP } from "./sessionConstants.ts";
 const ANCHOR_CHORD_BEATS = 2;
 // Two bars of silence to find and sing the tonic in: long enough to hunt for
 // it, short enough that you commit rather than work it out.
-const TONIC_SILENCE_BEATS = 8;
-// Room for the phone to finish saying "sing flat seven" before the silence
-// that is yours.
-const PROMPT_BEATS = 3;
+// Two beats per degree, called out and sung back at the same spacing. Two
+// rather than one because "flat seven" takes about 0.8s to say, which does
+// not fit a beat at any tempo worth practising at.
+const DEGREE_SPACING_BEATS = 2;
 
 /**
  * The anchor progression: I-IV-V-I, the plainest way to state a key.
@@ -72,6 +72,8 @@ export interface GameLoopDeps {
       inverseMode: React.MutableRefObject<boolean>;
       selectedShape: React.MutableRefObject<CagedShape>;
       keyAnchor: React.MutableRefObject<'drone' | 'vocals' | 'chords'>;
+      singNotes: React.MutableRefObject<number>;
+      singBars: React.MutableRefObject<number>;
     };
   };
 
@@ -147,7 +149,11 @@ export function useGameLoop(deps: GameLoopDeps) {
       // Whatever is lit in the visualizer, so you can start on 1-3-5 and open
       // it up later.
       const pool = enabledDegreesRef.current.length ? enabledDegreesRef.current : (["1"] as ScaleDegree[]);
-      const degree = pool[Math.floor(Math.random() * pool.length)];
+      const wanted = settings.refs.singNotes.current;
+      const asked: ScaleDegree[] = Array.from(
+        { length: wanted },
+        () => pool[Math.floor(Math.random() * pool.length)],
+      );
 
       const voiced = keyChanged
         ? anchorChords(scaleTypeRef.current).map((chord) => getChordMidiNotes(
@@ -155,8 +161,11 @@ export function useGameLoop(deps: GameLoopDeps) {
             settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
           ))
         : [];
-      const [revealNote] = generateFixedPattern(
-        [degree], roundKey, scaleTypeRef.current,
+      // generateFixedPattern spaces its notes two beats apart, which is also
+      // the spacing the prompts are called out at, so question and answer are
+      // the same shape.
+      const revealNotes = generateFixedPattern(
+        asked, roundKey, scaleTypeRef.current,
         settings.refs.minVocalMidi.current, settings.refs.maxVocalMidi.current,
       );
 
@@ -164,10 +173,16 @@ export function useGameLoop(deps: GameLoopDeps) {
         voiced.length
           ? audioEngine.preloadChordSamples(voiced.flatMap(v => [v.bass, ...v.triad]))
           : Promise.resolve(),
-        audioEngine.preloadNotes([revealNote]),
-        audioEngine.loadPromptBuffer(degree),
+        audioEngine.preloadNotes(revealNotes),
+        ...Array.from(new Set(asked)).map(d => audioEngine.loadPromptBuffer(d)),
       ]), 5000, 'degree preload').catch((e) => console.warn('Degree preload stalled.', e));
       if (!isPlayingRef.current) return;
+
+      // Whole bars throughout, so nothing drifts against the drum loop.
+      const toBars = (beats: number) => Math.ceil(beats / 4) * 4;
+      const spokenBeats = toBars(asked.length * DEGREE_SPACING_BEATS);
+      const sungBeats = toBars(asked.length * DEGREE_SPACING_BEATS);
+      const label = asked.join(" ");
 
       if (keyChanged) setTonicRevealed(false);
       audioEngine.scheduleDegreeRound({
@@ -179,13 +194,16 @@ export function useGameLoop(deps: GameLoopDeps) {
             }
           : null,
         chordBeats: voiced.length * ANCHOR_CHORD_BEATS,
-        promptBeats: PROMPT_BEATS,
-        silenceBeats: TONIC_SILENCE_BEATS,
-        promptLabel: `Sing ${degree}`,
-        revealLabel: `That was ${degree}`,
+        prompts: asked,
+        promptSpacingBeats: DEGREE_SPACING_BEATS,
+        promptBeats: spokenBeats,
+        silenceBeats: settings.refs.singBars.current * 4,
+        revealNotes,
+        revealBeats: sungBeats,
+        promptLabel: `Sing ${label}`,
+        revealLabel: `That was ${label}`,
         // The recording if we have it, the device's own voice if we do not.
-        onPrompt: (time) => { if (!audioEngine.playPrompt(degree, time)) speakDegree(degree); },
-        revealNote,
+        onPrompt: (degree, time) => { if (!audioEngine.playPrompt(degree, time)) speakDegree(degree); },
         onReveal: () => {
           // The key is only named once you have answered.
           setCurrentKey(roundKey);

@@ -200,8 +200,10 @@ export class Scheduler {
 
     let anchorTime = opts.atTime;
     if (anchorTime === undefined) {
+      // To the bar, so the anchor lands with the drum loop rather than
+      // across it.
       const now = Tone.getTransport().seconds;
-      anchorTime = Math.ceil(now / beatSec) * beatSec;
+      anchorTime = Math.ceil(now / measureSec) * measureSec;
     }
     const start = anchorTime + measureSec;
 
@@ -237,23 +239,30 @@ export class Scheduler {
   }
 
   /**
-   * One round of the sing-a-degree exercise: the key stated by chords (only
-   * when it has just changed), a spoken "sing 7", a silence to sing into,
-   * then that degree sung back at its real pitch.
+   * One round of the Numbers exercise: the key stated by chords (only when it
+   * has just changed), the degrees called out, a silence to sing them in,
+   * then the same degrees sung back at their real pitches.
    *
-   * The spoken prompt is NOT scheduled through Draw. Draw discards callbacks
-   * it reaches late, and a round whose prompt went missing is a round of
+   * Every segment is a whole number of bars and the round starts on a bar
+   * line, so the questions sit on the drum pattern instead of drifting
+   * against it.
+   *
+   * The spoken prompts are NOT scheduled through Draw. Draw discards
+   * callbacks it reaches late, and a round whose prompt went missing is a
    * silence you cannot answer.
    */
   public scheduleDegreeRound(opts: {
     playChords: ((time: number, beatSec: number) => void) | null;
     chordBeats: number;
+    prompts: string[];
+    promptSpacingBeats: number;
     promptBeats: number;
     silenceBeats: number;
-    onPrompt: (time: number) => void;
+    revealNotes: NoteEvent[];
+    revealBeats: number;
+    onPrompt: (degree: string, time: number) => void;
     promptLabel: string;
     revealLabel: string;
-    revealNote: NoteEvent;
     onReveal: () => void;
     onComplete: (nextStartTime: number) => void;
     atTime?: number;
@@ -266,8 +275,11 @@ export class Scheduler {
 
     let anchorTime = opts.atTime;
     if (anchorTime === undefined) {
+      // To the bar, not the beat: the drums loop per bar, and starting a
+      // third of the way through one is what made the questions feel out of
+      // time with them.
       const now = Tone.getTransport().seconds;
-      anchorTime = Math.ceil(now / beatSec) * beatSec;
+      anchorTime = Math.ceil(now / measureSec) * measureSec;
     }
     const start = anchorTime + measureSec;
 
@@ -288,22 +300,31 @@ export class Scheduler {
       cursor += opts.chordBeats * beatSec;
     }
 
-    say(opts.promptLabel, cursor);
-    schedule((time) => opts.onPrompt(time), cursor);
+    const promptsAt = cursor;
+    say(opts.promptLabel, promptsAt);
+    opts.prompts.forEach((degree, i) => {
+      schedule(
+        (time) => opts.onPrompt(degree, time),
+        promptsAt + i * opts.promptSpacingBeats * beatSec,
+      );
+    });
     cursor += opts.promptBeats * beatSec;
 
     const revealAt = cursor + opts.silenceBeats * beatSec;
     say(opts.revealLabel, revealAt);
-    schedule((time) => {
-      this.callbacks.playNoteAudio(opts.revealNote, time, false);
-      // State, not drawing — see the reveal in Find the Tonic.
-      opts.onReveal();
-      Tone.getDraw().schedule(() => {
-        if (!document.hidden) this.callbacks.onNotePlay(opts.revealNote, false);
-      }, time);
-    }, revealAt);
+    opts.revealNotes.forEach((note, i) => {
+      const noteTime = revealAt + note.startTime * beatSec;
+      schedule((time) => {
+        this.callbacks.playNoteAudio(note, time, false);
+        // State, not drawing: Draw drops callbacks it reaches late.
+        if (i === 0) opts.onReveal();
+        Tone.getDraw().schedule(() => {
+          if (!document.hidden) this.callbacks.onNotePlay(note, false);
+        }, time);
+      }, noteTime);
+    });
 
-    const end = revealAt + 6 * beatSec;
+    const end = revealAt + opts.revealBeats * beatSec + 4 * beatSec;
     schedule(() => opts.onComplete(end), end - 0.05);
   }
 

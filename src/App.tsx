@@ -228,6 +228,10 @@ export default function App() {
             setIncludeSevenths={session.setIncludeSevenths}
             enabledInversions={session.enabledInversions}
             setEnabledInversions={session.setEnabledInversions}
+            singNotes={session.singNotes}
+            setSingNotes={session.setSingNotes}
+            singBars={session.singBars}
+            setSingBars={session.setSingBars}
             keyAnchor={session.keyAnchor}
             setKeyAnchor={session.setKeyAnchor}
             playbackSound={session.playbackSound}

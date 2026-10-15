@@ -115,9 +115,9 @@ export default function Header({
         <button 
           className={`tab-btn ${activeTab === 'tonic' ? 'active' : ''}`} 
           onClick={() => handleTabChange("tonic")}
-          title="Sing: chords state a key, a voice names a scale degree, you sing it, then it is sung back"
+          title="Numbers: chords state a key, a voice calls out scale degrees, you sing them, then they are sung back"
         >
-          Sing
+          Numbers
         </button>
       </div>
 

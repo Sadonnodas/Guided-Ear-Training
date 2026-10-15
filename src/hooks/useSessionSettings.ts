@@ -63,6 +63,14 @@ export function useSessionSettings() {
     "keyAnchor", 'drone', asOneOf(['drone', 'vocals', 'chords'] as const),
   );
 
+  /**
+   * The Numbers exercise: how many degrees are called out per question, and
+   * how long you get to sing them. Both personal — how long is long enough
+   * is not something the app can know.
+   */
+  const [singNotes, setSingNotes] = usePersistentState("singNotes", 1, asInt(1, 4));
+  const [singBars, setSingBars] = usePersistentState("singBars", 1, asInt(1, 4));
+
   // Vocal Range
   const [minVocalMidi, setMinVocalMidi] = usePersistentState(
     "minVocalMidi", 43, asInt(VOCAL_MIN, VOCAL_MAX), // G2 - default vocal range min
@@ -87,6 +95,8 @@ export function useSessionSettings() {
     enabledInversions: useRef(enabledInversions),
     playbackSound: useRef(playbackSound),
     keyAnchor: useRef(keyAnchor),
+    singNotes: useRef(singNotes),
+    singBars: useRef(singBars),
     minVocalMidi: useRef(minVocalMidi),
     maxVocalMidi: useRef(maxVocalMidi),
   };
@@ -106,6 +116,8 @@ export function useSessionSettings() {
   useEffect(() => { refs.enabledInversions.current = enabledInversions; }, [enabledInversions]);
   useEffect(() => { refs.playbackSound.current = playbackSound; }, [playbackSound]);
   useEffect(() => { refs.keyAnchor.current = keyAnchor; }, [keyAnchor]);
+  useEffect(() => { refs.singNotes.current = singNotes; }, [singNotes]);
+  useEffect(() => { refs.singBars.current = singBars; }, [singBars]);
   useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]);
   useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]);
 
@@ -119,14 +131,14 @@ export function useSessionSettings() {
     bpm, currentPattern, startRoot, endRoot, silentPractice, 
     trainingWheels, inverseMode, questionsPerKey, difficulty,
     selectedShape, hideFretboardVisuals, includeSevenths, enabledInversions,
-    playbackSound, keyAnchor,
+    playbackSound, keyAnchor, singNotes, singBars,
     minVocalMidi, maxVocalMidi,
 
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
     setSelectedShape, setHideFretboardVisuals, setIncludeSevenths, setEnabledInversions,
-    setPlaybackSound, setKeyAnchor,
+    setPlaybackSound, setKeyAnchor, setSingNotes, setSingBars,
     setMinVocalMidi, setMaxVocalMidi,
     
     // Refs (Expose these to the game loop)
