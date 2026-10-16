@@ -485,3 +485,37 @@
   margin-bottom: 20px;
 }
 
+
+/* The three Melody exercises, where the unlabelled inverse toggle used to be.
+   Labelled rather than iconic: which exercise you are doing is the single
+   most important thing on this screen, and an icon cannot say "Numbers". */
+.exercise-picker {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 4px;
+}
+
+.exercise-pill {
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.exercise-pill:hover { color: var(--text-main); }
+
+.exercise-pill.active {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--btn-play);
+}
+
+@media (max-width: 420px) {
+  .exercise-pill { padding: 6px 10px; font-size: 0.72rem; }
+}

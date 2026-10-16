@@ -17,6 +17,9 @@ export interface NoteEvent {
   duration: number;
 }
 
+/** Which note lengths a melody may use. Independent of difficulty. */
+export type RhythmStyle = "steady" | "varied" | "complex";
+
 export interface MelodyConstraints {
   allowedDegrees: ScaleDegree[];
   focusedDegrees?: ScaleDegree[];
@@ -26,6 +29,7 @@ export interface MelodyConstraints {
   difficulty?: MelodyDifficulty;
   minMidi?: number;
   maxMidi?: number;
+  rhythm?: RhythmStyle;
 }
 
 export interface TrainingStage {

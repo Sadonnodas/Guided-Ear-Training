@@ -234,6 +234,10 @@ export default function App() {
             setSingBars={session.setSingBars}
             singKeyFrom={session.singKeyFrom}
             setSingKeyFrom={session.setSingKeyFrom}
+            exercise={session.exercise}
+            setExercise={session.setExercise}
+            noteLengths={session.noteLengths}
+            setNoteLengths={session.setNoteLengths}
             keyAnchor={session.keyAnchor}
             setKeyAnchor={session.setKeyAnchor}
             playbackSound={session.playbackSound}

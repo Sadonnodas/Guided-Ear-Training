@@ -7,7 +7,7 @@ import { getFretboardConfig } from "../config/FretboardData.ts";
 import { runProgressionsCycle } from "./useProgressionsCycle.ts";
 import type { ChordProgression, ChordInfo } from "../core/ChordProgressionGenerator.ts";
 import { getChordMidiNotes } from "../core/ChordProgressionGenerator.ts";
-import type { MusicalKey, ScaleDegree, ScaleType, MelodyConstraints, MelodyDifficulty, CagedShape } from "../types.ts";
+import type { MusicalKey, ScaleDegree, ScaleType, MelodyConstraints, MelodyDifficulty, CagedShape, RhythmStyle } from "../types.ts";
 import { KEYS, KEY_DISPLAY_MAP } from "./sessionConstants.ts";
 
 const ANCHOR_CHORD_BEATS = 2;
@@ -75,6 +75,7 @@ export interface GameLoopDeps {
       singNotes: React.MutableRefObject<number>;
       singBars: React.MutableRefObject<number>;
       singKeyFrom: React.MutableRefObject<'chords' | 'degree'>;
+      noteLengths: React.MutableRefObject<RhythmStyle>;
     };
   };
 
@@ -436,6 +437,7 @@ export function useGameLoop(deps: GameLoopDeps) {
             ...constraints,
             minMidi: fretboardRange?.min ?? settings.refs.minVocalMidi.current,
             maxMidi: fretboardRange?.max ?? settings.refs.maxVocalMidi.current,
+            rhythm: settings.refs.noteLengths.current,
           },
         });
         playSilent = settings.refs.silentPractice.current;
@@ -462,7 +464,11 @@ export function useGameLoop(deps: GameLoopDeps) {
           minMidi: fretboardRange?.min,
           maxMidi: fretboardRange?.max,
         };
-        noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleTypeRef.current, constraints });
+        noteEvents = generateMelody({
+          key: currentCycleKey,
+          scaleType: scaleTypeRef.current,
+          constraints: { ...constraints, rhythm: settings.refs.noteLengths.current },
+        });
       }
       playSilent = settings.refs.silentPractice.current;
 
@@ -487,7 +493,11 @@ export function useGameLoop(deps: GameLoopDeps) {
           minMidi: fretboardRange ? undefined : settings.refs.minVocalMidi.current,
           maxMidi: fretboardRange ? undefined : settings.refs.maxVocalMidi.current,
         };
-        noteEvents = generateMelody({ key: currentCycleKey, scaleType: scaleTypeRef.current, constraints });
+        noteEvents = generateMelody({
+          key: currentCycleKey,
+          scaleType: scaleTypeRef.current,
+          constraints: { ...constraints, rhythm: settings.refs.noteLengths.current },
+        });
       }
       playSilent = settings.refs.silentPractice.current;
     }

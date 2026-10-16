@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { audioEngine } from "../audio/AudioEngine";
 import { DRUM_PATTERNS } from "../config/AudioConfig";
 import { usePersistentState, asBool, asInt, asOneOf } from "./usePersistentState";
-import type { MelodyDifficulty, CagedShape} from "../types";
+import type { MelodyDifficulty, CagedShape, RhythmStyle } from "../types";
 
 const DIFFICULTIES: MelodyDifficulty[] = ["easiest", "easy", "normal", "hard"];
 const SHAPES: CagedShape[] = ["C", "A", "G", "E", "D"];
@@ -80,6 +80,15 @@ export function useSessionSettings() {
     "singKeyFrom", 'chords', asOneOf(['chords', 'degree'] as const),
   );
 
+  /**
+   * Which note lengths melodies may use. Its own setting rather than part of
+   * difficulty: how hard the degrees are and how busy the rhythm is are two
+   * different questions.
+   */
+  const [noteLengths, setNoteLengths] = usePersistentState<RhythmStyle>(
+    "noteLengths", 'steady', asOneOf(['steady', 'varied', 'complex'] as const),
+  );
+
   // Vocal Range
   const [minVocalMidi, setMinVocalMidi] = usePersistentState(
     "minVocalMidi", 43, asInt(VOCAL_MIN, VOCAL_MAX), // G2 - default vocal range min
@@ -107,6 +116,7 @@ export function useSessionSettings() {
     singNotes: useRef(singNotes),
     singBars: useRef(singBars),
     singKeyFrom: useRef(singKeyFrom),
+    noteLengths: useRef(noteLengths),
     minVocalMidi: useRef(minVocalMidi),
     maxVocalMidi: useRef(maxVocalMidi),
   };
@@ -129,6 +139,7 @@ export function useSessionSettings() {
   useEffect(() => { refs.singNotes.current = singNotes; }, [singNotes]);
   useEffect(() => { refs.singBars.current = singBars; }, [singBars]);
   useEffect(() => { refs.singKeyFrom.current = singKeyFrom; }, [singKeyFrom]);
+  useEffect(() => { refs.noteLengths.current = noteLengths; }, [noteLengths]);
   useEffect(() => { refs.minVocalMidi.current = minVocalMidi; }, [minVocalMidi]);
   useEffect(() => { refs.maxVocalMidi.current = maxVocalMidi; }, [maxVocalMidi]);
 
@@ -142,14 +153,14 @@ export function useSessionSettings() {
     bpm, currentPattern, startRoot, endRoot, silentPractice, 
     trainingWheels, inverseMode, questionsPerKey, difficulty,
     selectedShape, hideFretboardVisuals, includeSevenths, enabledInversions,
-    playbackSound, keyAnchor, singNotes, singBars, singKeyFrom,
+    playbackSound, keyAnchor, singNotes, singBars, singKeyFrom, noteLengths,
     minVocalMidi, maxVocalMidi,
 
     // Setters
     setBpm, setPattern, setStartRoot, setEndRoot, setSilentPractice,
     setTrainingWheels, setInverseMode, setQuestionsPerKey, setDifficulty,
     setSelectedShape, setHideFretboardVisuals, setIncludeSevenths, setEnabledInversions,
-    setPlaybackSound, setKeyAnchor, setSingNotes, setSingBars, setSingKeyFrom,
+    setPlaybackSound, setKeyAnchor, setSingNotes, setSingBars, setSingKeyFrom, setNoteLengths,
     setMinVocalMidi, setMaxVocalMidi,
     
     // Refs (Expose these to the game loop)

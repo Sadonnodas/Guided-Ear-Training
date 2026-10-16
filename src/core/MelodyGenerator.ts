@@ -1,5 +1,5 @@
 import { getNoteForDegree } from "../audio/MusicTheory";
-import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints, MelodyDifficulty } from "../types";
+import type { NoteEvent, MusicalKey, ScaleType, ScaleDegree, MelodyConstraints, MelodyDifficulty, RhythmStyle } from "../types";
 
 interface GeneratorOptions {
   key: MusicalKey;
@@ -79,18 +79,16 @@ function countLeaps(melody: NoteEvent[]): number {
  * attempt instead of looping forever.
  */
 /**
- * Note lengths each difficulty may use, in beats.
+ * Note lengths each rhythm setting may use, in beats.
  *
- * The easy settings stay on steady two-beat notes: rhythm is a second thing
- * to hear at once, and someone still placing the degrees does not need it.
- * Above that the melody gets eighths to fill a bar and long notes to leave
- * space, which is what real melodies do.
+ * Deliberately not tied to difficulty: how hard the degrees are to hear and
+ * how busy the rhythm is are two different things, and wanting one without
+ * the other is reasonable either way round.
  */
-const RHYTHM_VALUES: Record<string, number[]> = {
-  easiest: [2],
-  easy: [2],
-  normal: [1, 2, 3, 4],
-  hard: [0.5, 1, 1.5, 2, 3, 4],
+const RHYTHM_VALUES: Record<RhythmStyle, number[]> = {
+  steady: [2],
+  varied: [1, 2, 3, 4],
+  complex: [0.5, 1, 1.5, 2, 3, 4],
 };
 
 /**
@@ -101,8 +99,8 @@ const RHYTHM_VALUES: Record<string, number[]> = {
  * gap before the next melody and the bar alignment are all derived from the
  * melody's length, so a rhythm that ran long would drift against the drums.
  */
-function buildRhythm(length: number, difficulty: string): number[] {
-  const values = RHYTHM_VALUES[difficulty] ?? RHYTHM_VALUES.normal;
+function buildRhythm(length: number, style: RhythmStyle): number[] {
+  const values = RHYTHM_VALUES[style] ?? RHYTHM_VALUES.steady;
   if (values.length === 1) return new Array(length).fill(values[0]);
 
   const shortest = Math.min(...values);
@@ -245,7 +243,7 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
   let currentBeat = 0;
   let lastMidi: number | null = null;
   let hasLeaped = false; // Internal flag to track if we've already done a big leap
-  const rhythm = buildRhythm(length, constraints.difficulty || "normal");
+  const rhythm = buildRhythm(length, constraints.rhythm || "steady");
 
   degrees.forEach((d, i) => {
       const safeDegree = d || "1"; 

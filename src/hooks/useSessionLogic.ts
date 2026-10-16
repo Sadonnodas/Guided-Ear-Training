@@ -321,6 +321,23 @@ export function useSessionLogic() {
     setActiveMidi(null);
   };
 
+  /**
+   * Melody, Melody-inverse and Numbers are three exercises on the same
+   * material, and they used to be reached in three different ways: a tab for
+   * one, an unlabelled toggle for another. This is the one place that picks
+   * between them.
+   */
+  const exercise: 'sing' | 'identify' | 'numbers' =
+    activeTab === 'tonic' ? 'numbers' : (settings.inverseMode ? 'identify' : 'sing');
+
+  const setExercise = async (next: 'sing' | 'identify' | 'numbers') => {
+    const tab = next === 'numbers' ? 'tonic' : 'random';
+    // Awaited: the tab change restores that tab's remembered flags, including
+    // inverse, so setting it first would be undone a moment later.
+    if (tab !== activeTab) await handleTabChange(tab);
+    if (next !== 'numbers') settings.setInverseMode(next === 'identify');
+  };
+
   // ── Scale & degree handlers ──────────────────────────────────────────────────
   const handleScaleChange = (type: ScaleType) => {
     // Compute relative key: Major↔Minor shifts root by 3 semitones
@@ -525,7 +542,7 @@ export function useSessionLogic() {
     triggerPulse,
     debugClick, setDebugClick,
     activeChordIndex, activeRootMidi, currentProgression,
-    tonicRevealed,
+    tonicRevealed, exercise, setExercise,
 
     ...mixer,
     ...settings,

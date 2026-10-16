@@ -85,7 +85,7 @@ export default function Header({
     <>
       <div className="tabs">
         <button 
-          className={`tab-btn ${activeTab === 'random' ? 'active' : ''}`} 
+          className={`tab-btn ${activeTab === 'random' || activeTab === 'tonic' ? 'active' : ''}`} 
           onClick={() => handleTabChange("random")}
           title="Random Mode: Freeform practice with full control over scale degrees"
         >
@@ -112,13 +112,8 @@ export default function Header({
         >
           Progressions
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'tonic' ? 'active' : ''}`} 
-          onClick={() => handleTabChange("tonic")}
-          title="Numbers: chords state a key, a voice calls out scale degrees, you sing them, then they are sung back"
-        >
-          Numbers
-        </button>
+        {/* Numbers is not a mode of its own — it is one of the Melody
+            exercises, picked under the visualizer. */}
       </div>
 
       <div className="info-display">

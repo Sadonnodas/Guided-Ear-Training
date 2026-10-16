@@ -15,9 +15,7 @@ const StopIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="cur
 const ChevronIcon = ({open}: {open: boolean}) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}><path d="M6 9l6 6 6-6"/></svg>;
 const MinusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14"/></svg>;
 const PlusIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14"/></svg>;
-const TrainingWheelsIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><path d="M12 2v6" /><path d="M12 16v6" /><path d="M2 12h6" /><path d="M16 12h6" /></svg>;
 const EyeOffIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
-const InverseIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>;
 const MetronomeIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L4 20h16L12 2z" /><path d="M12 6v8" /></svg>;
 const TutorialIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
 
@@ -28,6 +26,18 @@ const MixerIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="no
 const MoreIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>;
 
 const TEMPOS = [60, 80, 100, 120, 150];
+
+const EXERCISES: { value: 'sing' | 'identify' | 'numbers'; label: string; title: string }[] = [
+  { value: 'sing', label: 'Sing along', title: 'Hear the melody sung, then sing it back.' },
+  { value: 'identify', label: 'Identify', title: 'Hear the melody played twice and name the degrees before the voices reveal them.' },
+  { value: 'numbers', label: 'Numbers', title: 'A voice calls out degrees, you sing them, then they are sung back.' },
+];
+
+const NOTE_LENGTHS: { value: 'steady' | 'varied' | 'complex'; label: string; title: string }[] = [
+  { value: 'steady', label: 'Steady', title: 'Every note the same length.' },
+  { value: 'varied', label: 'Varied', title: 'Quarter notes through whole notes.' },
+  { value: 'complex', label: 'Complex', title: 'Adds eighth notes and dotted lengths.' },
+];
 
 const INVERSION_OPTIONS: { value: number; label: string; title: string }[] = [
   { value: 0, label: 'Root',     title: 'Root position: chord notes played in their natural order' },
@@ -80,6 +90,10 @@ interface ControlsProps {
   setSingBars: (v: number) => void;
   singKeyFrom: 'chords' | 'degree';
   setSingKeyFrom: (v: 'chords' | 'degree') => void;
+  exercise: 'sing' | 'identify' | 'numbers';
+  setExercise: (v: 'sing' | 'identify' | 'numbers') => void;
+  noteLengths: 'steady' | 'varied' | 'complex';
+  setNoteLengths: (v: 'steady' | 'varied' | 'complex') => void;
   keyAnchor: 'drone' | 'vocals' | 'chords';
   setKeyAnchor: (v: 'drone' | 'vocals' | 'chords') => void;
   playbackSound: 'synth' | 'piano' | 'guitar';
@@ -197,7 +211,7 @@ export default function Controls(props: ControlsProps) {
   const isFretboardTab = props.activeTab === 'fretboard';
   const isRandomTab = props.activeTab === 'random';
   const showBlindMode = isFretboardTab || props.inverseMode || props.activeTab === 'progressions';
-  const showPitchGuideAndInverse = isRandomTab;
+  const showExercisePicker = isRandomTab || props.activeTab === 'tonic';
   const showGuideVolume = props.trainingWheels || props.inverseMode || isFretboardTab;
 
   return (
@@ -225,29 +239,21 @@ export default function Controls(props: ControlsProps) {
         </div>
       </div>
       <div className="practice-controls">
-        {showPitchGuideAndInverse && (
-          <div 
-            className={`icon-toggle-btn ${props.trainingWheels ? 'active' : ''}`} 
-            onClick={() => !isTrainingMode && props.setTrainingWheels(!props.trainingWheels)}
-            style={{ 
-              opacity: isTrainingMode ? 0.5 : 1,
-              cursor: isTrainingMode ? 'not-allowed' : 'pointer'
-            }}
-            title={isTrainingMode 
-              ? "Training mode controls pitch guide (enabled in Stages 1-2)" 
-              : "Pitch Guide: Synth plays along with your singing for reference"}
-          >
-            <TrainingWheelsIcon />
-          </div>
-        )}
-
-        {showPitchGuideAndInverse && (
-          <div 
-            className={`icon-toggle-btn ${props.inverseMode ? 'active' : ''}`} 
-            onClick={() => props.setInverseMode(!props.inverseMode)} 
-            title="Inverse Mode: Test your scale degree recognition by identifying the melody before the 3rd repetition."
-          >
-            <InverseIcon />
+        {/* The three Melody exercises, picked where the unlabelled inverse
+            toggle used to be. The pitch guide moved into the controls: it is
+            a setting, not a choice of exercise. */}
+        {showExercisePicker && (
+          <div className="exercise-picker">
+            {EXERCISES.map(ex => (
+              <div
+                key={ex.value}
+                className={`exercise-pill ${props.exercise === ex.value ? 'active' : ''}`}
+                onClick={() => props.setExercise(ex.value)}
+                title={ex.title}
+              >
+                {ex.label}
+              </div>
+            ))}
           </div>
         )}
 
@@ -445,6 +451,21 @@ export default function Controls(props: ControlsProps) {
 
 
 
+              {props.activeTab === 'random' && (
+                <div className="control-section">
+                  <h3 className="section-title">Pitch Guide</h3>
+                  <div className="toggle-grid-sleek">
+                    <div
+                      className={`toggle-pill-btn ${props.trainingWheels ? 'active' : ''}`}
+                      onClick={() => !isTrainingMode && props.setTrainingWheels(!props.trainingWheels)}
+                      title="The synth plays along with your singing, for reference."
+                    >
+                      {props.trainingWheels ? 'On' : 'Off'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {props.activeTab === 'tonic' && (
                 <div className="control-section">
                   <h3 className="section-title">Numbers</h3>
@@ -630,6 +651,20 @@ export default function Controls(props: ControlsProps) {
               </div>
 
               <div className="control-section no-border">
+                <h3 className="section-title">Note Lengths</h3>
+                <div className="toggle-grid-sleek" style={{ marginBottom: '20px' }}>
+                  {NOTE_LENGTHS.map(opt => (
+                    <div
+                      key={opt.value}
+                      className={`toggle-pill-btn ${props.noteLengths === opt.value ? 'active' : ''}`}
+                      onClick={() => props.setNoteLengths(opt.value)}
+                      title={opt.title}
+                    >
+                      {opt.label}
+                    </div>
+                  ))}
+                </div>
+
                 <h3 className="section-title">Groove & Click</h3>
                 <div className="row-split" style={{marginBottom: '12px'}}>
                   <span className="stepper-label">Drum Pattern</span>
