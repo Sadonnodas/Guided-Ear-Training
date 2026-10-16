@@ -27,10 +27,10 @@ const MoreIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 
 const TEMPOS = [60, 80, 100, 120, 150];
 
-const EXERCISES: { value: 'sing' | 'identify' | 'numbers'; label: string; title: string }[] = [
-  { value: 'sing', label: 'Sing along', title: 'Hear the melody sung, then sing it back.' },
+const EXERCISES: { value: 'echo' | 'identify' | 'findNote'; label: string; title: string }[] = [
+  { value: 'echo', label: 'Echo', title: 'Hear the melody, sing with it, then sing it alone.' },
   { value: 'identify', label: 'Identify', title: 'Hear the melody played twice and name the degrees before the voices reveal them.' },
-  { value: 'numbers', label: 'Numbers', title: 'A voice calls out degrees, you sing them, then they are sung back.' },
+  { value: 'findNote', label: 'Find Note', title: 'A voice names a degree with nothing to copy — find the pitch and sing it, then hear it sung back.' },
 ];
 
 const NOTE_LENGTHS: { value: 'steady' | 'varied' | 'complex'; label: string; title: string }[] = [
@@ -90,8 +90,8 @@ interface ControlsProps {
   setSingBars: (v: number) => void;
   singKeyFrom: 'chords' | 'degree';
   setSingKeyFrom: (v: 'chords' | 'degree') => void;
-  exercise: 'sing' | 'identify' | 'numbers';
-  setExercise: (v: 'sing' | 'identify' | 'numbers') => void;
+  exercise: 'echo' | 'identify' | 'findNote';
+  setExercise: (v: 'echo' | 'identify' | 'findNote') => void;
   noteLengths: 'steady' | 'varied' | 'complex';
   setNoteLengths: (v: 'steady' | 'varied' | 'complex') => void;
   keyAnchor: 'drone' | 'vocals' | 'chords';
@@ -468,7 +468,7 @@ export default function Controls(props: ControlsProps) {
 
               {props.activeTab === 'tonic' && (
                 <div className="control-section">
-                  <h3 className="section-title">Numbers</h3>
+                  <h3 className="section-title">Find Note</h3>
                   <div className="section-subtitle">Key from</div>
                   <div className="toggle-grid-sleek">
                     <div

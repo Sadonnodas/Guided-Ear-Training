@@ -112,7 +112,7 @@ export default function Header({
         >
           Progressions
         </button>
-        {/* Numbers is not a mode of its own — it is one of the Melody
+        {/* Find Note is not a mode of its own — it is one of the Melody
             exercises, picked under the visualizer. */}
       </div>
 

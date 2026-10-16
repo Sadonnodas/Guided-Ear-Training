@@ -64,14 +64,14 @@ export function useSessionSettings() {
   );
 
   /**
-   * The Numbers exercise: how many degrees are called out per question, and
+   * The Find Note exercise: how many degrees are called out per question, and
    * how long you get to sing them. Both personal — how long is long enough
    * is not something the app can know.
    */
   const [singNotes, setSingNotes] = usePersistentState("singNotes", 1, asInt(1, 4));
   const [singBars, setSingBars] = usePersistentState("singBars", 1, asInt(1, 4));
   /**
-   * How the key is given in Numbers. 'chords' is a cadence, which settles the
+   * How the key is given in Find Note. 'chords' is a cadence, which settles the
    * key for you. 'degree' is one note sung with its name — you have to work
    * out where home is from it, which is what a song playing on the radio
    * actually gives you.

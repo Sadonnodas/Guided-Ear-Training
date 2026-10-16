@@ -322,20 +322,20 @@ export function useSessionLogic() {
   };
 
   /**
-   * Melody, Melody-inverse and Numbers are three exercises on the same
+   * Echo, Identify and Find Note are three exercises on the same
    * material, and they used to be reached in three different ways: a tab for
    * one, an unlabelled toggle for another. This is the one place that picks
    * between them.
    */
-  const exercise: 'sing' | 'identify' | 'numbers' =
-    activeTab === 'tonic' ? 'numbers' : (settings.inverseMode ? 'identify' : 'sing');
+  const exercise: 'echo' | 'identify' | 'findNote' =
+    activeTab === 'tonic' ? 'findNote' : (settings.inverseMode ? 'identify' : 'echo');
 
-  const setExercise = async (next: 'sing' | 'identify' | 'numbers') => {
-    const tab = next === 'numbers' ? 'tonic' : 'random';
+  const setExercise = async (next: 'echo' | 'identify' | 'findNote') => {
+    const tab = next === 'findNote' ? 'tonic' : 'random';
     // Awaited: the tab change restores that tab's remembered flags, including
     // inverse, so setting it first would be undone a moment later.
     if (tab !== activeTab) await handleTabChange(tab);
-    if (next !== 'numbers') settings.setInverseMode(next === 'identify');
+    if (next !== 'findNote') settings.setInverseMode(next === 'identify');
   };
 
   // ── Scale & degree handlers ──────────────────────────────────────────────────

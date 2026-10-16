@@ -239,7 +239,7 @@ export class Scheduler {
   }
 
   /**
-   * One round of the Numbers exercise: the key stated by chords (only when it
+   * One round of the Find Note exercise: the key stated by chords (only when it
    * has just changed), the degrees called out, a silence to sing them in,
    * then the same degrees sung back at their real pitches.
    *
