@@ -446,10 +446,10 @@ export class AudioEngine {
     const beatSec = 60 / Tone.getTransport().bpm.value;
     // The melody's length in BARS, not the sum of its notes.
     //
-    // Rests sound like nothing and so add nothing to that sum, which would
-    // make a melody ending in one measure short — and every pass after it
-    // would start early and drift against the drums. Rounding up to whole
-    // bars keeps each pass on the grid whatever the rhythm does.
+    // Fixed patterns are not all an even number of bars — a seven-note scale
+    // preview runs three and a half — and a pass starting half a bar early
+    // drifts against the drum loop for the rest of the cycle. Rounding up
+    // keeps every pass on the grid whatever it was handed.
     const sungSpan = Math.max(...notes.map(n => n.startTime + n.duration));
     const melodyDur = Math.ceil(sungSpan / 4) * 4 * beatSec; 
     

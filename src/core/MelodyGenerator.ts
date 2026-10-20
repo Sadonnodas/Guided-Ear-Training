@@ -79,48 +79,42 @@ function countLeaps(melody: NoteEvent[]): number {
  * attempt instead of looping forever.
  */
 /**
- * Bar patterns, four beats each, built only from half, quarter and eighth
- * notes and their rests. A negative value is a rest of that length.
+ * Bar patterns, four beats each, built from half, quarter and eighth notes.
  *
  * Patterns rather than a free partition of the bar. Picking lengths freely
  * made rhythms that totalled correctly and were awkward to sing — three
  * beats then three then one is arithmetic, not a rhythm. These are shapes
  * that land on the beat.
  *
- * None of them opens with a rest: a melody that begins with silence reads as
- * the app having failed to start.
+ * No rests. They were tried and taken out: these are sung samples, whole
+ * syllables, so a rest is not silence but a voice cut off part-way through a
+ * word. That reads as the app glitching rather than as a rest, and the
+ * fade needed to make one only draws attention to it.
  */
 const BAR_PATTERNS: Record<RhythmStyle, number[][]> = {
   steady: [[2, 2]],
   varied: [
-    [2, 2], [2, 1, 1], [1, 1, 2], [1, 1, 1, 1],
-    [2, 1, -1], [1, 1, -1, 1], [2, -1, 1], [1, 2, -1], [1, -1, 1, 1],
+    [2, 2], [2, 1, 1], [1, 1, 2], [1, 1, 1, 1], [1, 2, 1],
   ],
   complex: [
-    [2, 2], [2, 1, 1], [1, 1, 2], [1, 1, 1, 1],
+    [2, 2], [2, 1, 1], [1, 1, 2], [1, 1, 1, 1], [1, 2, 1],
     [1, 0.5, 0.5, 2], [2, 0.5, 0.5, 1], [0.5, 0.5, 1, 2], [2, 1, 0.5, 0.5],
     [1, 1, 0.5, 0.5, 1], [0.5, 0.5, 1, 1, 1], [1, 0.5, 0.5, 1, 1],
-    [0.5, 0.5, 0.5, 0.5, 2], [1, 0.5, 0.5, 2],
-    [2, 1, -1], [1, 0.5, 0.5, -1, 1], [0.5, 0.5, 1, -1, 1], [2, -1, 0.5, 0.5],
+    [0.5, 0.5, 0.5, 0.5, 2], [1, 1, 1, 0.5, 0.5],
   ],
 };
 
 /** A melody is two bars, as it has always been. */
 const BARS_PER_MELODY = 2;
 
-interface RhythmSlot {
-  beats: number;
-  rest: boolean;
-}
-
-function buildRhythm(style: RhythmStyle): RhythmSlot[] {
+function buildRhythm(style: RhythmStyle): number[] {
   const patterns = BAR_PATTERNS[style] ?? BAR_PATTERNS.steady;
-  const slots: RhythmSlot[] = [];
+  const beats: number[] = [];
   for (let bar = 0; bar < BARS_PER_MELODY; bar++) {
     const pattern = patterns[Math.floor(Math.random() * patterns.length)];
-    pattern.forEach((value) => slots.push({ beats: Math.abs(value), rest: value < 0 }));
+    beats.push(...pattern);
   }
-  return slots;
+  return beats;
 }
 
 /**
@@ -186,7 +180,7 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
   
   // 1. The rhythm first: it decides how many notes there are to fill.
   const slots = buildRhythm(constraints.rhythm || "steady");
-  const sounding = slots.filter((slot) => !slot.rest).length;
+  const sounding = slots.length;
 
   // 2. The degrees this melody may use. `length` is the number of DIFFERENT
   // degrees, not the number of notes — a busier rhythm repeats them rather
@@ -229,25 +223,17 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
       degrees[i] = candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // 5. Convert abstract degrees to playable NoteEvents. Rests advance the
-  // clock without sounding, so the melody still fills its two bars.
+  // 5. Convert abstract degrees to playable NoteEvents.
   const melody: NoteEvent[] = [];
   let currentBeat = 0;
   let lastMidi: number | null = null;
   let hasLeaped = false; // Internal flag to track if we've already done a big leap
-  let soundingIndex = 0;
 
-  slots.forEach((slot) => {
-      if (slot.rest) {
-          currentBeat += slot.beats;
-          return;
-      }
-
-      const safeDegree = degrees[soundingIndex] || "1";
-      soundingIndex += 1;
+  slots.forEach((beats, i) => {
+      const safeDegree = degrees[i] || "1";
 
       // Pass the difficulty and current leap status
-      const event = createEvent(safeDegree, key, scaleType, currentBeat, slot.beats, lastMidi, constraints.difficulty || "normal", hasLeaped, constraints);
+      const event = createEvent(safeDegree, key, scaleType, currentBeat, beats, lastMidi, constraints.difficulty || "normal", hasLeaped, constraints);
 
       // If this specific note created a leap > 7 semitones, trip the flag
       if (lastMidi !== null && Math.abs(event.noteInfo.midi - lastMidi) > 7) {
@@ -255,7 +241,7 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
       }
 
       melody.push(event);
-      currentBeat += slot.beats;
+      currentBeat += beats;
       lastMidi = event.noteInfo.midi;
   });
 
