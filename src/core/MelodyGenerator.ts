@@ -79,64 +79,72 @@ function countLeaps(melody: NoteEvent[]): number {
  * attempt instead of looping forever.
  */
 /**
- * Note lengths each rhythm setting may use, in beats.
+ * Bar patterns, four beats each, built only from half, quarter and eighth
+ * notes and their rests. A negative value is a rest of that length.
  *
- * Deliberately not tied to difficulty: how hard the degrees are to hear and
- * how busy the rhythm is are two different things, and wanting one without
- * the other is reasonable either way round.
+ * Patterns rather than a free partition of the bar. Picking lengths freely
+ * made rhythms that totalled correctly and were awkward to sing — three
+ * beats then three then one is arithmetic, not a rhythm. These are shapes
+ * that land on the beat.
+ *
+ * None of them opens with a rest: a melody that begins with silence reads as
+ * the app having failed to start.
  */
-const RHYTHM_VALUES: Record<RhythmStyle, number[]> = {
-  steady: [2],
-  varied: [1, 2, 3, 4],
-  complex: [0.5, 1, 1.5, 2, 3, 4],
+const BAR_PATTERNS: Record<RhythmStyle, number[][]> = {
+  steady: [[2, 2]],
+  varied: [
+    [2, 2], [2, 1, 1], [1, 1, 2], [1, 1, 1, 1],
+    [2, 1, -1], [1, 1, -1, 1], [2, -1, 1], [1, 2, -1], [1, -1, 1, 1],
+  ],
+  complex: [
+    [2, 2], [2, 1, 1], [1, 1, 2], [1, 1, 1, 1],
+    [1, 0.5, 0.5, 2], [2, 0.5, 0.5, 1], [0.5, 0.5, 1, 2], [2, 1, 0.5, 0.5],
+    [1, 1, 0.5, 0.5, 1], [0.5, 0.5, 1, 1, 1], [1, 0.5, 0.5, 1, 1],
+    [0.5, 0.5, 0.5, 0.5, 2], [1, 0.5, 0.5, 2],
+    [2, 1, -1], [1, 0.5, 0.5, -1, 1], [0.5, 0.5, 1, -1, 1], [2, -1, 0.5, 0.5],
+  ],
 };
 
-/**
- * Note lengths for one melody, always totalling the same as the steady
- * version (two beats a note).
- *
- * Holding the total fixed is what keeps this safe: the cycle's passes, the
- * gap before the next melody and the bar alignment are all derived from the
- * melody's length, so a rhythm that ran long would drift against the drums.
- */
-function buildRhythm(length: number, style: RhythmStyle): number[] {
-  const values = RHYTHM_VALUES[style] ?? RHYTHM_VALUES.steady;
-  if (values.length === 1) return new Array(length).fill(values[0]);
+/** A melody is two bars, as it has always been. */
+const BARS_PER_MELODY = 2;
 
-  const shortest = Math.min(...values);
-  const longest = Math.max(...values);
+interface RhythmSlot {
+  beats: number;
+  rest: boolean;
+}
 
-  // Can `rest` beats be made from exactly `notes` legal lengths?
-  //
-  // Asking only whether the remainder lies between the shortest and longest
-  // possible is not enough: six and a half beats across two notes sits inside
-  // that range and cannot be built from these lengths at all, which left the
-  // last note an off-grid two and a half.
-  const memo = new Map<string, boolean>();
-  const canFill = (rest: number, notes: number): boolean => {
-    if (notes === 0) return Math.abs(rest) < 1e-9;
-    if (rest < notes * shortest - 1e-9 || rest > notes * longest + 1e-9) return false;
-    const key = `${rest}|${notes}`;
-    const seen = memo.get(key);
-    if (seen !== undefined) return seen;
-    const ok = values.some((v) => canFill(rest - v, notes - 1));
-    memo.set(key, ok);
-    return ok;
-  };
-
-  const durations: number[] = [];
-  let left = length * 2;
-
-  for (let i = 0; i < length; i++) {
-    const after = length - i - 1;
-    const feasible = values.filter((v) => canFill(left - v, after));
-    if (!feasible.length) return new Array(length).fill(2); // steady, always valid
-    const pick = feasible[Math.floor(Math.random() * feasible.length)];
-    durations.push(pick);
-    left -= pick;
+function buildRhythm(style: RhythmStyle): RhythmSlot[] {
+  const patterns = BAR_PATTERNS[style] ?? BAR_PATTERNS.steady;
+  const slots: RhythmSlot[] = [];
+  for (let bar = 0; bar < BARS_PER_MELODY; bar++) {
+    const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+    pattern.forEach((value) => slots.push({ beats: Math.abs(value), rest: value < 0 }));
   }
+  return slots;
+}
 
-  return durations;
+/**
+ * The degrees this melody is allowed to use — at most `size` of them.
+ *
+ * Rhythm adds note events, not new pitches to recognise: a bar of six notes
+ * drawn from four degrees is a rhythm exercise, a bar of six different
+ * degrees is a different and much harder exercise. Anything asked for by
+ * name — the start, the end, the focused degrees — takes its place first.
+ */
+function buildDegreePool(
+  size: number,
+  playable: ScaleDegree[],
+  required: (ScaleDegree | undefined)[],
+): ScaleDegree[] {
+  const pool: ScaleDegree[] = [];
+  for (const degree of required) {
+    if (degree && playable.includes(degree) && !pool.includes(degree) && pool.length < size) {
+      pool.push(degree);
+    }
+  }
+  const spare = playable.filter((d) => !pool.includes(d)).sort(() => Math.random() - 0.5);
+  while (pool.length < size && spare.length) pool.push(spare.pop()!);
+  return pool.length ? pool : ["1"];
 }
 
 export function generateMelody(options: GeneratorOptions): NoteEvent[] {
@@ -176,81 +184,70 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
     playableDegrees.push("1");
   }
   
-  // 1. Initialize empty slots
-  const degrees: (ScaleDegree | null)[] = new Array(length).fill(null);
-  
-  // 2. Set Constraints (Start/End)
-  // Only set them if they are in the playable list
-  if (startDegree && playableDegrees.includes(startDegree)) {
-      degrees[0] = startDegree;
-  }
-  if (endDegree && playableDegrees.includes(endDegree)) {
-      degrees[length - 1] = endDegree;
-  }
+  // 1. The rhythm first: it decides how many notes there are to fill.
+  const slots = buildRhythm(constraints.rhythm || "steady");
+  const sounding = slots.filter((slot) => !slot.rest).length;
 
-  // 3. Handle Focused Degrees (NEW LOGIC)
-  // We need to forcibly insert these into the NULL slots.
+  // 2. The degrees this melody may use. `length` is the number of DIFFERENT
+  // degrees, not the number of notes — a busier rhythm repeats them rather
+  // than introducing more to recognise.
+  const pool = buildDegreePool(
+    Math.max(1, Math.min(length, playableDegrees.length)),
+    playableDegrees,
+    [startDegree, endDegree, ...(focusedDegrees ?? [])],
+  );
+
+  // 3. Place the degrees that were asked for by name.
+  const degrees: (ScaleDegree | null)[] = new Array(sounding).fill(null);
+  if (startDegree && pool.includes(startDegree)) degrees[0] = startDegree;
+  if (endDegree && pool.includes(endDegree)) degrees[sounding - 1] = endDegree;
+
   if (focusedDegrees && focusedDegrees.length > 0) {
-      // Create a shuffled copy of focus requirements to randomize insertion order
-      const focusPool = [...focusedDegrees].sort(() => Math.random() - 0.5);
-      
-      // Get all currently empty indices
-      let emptyIndices = degrees
+      const focusPool = [...focusedDegrees].filter(d => pool.includes(d)).sort(() => Math.random() - 0.5);
+      const emptyIndices = degrees
           .map((val, idx) => val === null ? idx : -1)
-          .filter(idx => idx !== -1);
-      
-      // Shuffle the indices so the focused notes appear in random positions
-      emptyIndices.sort(() => Math.random() - 0.5);
+          .filter(idx => idx !== -1)
+          .sort(() => Math.random() - 0.5);
 
-      // Place focused notes into the empty slots
-      // SAFEGUARD: Ensure focused note is playable in current range
-      const validFocusPool = focusPool.filter(d => playableDegrees.includes(d));
-      
-      while (validFocusPool.length > 0 && emptyIndices.length > 0) {
-          const note = validFocusPool.pop()!;
-          const idx = emptyIndices.pop()!;
-          degrees[idx] = note;
+      while (focusPool.length > 0 && emptyIndices.length > 0) {
+          degrees[emptyIndices.pop()!] = focusPool.pop()!;
       }
   }
 
-  // 4. Fill remaining slots randomly from Playable Degrees
-  const pool: ScaleDegree[] = playableDegrees.length > 0 ? playableDegrees : ["1"];
-  
-  for (let i = 0; i < length; i++) {
-      // Only fill if the slot wasn't already taken by Start, End, or Focus
-      if (degrees[i] === null) {
-          let candidatePool = [...pool];
-
-          // Simple Repetition Guard: Avoid 3 identical notes in a row
-          // We only check this if we are generating a new note. 
-          // (If a Focused note creates a triplet, we allow it because Focus is higher priority).
-          if (i >= 2) {
-              const prev1 = degrees[i-1];
-              const prev2 = degrees[i-2];
-              if (prev1 && prev2 && prev1 === prev2) {
-                  candidatePool = candidatePool.filter(d => d !== prev1);
-                  // If we filtered everything out (impossible if pool > 1), reset
-                  if (candidatePool.length === 0) candidatePool = [...pool];
-              }
+  // 4. Fill the rest from the pool, avoiding three of the same in a row.
+  for (let i = 0; i < sounding; i++) {
+      if (degrees[i] !== null) continue;
+      let candidates = [...pool];
+      if (i >= 2) {
+          const prev1 = degrees[i - 1];
+          const prev2 = degrees[i - 2];
+          if (prev1 && prev2 && prev1 === prev2) {
+              const thinned = candidates.filter(d => d !== prev1);
+              if (thinned.length) candidates = thinned;
           }
-          
-          degrees[i] = candidatePool[Math.floor(Math.random() * candidatePool.length)];
       }
+      degrees[i] = candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // 5. Convert abstract degrees to playable NoteEvents
+  // 5. Convert abstract degrees to playable NoteEvents. Rests advance the
+  // clock without sounding, so the melody still fills its two bars.
   const melody: NoteEvent[] = [];
   let currentBeat = 0;
   let lastMidi: number | null = null;
   let hasLeaped = false; // Internal flag to track if we've already done a big leap
-  const rhythm = buildRhythm(length, constraints.rhythm || "steady");
+  let soundingIndex = 0;
 
-  degrees.forEach((d, i) => {
-      const safeDegree = d || "1"; 
-      const noteDur = rhythm[i] ?? 2;
-      
+  slots.forEach((slot) => {
+      if (slot.rest) {
+          currentBeat += slot.beats;
+          return;
+      }
+
+      const safeDegree = degrees[soundingIndex] || "1";
+      soundingIndex += 1;
+
       // Pass the difficulty and current leap status
-      const event = createEvent(safeDegree, key, scaleType, currentBeat, noteDur, lastMidi, constraints.difficulty || "normal", hasLeaped, constraints);
+      const event = createEvent(safeDegree, key, scaleType, currentBeat, slot.beats, lastMidi, constraints.difficulty || "normal", hasLeaped, constraints);
 
       // If this specific note created a leap > 7 semitones, trip the flag
       if (lastMidi !== null && Math.abs(event.noteInfo.midi - lastMidi) > 7) {
@@ -258,7 +255,7 @@ function buildMelody(options: GeneratorOptions): NoteEvent[] {
       }
 
       melody.push(event);
-      currentBeat += noteDur;
+      currentBeat += slot.beats;
       lastMidi = event.noteInfo.midi;
   });
 

@@ -34,6 +34,9 @@ export function guitarSampleName(midi: number): string | null {
   return best ? `${best.str}-${best.fret}` : null;
 }
 
+// Long enough not to click, short enough not to blur into the next note.
+const VOCAL_FADE_SECONDS = 0.08;
+
 export const MIN_VOCAL_MIDI = 43; // G2
 export const MAX_VOCAL_MIDI = 67; // G4
 
@@ -297,7 +300,17 @@ export class AudioEngine {
       const buffer = this.noteBuffers.get(id);
       if (buffer) {
         const source = new Tone.ToneBufferSource(buffer).connect(this.vocalGain);
-        source.start(Math.max(0, time), 0, buffer.duration);
+        // Hold the note for as long as it is written for, then fade fast.
+        //
+        // The samples are whole sung syllables, over a second each, and they
+        // used to play to the end whatever the melody said — so a run of
+        // short notes became three voices singing different degrees at once.
+        // The fade starts AT the note's end and runs just past it, which is
+        // what keeps the cut from clicking.
+        source.fadeOut = VOCAL_FADE_SECONDS;
+        const beatSeconds = 60 / Tone.getTransport().bpm.value;
+        const hold = Math.min(note.duration * beatSeconds, buffer.duration);
+        source.start(Math.max(0, time), 0, hold);
       } else {
         console.warn(`Sample not found for ${id}, falling back to synth/piano`);
         this.playSynthOrPiano(note, time);
@@ -431,7 +444,14 @@ export class AudioEngine {
   ) {
     if (!this.isInitialized) return;
     const beatSec = 60 / Tone.getTransport().bpm.value;
-    const melodyDur = notes.reduce((sum, n) => sum + n.duration, 0) * beatSec; 
+    // The melody's length in BARS, not the sum of its notes.
+    //
+    // Rests sound like nothing and so add nothing to that sum, which would
+    // make a melody ending in one measure short — and every pass after it
+    // would start early and drift against the drums. Rounding up to whole
+    // bars keeps each pass on the grid whatever the rhythm does.
+    const sungSpan = Math.max(...notes.map(n => n.startTime + n.duration));
+    const melodyDur = Math.ceil(sungSpan / 4) * 4 * beatSec; 
     
     let safeStartTime = startTime;
     const now = Tone.getTransport().seconds;
