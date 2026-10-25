@@ -240,6 +240,12 @@ export default function App() {
             setNoteLengths={session.setNoteLengths}
             keyAnchor={session.keyAnchor}
             setKeyAnchor={session.setKeyAnchor}
+            levelSynth={session.levelSynth}
+            setLevelSynth={session.setLevelSynth}
+            levelPiano={session.levelPiano}
+            setLevelPiano={session.setLevelPiano}
+            levelGuitar={session.levelGuitar}
+            setLevelGuitar={session.setLevelGuitar}
             playbackSound={session.playbackSound}
             setPlaybackSound={session.setPlaybackSound}
             activeTab={session.activeTab}

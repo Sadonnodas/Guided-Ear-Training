@@ -17,6 +17,13 @@ export function useMixerLogic() {
   const [volBass, setVolBass] = usePersistentState("volBass", 0.7, asVolume);
   const [volPiano, setVolPiano] = usePersistentState("volPiano", 0.6, asVolume);
 
+  // Trim for each melody instrument, on top of its built-in makeup. Which of
+  // the three sounds loudest is partly timbre rather than level, so it is a
+  // judgement for the ear rather than a constant.
+  const [levelSynth, setLevelSynth] = usePersistentState("levelSynth", 1, asNumber(0, 2));
+  const [levelPiano, setLevelPiano] = usePersistentState("levelPiano", 1, asNumber(0, 2));
+  const [levelGuitar, setLevelGuitar] = usePersistentState("levelGuitar", 1, asNumber(0, 2));
+
   // Sync to AudioEngine
   useEffect(() => { audioEngine.setMasterVol(volMaster); }, [volMaster]);
   useEffect(() => { audioEngine.setVocalVol(volVoice); }, [volVoice]);
@@ -27,6 +34,9 @@ export function useMixerLogic() {
   useEffect(() => { audioEngine.setReverbAmt(volReverb); }, [volReverb]);
   useEffect(() => { audioEngine.setBassVolume(volBass); }, [volBass]);
   useEffect(() => { audioEngine.setPianoVolume(volPiano); }, [volPiano]);
+  useEffect(() => { audioEngine.setSynthLevel(levelSynth); }, [levelSynth]);
+  useEffect(() => { audioEngine.setPianoLevel(levelPiano); }, [levelPiano]);
+  useEffect(() => { audioEngine.setGuitarLevel(levelGuitar); }, [levelGuitar]);
 
   return {
     volMaster, setVolMaster,
@@ -38,5 +48,8 @@ export function useMixerLogic() {
     volReverb, setVolReverb,
     volBass, setVolBass,
     volPiano, setVolPiano,
+    levelSynth, setLevelSynth,
+    levelPiano, setLevelPiano,
+    levelGuitar, setLevelGuitar,
   };
 }

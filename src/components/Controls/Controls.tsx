@@ -90,6 +90,12 @@ interface ControlsProps {
   setSingBars: (v: number) => void;
   singKeyFrom: 'chords' | 'degree';
   setSingKeyFrom: (v: 'chords' | 'degree') => void;
+  levelSynth: number;
+  setLevelSynth: (v: number) => void;
+  levelPiano: number;
+  setLevelPiano: (v: number) => void;
+  levelGuitar: number;
+  setLevelGuitar: (v: number) => void;
   exercise: 'echo' | 'identify' | 'findNote';
   setExercise: (v: 'echo' | 'identify' | 'findNote') => void;
   noteLengths: 'steady' | 'varied' | 'complex';
@@ -726,6 +732,26 @@ export default function Controls(props: ControlsProps) {
                       Guitar
                     </div>
                   </div>
+
+                  <div className="section-subtitle">Levels</div>
+                  {([
+                    ['Synth', props.levelSynth, props.setLevelSynth],
+                    ['Piano', props.levelPiano, props.setLevelPiano],
+                    ['Guitar', props.levelGuitar, props.setLevelGuitar],
+                  ] as [string, number, (v: number) => void][]).map(([label, value, set]) => (
+                    <div className="slider-row" key={label}>
+                      <span>{label}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="2"
+                        step="0.05"
+                        value={value}
+                        onChange={e => set(parseFloat(e.target.value))}
+                        title={`Trim the ${label.toLowerCase()} against the other two. 1 is its built-in level.`}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
 

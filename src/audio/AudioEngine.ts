@@ -34,6 +34,12 @@ export function guitarSampleName(midi: number): string | null {
   return best ? `${best.str}-${best.fret}` : null;
 }
 
+// Makeup gains that bring each melody instrument to roughly the same level
+// before the user's own trim. The piano samples are recorded quietly and the
+// guitar ones hot; the synth is loud by construction and trims down.
+const PIANO_MAKEUP = 2.4;
+const GUITAR_MAKEUP = 1.51;
+
 // Long enough not to click, short enough not to blur into the next note.
 const VOCAL_FADE_SECONDS = 0.08;
 
@@ -59,6 +65,7 @@ export class AudioEngine {
   // still rides on top of this (it drives trainingGain).
   private pianoPlaybackGain!: Tone.Gain;
   private guitarPlaybackGain!: Tone.Gain;
+  private synthPlaybackGain!: Tone.Gain;
   private promptGain!: Tone.Gain;
   private transitionSynth!: Tone.MetalSynth;
   private metronome!: Metronome;
@@ -97,6 +104,17 @@ export class AudioEngine {
   // melodies, pitch guide, out-of-vocal-range fallback). Falls back to synth
   // automatically for notes outside the piano sample range (23-67).
   private playbackSound: 'synth' | 'piano' | 'guitar' = 'synth';
+  /**
+   * The instrument the notes currently scheduled were prepared for.
+   *
+   * Separate from playbackSound because a melody's samples are loaded before
+   * it is scheduled: switching instrument mid-melody used to change the
+   * choice without the samples existing yet, so every remaining note fell
+   * through to the synth until the next question reloaded. This only ever
+   * changes once the new instrument's samples are loaded.
+   */
+  private scheduledSound: 'synth' | 'piano' | 'guitar' = 'synth';
+  private scheduledNotes: NoteEvent[] = [];
 
   public onNotePlay: ((note: NoteEvent | null, isClick?: boolean) => void) | null = null;
   public onBeat: ((beatNumber: number) => void) | null = null;
@@ -191,19 +209,27 @@ export class AudioEngine {
     // Piano samples are recorded relatively quiet; bumped from 1.7 → 2.4 so
     // they sit at a comfortable default loudness without needing to push the
     // user-facing fader past unity.
-    this.pianoPlaybackGain = new Tone.Gain(2.4).connect(this.trainingGain);
+    this.pianoPlaybackGain = new Tone.Gain(PIANO_MAKEUP).connect(this.trainingGain);
+
+    // Each melody instrument gets its own trim on top of its makeup gain.
+    // The three are recorded and synthesised at genuinely different levels,
+    // and which one sounds loudest is partly a matter of timbre rather than
+    // level — so this is a judgement for the ear at the mixer, not a constant
+    // to be argued about in here.
+    this.synthPlaybackGain = new Tone.Gain(1).connect(this.trainingGain);
 
     // Spoken prompts go straight to the master, dry: they are an instruction,
     // not music, and reverb on a spoken word costs clarity for nothing.
     this.promptGain = new Tone.Gain(1).connect(this.masterGain);
 
     // Guitar samples are recorded hotter than the piano ones, so they need
-    // less makeup to sit at the same loudness under the same fader.
-    this.guitarPlaybackGain = new Tone.Gain(1.2).connect(this.trainingGain);
+    // less makeup to sit at the same loudness under the same fader. Nudged up
+    // 2dB from 1.2 on report that guitar sat under the others.
+    this.guitarPlaybackGain = new Tone.Gain(GUITAR_MAKEUP).connect(this.trainingGain);
 
     this.trainingSynth.connect(trainingCompressor);
     trainingCompressor.connect(makeupGain);
-    makeupGain.connect(this.trainingGain);
+    makeupGain.connect(this.synthPlaybackGain);
 
     this.transitionSynth = new Tone.MetalSynth({
       envelope: { attack: 0.001, decay: 0.3, release: 0.1 },
@@ -243,6 +269,23 @@ export class AudioEngine {
    */
   public setPlaybackSound(sound: 'synth' | 'piano' | 'guitar') {
     this.playbackSound = sound;
+
+    // Nothing is playing, or the synth needs no samples: switch now.
+    if (!this.isInitialized || sound === 'synth' || this.scheduledNotes.length === 0) {
+      this.scheduledSound = sound;
+      return;
+    }
+
+    // Otherwise fetch what the notes already scheduled would need, and switch
+    // when it is there. Until then the melody stays on the instrument it
+    // started on, which is the one whose samples are loaded.
+    const midis = this.scheduledNotes.map(n => n.noteInfo.midi);
+    const loading = sound === 'guitar'
+      ? this.loadGuitarBuffers(midis)
+      : this.loadPianoBuffers(midis);
+    loading
+      .then(() => { if (this.playbackSound === sound) this.scheduledSound = sound; })
+      .catch(() => { /* keep the instrument that can actually sound */ });
   }
 
   /**
@@ -251,7 +294,7 @@ export class AudioEngine {
    * Routes through trainingGain so the existing "Guide" volume slider works.
    */
   private playSynthOrPiano(note: NoteEvent, time: number) {
-    if (this.playbackSound === 'guitar') {
+    if (this.scheduledSound === 'guitar') {
       const guitarBuffer = this.guitarBuffers.get(note.noteInfo.midi);
       if (guitarBuffer) {
         const source = new Tone.ToneBufferSource(guitarBuffer).connect(this.guitarPlaybackGain);
@@ -261,7 +304,7 @@ export class AudioEngine {
       // Outside E2-E5, or not loaded yet — fall through to the synth.
     }
 
-    if (this.playbackSound === 'piano') {
+    if (this.scheduledSound === 'piano') {
       const pianoBuffer = this.pianoBuffers.get(note.noteInfo.midi);
       if (pianoBuffer) {
         const source = new Tone.ToneBufferSource(pianoBuffer).connect(this.pianoPlaybackGain);
@@ -443,6 +486,13 @@ export class AudioEngine {
     fretboardMode: boolean = false // FIX #3: Add fretboardMode parameter
   ) {
     if (!this.isInitialized) return;
+
+    // Remember what is playing and on which instrument. Switching instrument
+    // mid-melody needs both: which notes to fetch samples for, and what to
+    // keep sounding until they arrive.
+    this.scheduledNotes = notes;
+    this.scheduledSound = this.playbackSound;
+
     const beatSec = 60 / Tone.getTransport().bpm.value;
     // The melody's length in BARS, not the sum of its notes.
     //
@@ -782,6 +832,19 @@ export class AudioEngine {
     if (this.bassGain) this.bassGain.gain.rampTo(vol, 0.1);
   }
   
+  /** User trim for each melody instrument, 1 being its built-in level. */
+  public setSynthLevel(vol: number) {
+    if (this.synthPlaybackGain) this.synthPlaybackGain.gain.rampTo(vol, 0.1);
+  }
+
+  public setPianoLevel(vol: number) {
+    if (this.pianoPlaybackGain) this.pianoPlaybackGain.gain.rampTo(PIANO_MAKEUP * vol, 0.1);
+  }
+
+  public setGuitarLevel(vol: number) {
+    if (this.guitarPlaybackGain) this.guitarPlaybackGain.gain.rampTo(GUITAR_MAKEUP * vol, 0.1);
+  }
+
   public setPianoVolume(vol: number) {
     if (this.pianoGain) this.pianoGain.gain.rampTo(vol, 0.1);
   }
